@@ -2,12 +2,13 @@
   "name": "bizreplyai-frontend",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.26.2",
   "scripts": {
     "dev": "next dev -p 5173",
     "build": "next build",
     "start": "next start -p 5173",
     "lint": "eslint",
-    "test": "npm run lint && npm run build",
+    "test": "pnpm lint && pnpm build",
     "prepare": "husky"
   },
   "dependencies": {
