@@ -1,6 +1,6 @@
 "use client";
 
-import { ContactRound, CreditCard, LayoutDashboard, Menu, Users } from "lucide-react";
+import { ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { UserAccountMenu } from "@/components/account/user-account-menu";
@@ -63,6 +63,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const navItems: SidebarNavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main" },
     { label: "Leads", href: "/leads", icon: ContactRound, section: "main" },
+    { label: "Inbox", href: "/conversations", icon: MessageSquareText, section: "main" },
     { label: "Team members", href: "/settings/members", icon: Users, section: "workspace", visible: profile.data.permissions.includes("members:manage") },
     { label: "Billing & plan", href: "/settings/billing", icon: CreditCard, section: "workspace" },
   ];
