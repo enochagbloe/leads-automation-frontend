@@ -1,6 +1,18 @@
 export type LeadSource = "MANUAL" | "WHATSAPP" | "WEBSITE" | "REFERRAL" | "INSTAGRAM" | "FACEBOOK" | "OTHER";
 export type LeadStatus = "NEW" | "CONTACTED" | "INTERESTED" | "QUALIFIED" | "APPOINTMENT_SCHEDULED" | "WON" | "LOST";
-export type LeadActivityAction = "LEAD_CREATED" | "LEAD_UPDATED" | "LEAD_ASSIGNED" | "LEAD_STATUS_CHANGED" | "LEAD_NOTE_UPDATED" | "LEAD_DELETED";
+export type LeadActivityAction =
+  | "LEAD_CREATED"
+  | "LEAD_UPDATED"
+  | "LEAD_ASSIGNED"
+  | "LEAD_STATUS_CHANGED"
+  | "LEAD_NOTE_UPDATED"
+  | "LEAD_DELETED"
+  | "CONVERSATION_CREATED"
+  | "CONVERSATION_ASSIGNED"
+  | "CONVERSATION_STATUS_CHANGED"
+  | "CONVERSATION_DELETED"
+  | "MESSAGE_CREATED"
+  | "CONVERSATION_MARKED_READ";
 export type LeadSortBy = "createdAt" | "updatedAt" | "fullName" | "status" | "lastContactedAt";
 export type SortOrder = "asc" | "desc";
 
@@ -83,4 +95,4 @@ export interface LeadInput {
   customFields?: Record<string, unknown> | null;
 }
 
-export type UpdateLeadInput = Partial<LeadInput>;
+export type UpdateLeadInput = Partial<Omit<LeadInput, "assignedStaffId">>;

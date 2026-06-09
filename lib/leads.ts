@@ -30,7 +30,18 @@ export const LEAD_ACTIVITY_LABELS: Record<LeadActivityAction, string> = {
   LEAD_STATUS_CHANGED: "Status changed",
   LEAD_NOTE_UPDATED: "Notes updated",
   LEAD_DELETED: "Lead deleted",
+  CONVERSATION_CREATED: "Conversation created",
+  CONVERSATION_ASSIGNED: "Conversation assigned",
+  CONVERSATION_STATUS_CHANGED: "Conversation status changed",
+  CONVERSATION_DELETED: "Conversation deleted",
+  MESSAGE_CREATED: "Message created",
+  CONVERSATION_MARKED_READ: "Conversation marked read",
 };
+
+export function getLeadActivityLabel(action: string) {
+  return LEAD_ACTIVITY_LABELS[action as LeadActivityAction]
+    ?? action.replaceAll("_", " ").toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
+}
 
 export function leadStatusTone(status: LeadStatus) {
   if (status === "WON") return "bg-success/10 text-success";
