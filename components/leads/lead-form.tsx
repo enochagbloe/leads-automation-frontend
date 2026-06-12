@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { AppButton } from "@/components/app-button";
@@ -11,24 +12,32 @@ import { AppFormField } from "@/components/app-form-field";
 import { AppInput } from "@/components/app-input";
 import { AppSelect } from "@/components/app-select";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { useCreateLead, useUpdateLead } from "@/hooks/use-leads";
+import { useAssignLead, useCreateLead, useUpdateLead } from "@/hooks/use-leads";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import { applyApiFieldErrors } from "@/lib/form-errors";
 import { LEAD_SOURCES, LEAD_SOURCE_LABELS, LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/leads";
 import { leadFormSchema, type LeadFormValues } from "@/schemas/lead";
-import type { Lead, LeadInput } from "@/types/lead";
+import type { Lead, LeadInput, UpdateLeadInput } from "@/types/lead";
 
-function toInput(values: LeadFormValues): LeadInput {
+function toUpdateInput(values: LeadFormValues): UpdateLeadInput {
   return {
     fullName: values.fullName.trim(),
     phone: values.phone.trim(),
     email: values.email.trim() || null,
     source: values.source,
     status: values.status,
-    assignedStaffId: values.assignedStaffId || null,
     notes: values.notes.trim() || null,
     tags: [...new Set(values.tagsText.split(",").map((tag) => tag.trim()).filter(Boolean))],
     customFields: values.customFieldsText.trim() ? JSON.parse(values.customFieldsText) as Record<string, unknown> : null,
+  };
+}
+
+function toCreateInput(values: LeadFormValues): LeadInput {
+  return {
+    ...toUpdateInput(values),
+    fullName: values.fullName.trim(),
+    phone: values.phone.trim(),
+    assignedStaffId: values.assignedStaffId || null,
   };
 }
 
@@ -37,14 +46,15 @@ export function LeadForm({ lead }: { lead?: Lead }) {
   const profile = useCurrentUser();
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
-  const mutation = lead ? updateLead : createLead;
+  const assignLead = useAssignLead();
+  const mutationPending = lead ? updateLead.isPending || assignLead.isPending : createLead.isPending;
   const canAssign = profile.data?.role !== "STAFF";
   const staffEdit = Boolean(lead && profile.data?.role === "STAFF");
   const currentMembership = profile.data?.membership;
   const assigneeOptions = [
     { value: "__unassigned", label: "Unassigned" },
     ...(lead?.assignedStaff ? [{ value: lead.assignedStaff.id, label: `${lead.assignedStaff.user.firstName} ${lead.assignedStaff.user.lastName}`, description: lead.assignedStaff.user.email }] : []),
-    ...(currentMembership && ["MANAGER", "STAFF"].includes(currentMembership.role) && currentMembership.id !== lead?.assignedStaff?.id
+    ...(currentMembership && currentMembership.id !== lead?.assignedStaff?.id
       ? [{ value: currentMembership.id, label: "Assign to me", description: profile.data?.user.email }]
       : []),
   ];
@@ -56,31 +66,54 @@ export function LeadForm({ lead }: { lead?: Lead }) {
       email: lead?.email ?? "",
       source: lead?.source ?? "MANUAL",
       status: lead?.status ?? "NEW",
-      assignedStaffId: lead?.assignedStaffId ?? "",
+      assignedStaffId: lead?.assignedStaffId ?? (!lead && currentMembership ? currentMembership.id : ""),
       notes: lead?.notes ?? "",
       tagsText: lead?.tags.join(", ") ?? "",
       customFieldsText: lead?.customFields ? JSON.stringify(lead.customFields, null, 2) : "",
     },
   });
 
-  const submit = form.handleSubmit((values) => {
-    const input = toInput({ ...values, assignedStaffId: values.assignedStaffId === "__unassigned" ? "" : values.assignedStaffId });
-    const options = {
-      onSuccess: (savedLead: Lead) => {
-        toast.success(lead ? "Lead updated" : "Lead created");
+  useEffect(() => {
+    if (!lead && currentMembership && !form.getValues("assignedStaffId")) {
+      form.setValue("assignedStaffId", currentMembership.id);
+    }
+  }, [currentMembership, form, lead]);
+
+  const submit = form.handleSubmit(async (values) => {
+    const normalizedAssignedStaffId = values.assignedStaffId === "__unassigned" ? "" : values.assignedStaffId;
+    const normalizedValues = { ...values, assignedStaffId: normalizedAssignedStaffId };
+
+    try {
+      if (!lead) {
+        const savedLead = await createLead.mutateAsync(toCreateInput(normalizedValues));
+        toast.success("Lead created");
         router.push(`/leads?lead=${savedLead.id}`);
-      },
-      onError: (error: unknown) => {
-        if (error instanceof ApiError && error.code === "DUPLICATE_LEAD") {
-          form.setError("phone", { type: "server", message: "A lead with this phone number already exists in this business." });
-        } else {
-          applyApiFieldErrors(error, form.setError);
-          toast.error("Could not save lead", { description: getApiErrorMessage(error) });
-        }
-      },
-    };
-    if (lead) updateLead.mutate({ id: lead.id, input: staffEdit ? { status: input.status, notes: input.notes } : input }, options);
-    else createLead.mutate(input, options);
+        return;
+      }
+
+      const input = toUpdateInput(normalizedValues);
+      await updateLead.mutateAsync({
+        id: lead.id,
+        input: staffEdit ? { status: input.status, notes: input.notes } : input,
+      });
+
+      if (canAssign && normalizedAssignedStaffId !== (lead.assignedStaffId ?? "")) {
+        await assignLead.mutateAsync({
+          id: lead.id,
+          assignedStaffId: normalizedAssignedStaffId || null,
+        });
+      }
+
+      toast.success("Lead updated");
+      router.push(`/leads?lead=${lead.id}`);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "DUPLICATE_LEAD") {
+        form.setError("phone", { type: "server", message: "A lead with this phone number already exists in this business." });
+      } else {
+        applyApiFieldErrors(error, form.setError);
+        toast.error("Could not save lead", { description: getApiErrorMessage(error) });
+      }
+    }
   });
 
   return (
@@ -98,7 +131,7 @@ export function LeadForm({ lead }: { lead?: Lead }) {
       {!staffEdit && <AppFormField id="customFieldsText" label="Custom fields" hint='Optional JSON object, for example: { "budget": "GHS 5,000" }' error={form.formState.errors.customFieldsText?.message}><textarea id="customFieldsText" rows={4} spellCheck={false} className="w-full resize-y rounded-lg border border-input bg-card px-3 py-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20" {...form.register("customFieldsText")} /></AppFormField>}
       <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-between">
         <AppButton variant="ghost" asChild><Link href={lead ? `/leads?lead=${lead.id}` : "/leads"}><ArrowLeft className="size-4" />Cancel</Link></AppButton>
-        <AppButton type="submit" loading={mutation.isPending} loadingText="Saving lead"><Save className="size-4" />{lead ? "Save changes" : "Create lead"}</AppButton>
+        <AppButton type="submit" loading={mutationPending} loadingText="Saving lead"><Save className="size-4" />{lead ? "Save changes" : "Create lead"}</AppButton>
       </div>
     </form>
   );

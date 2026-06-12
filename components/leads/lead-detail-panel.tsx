@@ -29,7 +29,7 @@ import { LeadStatusBadge } from "@/components/leads/lead-status-badge";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAssignLead, useLead, useUpdateLeadStatus } from "@/hooks/use-leads";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
-import { formatLeadDate, LEAD_ACTIVITY_LABELS, LEAD_SOURCE_LABELS, LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/leads";
+import { formatLeadDate, getLeadActivityLabel, LEAD_SOURCE_LABELS, LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/leads";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadActivity, LeadStatus } from "@/types/lead";
 
@@ -61,9 +61,15 @@ function activityDescription(activity: LeadActivity) {
   if (activity.action === "LEAD_STATUS_CHANGED" && typeof activity.metadata?.to === "string") {
     return `${actor} changed status to ${String(activity.metadata.to).replaceAll("_", " ").toLowerCase()}`;
   }
-  if (activity.action === "LEAD_ASSIGNED") return `${actor} updated the lead owner`;
+  if (activity.action === "LEAD_ASSIGNED") {
+    const previousAssignee = activity.metadata?.previousAssignedStaffId ?? activity.metadata?.from;
+    const newAssignee = activity.metadata?.newAssignedStaffId ?? activity.metadata?.to;
+    if (newAssignee === null) return `${actor} cleared the lead assignment`;
+    if (previousAssignee === null || previousAssignee === undefined) return `${actor} assigned the lead`;
+    return `${actor} reassigned the lead`;
+  }
   if (activity.action === "LEAD_NOTE_UPDATED") return `${actor} updated the lead notes`;
-  return `${actor} ${LEAD_ACTIVITY_LABELS[activity.action].toLowerCase()}`;
+  return `${actor} ${getLeadActivityLabel(activity.action).toLowerCase()}`;
 }
 
 function LeadPanelSkeleton() {
@@ -121,7 +127,7 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
   const assigneeOptions = lead ? [
     { value: "__unassigned", label: "Unassigned" },
     ...(lead.assignedStaff ? [{ value: lead.assignedStaff.id, label: `${lead.assignedStaff.user.firstName} ${lead.assignedStaff.user.lastName}`, description: lead.assignedStaff.user.email }] : []),
-    ...(profile.data?.membership && ["MANAGER", "STAFF"].includes(profile.data.membership.role) && profile.data.membership.id !== lead.assignedStaffId
+    ...(profile.data?.membership && profile.data.membership.id !== lead.assignedStaffId
       ? [{ value: profile.data.membership.id, label: "Assign to me", description: profile.data.user.email }]
       : []),
   ] : [];
@@ -206,7 +212,13 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
                   disabled={assignLead.isPending}
                   onValueChange={(assignedStaffId) => assignLead.mutate(
                     { id: detail.data.lead.id, assignedStaffId: assignedStaffId === "__unassigned" ? null : assignedStaffId },
-                    { onSuccess: () => toast.success("Assignment updated"), onError: (error) => toast.error("Could not update assignment", { description: getApiErrorMessage(error) }) },
+                    {
+                      onSuccess: () => toast.success("Assignment updated"),
+                      onError: (error) => {
+                        if (error instanceof ApiError && error.code === "INVALID_LEAD_ASSIGNEE") void detail.refetch();
+                        toast.error("Could not update assignment", { description: getApiErrorMessage(error) });
+                      },
+                    },
                   )}
                 />
               </div>
