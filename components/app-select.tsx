@@ -96,7 +96,7 @@ export function AppSelect({
           sideOffset={6}
           collisionPadding={12}
           className={cn(
-            "app-select-content z-[70] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-[0_14px_40px_rgba(20,35,27,0.14),0_2px_8px_rgba(20,35,27,0.06)]",
+            "app-select-content z-[100] max-h-[min(320px,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-[0_14px_40px_rgba(20,35,27,0.14),0_2px_8px_rgba(20,35,27,0.06)]",
             contentClassName,
           )}
         >

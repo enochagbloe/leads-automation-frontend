@@ -18,6 +18,7 @@ import { AppEmptyState } from "@/components/app-empty-state";
 import { AppErrorState } from "@/components/app-error-state";
 import { AppInput } from "@/components/app-input";
 import { AppSelect } from "@/components/app-select";
+import { ConversationChannelBadge } from "@/components/conversations/conversation-channel-badge";
 import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
 import { ConversationWorkspace } from "@/components/conversations/conversation-workspace";
 import { CreateConversationDialog } from "@/components/conversations/create-conversation-dialog";
@@ -81,8 +82,9 @@ function ConversationListItem({ conversation, onSelect }: { conversation: Conver
       <span className={cn("grid size-11 shrink-0 place-items-center rounded-full text-xs font-bold", conversation.unreadCount > 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-primary")}>{initials(conversation.lead.fullName)}</span>
       <span className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2"><span className={cn("flex min-w-0 items-center gap-1 truncate text-sm", conversation.unreadCount > 0 ? "font-bold" : "font-semibold")}>{conversation.pinned && <Pin className="size-3 shrink-0 fill-current text-primary" />}<span className="truncate">{conversation.lead.fullName}</span></span><span className="shrink-0 text-[10px] font-medium text-muted-foreground">{formatConversationTime(conversation.lastMessageAt ?? conversation.updatedAt)}</span></span>
+        <span className="mt-1 block truncate text-[11px] font-medium text-muted-foreground">{conversation.lead.phone}</span>
         <span className="mt-1 block truncate text-xs text-muted-foreground">{conversation.lastMessagePreview ?? conversation.subject ?? "No messages yet"}</span>
-        <span className="mt-3 flex items-center gap-2"><ConversationStatusBadge status={conversation.status} compact /><span className="truncate text-[10px] font-medium text-muted-foreground">{conversation.displayId} · {assigneeName(conversation)}</span>{conversation.unreadCount > 0 && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">{conversation.unreadCount}</span>}</span>
+        <span className="mt-3 flex flex-wrap items-center gap-2"><ConversationStatusBadge status={conversation.status} compact /><ConversationChannelBadge channel={conversation.channel} compact /><span className="min-w-0 flex-1 truncate text-[10px] font-medium text-muted-foreground">{conversation.displayId} · {assigneeName(conversation)}</span>{conversation.unreadCount > 0 && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">{conversation.unreadCount}</span>}</span>
       </span>
     </button>
   );
@@ -159,6 +161,7 @@ export function ConversationsInbox() {
   const leadDetail = useLead(currentDetail?.conversation.leadId ?? "");
   const sendMessage = useSendMessage();
   const markRead = useMarkConversationRead();
+  const markConversationRead = markRead.mutate;
   const updateStatus = useUpdateConversationStatus();
   const updateConversation = useUpdateConversation();
   const assign = useAssignConversation();
@@ -182,8 +185,8 @@ export function ConversationsInbox() {
   };
 
   useEffect(() => {
-    if (selectedConversation?.unreadCount) markRead.mutate(selectedConversation.id);
-  }, [selectedConversation?.id, selectedConversation?.unreadCount]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (selectedConversation?.unreadCount) markConversationRead(selectedConversation.id);
+  }, [markConversationRead, selectedConversation?.id, selectedConversation?.unreadCount]);
 
   const send = () => {
     const content = draft.trim();
@@ -205,7 +208,7 @@ export function ConversationsInbox() {
   const assigneeOptions = selectedConversation ? [
     { value: "__unassigned", label: "Unassigned" },
     ...(selectedConversation.assignedStaff ? [{ value: selectedConversation.assignedStaff.id, label: assigneeName(selectedConversation), description: selectedConversation.assignedStaff.user.email }] : []),
-    ...(profile.data?.membership && ["MANAGER", "STAFF"].includes(profile.data.membership.role) && profile.data.membership.id !== selectedConversation.assignedStaffId
+    ...(profile.data?.membership && profile.data.membership.id !== selectedConversation.assignedStaffId
       ? [{ value: profile.data.membership.id, label: "Assign to me", description: profile.data.user.email }]
       : []),
   ] : [];

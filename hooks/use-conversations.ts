@@ -5,14 +5,28 @@ import { queryKeys } from "@/lib/query-keys";
 import { conversationService } from "@/services/conversation-service";
 import type { Conversation, ConversationListQuery } from "@/types/conversation";
 
-export const useConversations = (query: ConversationListQuery) => useQuery({ queryKey: queryKeys.conversations.list(query), queryFn: () => conversationService.list(query) });
-export const useConversationStats = () => useQuery({ queryKey: queryKeys.conversations.stats, queryFn: conversationService.stats });
+const CONVERSATION_POLL_INTERVAL = 10_000;
+
+export const useConversations = (query: ConversationListQuery) => useQuery({
+  queryKey: queryKeys.conversations.list(query),
+  queryFn: () => conversationService.list(query),
+  refetchInterval: CONVERSATION_POLL_INTERVAL,
+  refetchIntervalInBackground: false,
+});
+export const useConversationStats = () => useQuery({
+  queryKey: queryKeys.conversations.stats,
+  queryFn: conversationService.stats,
+  refetchInterval: CONVERSATION_POLL_INTERVAL,
+  refetchIntervalInBackground: false,
+});
 export const useConversation = (id: string) => useInfiniteQuery({
   queryKey: queryKeys.conversations.detail(id),
   queryFn: ({ pageParam }) => conversationService.detail(id, pageParam),
   initialPageParam: undefined as string | undefined,
   getNextPageParam: (page) => page.messagePagination.nextBeforeMessageId ?? undefined,
   enabled: Boolean(id),
+  refetchInterval: id ? CONVERSATION_POLL_INTERVAL : false,
+  refetchIntervalInBackground: false,
 });
 
 function useConversationMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<Conversation>) {

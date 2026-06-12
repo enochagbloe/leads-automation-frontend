@@ -1,4 +1,4 @@
-# BizReply AI Design System
+pnpm# BizReply AI Design System
 
 - Product direction: trustworthy, restrained B2B SaaS.
 - Primary UI font: Inter. Sora is reserved for future marketing display use.

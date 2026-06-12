@@ -112,7 +112,8 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
     );
   }
 
-  const outbound = message.senderType === "STAFF" || message.senderType === "AI";
+  const inboundCustomer = message.senderType === "CUSTOMER" && message.direction === "INBOUND";
+  const outbound = !inboundCustomer && (message.direction === "OUTBOUND" || message.senderType === "STAFF" || message.senderType === "AI");
   const senderName = message.senderType === "AI"
     ? "AI assistant"
     : message.senderUser
@@ -136,7 +137,17 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
           {article && <ArticleMessageCard article={article} />}
         </div>
         <p className={cn("mt-1.5 text-[10px] text-muted-foreground", outbound && "text-right")}>
-          {message.deliveryStatus === "FAILED" ? "Could not save" : message.deliveryStatus === "PENDING" ? "Saving..." : "Stored in BizReply"}
+          {message.deliveryStatus === "FAILED"
+            ? "Could not save"
+            : message.deliveryStatus === "PENDING"
+              ? "Saving..."
+              : message.deliveryStatus === "DELIVERED"
+                ? "Delivered"
+                : message.deliveryStatus === "READ"
+                  ? "Read"
+                  : message.deliveryStatus === "SENT"
+                    ? "Sent"
+                    : "Stored internally"}
         </p>
       </div>
     </article>
@@ -179,6 +190,31 @@ const REPLY_MACROS: Macro[] = [
 
 function MessageComposer({ draft, onDraftChange, onSend, sending, closed, channel, senderName }: { draft: string; onDraftChange: (value: string) => void; onSend: () => void; sending: boolean; closed: boolean; channel: Conversation["channel"]; senderName: string }) {
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const emojiRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiRef.current && !emojiRef.current.contains(event.target as Node)) {
+        setEmojiOpen(false);
+      }
+    };
+
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setEmojiOpen(false);
+      }
+    };
+
+    if (emojiOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscKey);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("keydown", handleEscKey);
+      };
+    }
+  }, [emojiOpen]);
+
   if (closed) {
     return <div className="border-t bg-card px-4 py-3"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3"><div><p className="text-sm font-semibold">This conversation is closed</p><p className="text-xs text-muted-foreground">Reopen it before sending another stored message.</p></div></div></div>;
   }
@@ -203,28 +239,25 @@ function MessageComposer({ draft, onDraftChange, onSend, sending, closed, channe
           onSendMessage={onSend}
           onOpenEmojiPicker={() => setEmojiOpen((open) => !open)}
         />
-        {emojiOpen && <div className="absolute bottom-12 left-10 z-20 flex w-56 flex-wrap gap-1 rounded-xl border bg-popover p-2 shadow-[0_14px_40px_rgba(20,35,27,0.16)]" aria-label="Emoji picker">{["🙂", "👍", "🙏", "✅", "🎉", "📅", "📍", "💬", "❤️", "👋", "😊", "🤝"].map((emoji) => <button key={emoji} type="button" className="grid size-9 place-items-center rounded-lg text-lg transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { onDraftChange(`${draft}${emoji}`); setEmojiOpen(false); }}>{emoji}</button>)}</div>}
+        {emojiOpen && <div ref={emojiRef} className="absolute bottom-12 left-10 z-20 flex w-56 flex-wrap gap-1 rounded-xl border bg-popover p-2 shadow-[0_14px_40px_rgba(20,35,27,0.16)]" aria-label="Emoji picker">{["🙂", "👍", "🙏", "✅", "🎉", "📅", "📍", "💬", "❤️", "👋", "😊", "🤝"].map((emoji) => <button key={emoji} type="button" className="grid size-9 place-items-center rounded-lg text-lg transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { onDraftChange(`${draft}${emoji}`); setEmojiOpen(false); }}>{emoji}</button>)}</div>}
         <p className="mt-1.5 px-1 text-[10px] text-muted-foreground">Stored in BizReply only. External channel delivery is not active yet.</p>
       </div>
     </div>
   );
 }
 
-function ArticleFilterPopover({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const [visibility, setVisibility] = useState("ALL");
-  const [frequency, setFrequency] = useState("ALL");
-  const [tags, setTags] = useState<string[]>([]);
+function ArticleFilterPopover({ open, onOpenChange, visibility, onVisibilityChange, frequency, onFrequencyChange, tags, onTagsChange }: { open: boolean; onOpenChange: (open: boolean) => void; visibility: string; onVisibilityChange: (value: string) => void; frequency: string; onFrequencyChange: (value: string) => void; tags: string[]; onTagsChange: (tags: string[]) => void }) {
   if (!open) return null;
   const availableTags = ["Payment", "Setup", "Website", "Error", "Guideline"];
   return (
     <div className="absolute right-12 top-14 z-20 w-[min(300px,calc(100vw-2rem))] rounded-xl border bg-popover p-4 shadow-[0_18px_50px_rgba(20,35,27,0.18)]">
-      <div className="flex items-center justify-between"><p className="text-sm font-bold">Article filters</p><button type="button" className="text-xs font-semibold text-primary" onClick={() => { setVisibility("ALL"); setFrequency("ALL"); setTags([]); }}>Reset</button></div>
+      <div className="flex items-center justify-between"><p className="text-sm font-bold">Article filters</p><button type="button" className="text-xs font-semibold text-primary" onClick={() => { onVisibilityChange("ALL"); onFrequencyChange("ALL"); onTagsChange([]); }}>Reset</button></div>
       <label className="mt-4 block text-xs font-semibold">Visibility</label>
-      <AppSelect className="mt-1" value={visibility} onValueChange={setVisibility} options={[{ value: "ALL", label: "Public and private" }, { value: "PUBLIC", label: "Public" }, { value: "PRIVATE", label: "Private" }]} />
+      <AppSelect className="mt-1" value={visibility} onValueChange={onVisibilityChange} options={[{ value: "ALL", label: "Public and private" }, { value: "PUBLIC", label: "Public" }, { value: "PRIVATE", label: "Private" }]} />
       <label className="mt-4 block text-xs font-semibold">Frequency</label>
-      <AppSelect className="mt-1" value={frequency} onValueChange={setFrequency} options={[{ value: "ALL", label: "All frequencies" }, { value: "FAQ", label: "Frequently asked" }, { value: "RARE", label: "Rarely asked" }]} />
+      <AppSelect className="mt-1" value={frequency} onValueChange={onFrequencyChange} options={[{ value: "ALL", label: "All frequencies" }, { value: "FAQ", label: "Frequently asked" }, { value: "RARE", label: "Rarely asked" }]} />
       <p className="mt-4 text-xs font-semibold">Tags</p>
-      <div className="mt-2 flex flex-wrap gap-1.5">{availableTags.map((tag) => <button type="button" key={tag} onClick={() => setTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag])} className={cn("rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors", tags.includes(tag) ? "border-primary bg-secondary text-primary" : "bg-card text-muted-foreground hover:bg-muted")}>{tag}</button>)}</div>
+      <div className="mt-2 flex flex-wrap gap-1.5">{availableTags.map((tag) => <button type="button" key={tag} onClick={() => onTagsChange(tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag])} className={cn("rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors", tags.includes(tag) ? "border-primary bg-secondary text-primary" : "bg-card text-muted-foreground hover:bg-muted")}>{tag}</button>)}</div>
       <AppButton className="mt-5 w-full" size="sm" onClick={() => onOpenChange(false)}>Apply filters</AppButton>
     </div>
   );
@@ -234,7 +267,16 @@ function KnowledgeBaseDrawer({ onSuggest }: { onSuggest: (article: Article) => v
   const [query, setQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const articles = ARTICLES.filter((article) => `${article.title} ${article.summary} ${article.tag}`.toLowerCase().includes(query.toLowerCase()));
+  const [visibility, setVisibility] = useState("ALL");
+  const [frequency, setFrequency] = useState("ALL");
+  const [tags, setTags] = useState<string[]>([]);
+  const articles = ARTICLES.filter((article) => {
+    const matchesQuery = `${article.title} ${article.summary} ${article.tag}`.toLowerCase().includes(query.toLowerCase());
+    const matchesVisibility = visibility === "ALL" || article.visibility === visibility;
+    const matchesFrequency = frequency === "ALL" || article.frequency === frequency;
+    const matchesTags = tags.length === 0 || tags.includes(article.tag);
+    return matchesQuery && matchesVisibility && matchesFrequency && matchesTags;
+  });
   if (selectedArticle) {
     return (
       <div className="flex h-full flex-col">
@@ -260,7 +302,7 @@ function KnowledgeBaseDrawer({ onSuggest }: { onSuggest: (article: Article) => v
           <AppButton size="icon" variant="outline" aria-label="Create article coming soon" title="Article creation coming soon" disabled><Plus className="size-4" /></AppButton>
         </div>
       </div>
-      <ArticleFilterPopover open={filterOpen} onOpenChange={setFilterOpen} />
+      <ArticleFilterPopover open={filterOpen} onOpenChange={setFilterOpen} visibility={visibility} onVisibilityChange={setVisibility} frequency={frequency} onFrequencyChange={setFrequency} tags={tags} onTagsChange={setTags} />
       <div className="min-h-0 flex-1 divide-y overflow-y-auto">
         {articles.map((article) => (
           <article key={article.id} className="p-4">
