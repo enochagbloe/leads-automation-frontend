@@ -22,6 +22,7 @@ import { ConversationChannelBadge } from "@/components/conversations/conversatio
 import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
 import { ConversationWorkspace } from "@/components/conversations/conversation-workspace";
 import { CreateConversationDialog } from "@/components/conversations/create-conversation-dialog";
+import { RealtimeStatusIndicator } from "@/components/conversations/realtime-status-indicator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentUser } from "@/hooks/use-auth";
 import {
@@ -110,7 +111,7 @@ function InboxList({
     <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6">
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-wrap items-end justify-between gap-4">
-          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Communication center</p><h1 className="mt-1 text-2xl font-bold">Inbox</h1><p className="mt-1 text-sm text-muted-foreground">Review stored customer conversations and team follow-up.</p></div>
+          <div><div className="flex items-center gap-2"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Communication center</p><RealtimeStatusIndicator /></div><h1 className="mt-1 text-2xl font-bold">Inbox</h1><p className="mt-1 text-sm text-muted-foreground">Review stored customer conversations and team follow-up.</p></div>
           <AppButton onClick={onCreate}><MessageSquarePlus className="size-4" />New conversation</AppButton>
         </header>
 

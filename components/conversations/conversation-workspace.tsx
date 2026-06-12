@@ -36,6 +36,7 @@ import { AppEmptyState } from "@/components/app-empty-state";
 import { AppSelect, type AppSelectOption } from "@/components/app-select";
 import { ConversationComposer, type Macro } from "@/components/conversations/composer/conversation-composer";
 import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
+import { RealtimeStatusIndicator } from "@/components/conversations/realtime-status-indicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ACTIVE_CONVERSATION_STATUSES, CONVERSATION_CHANNEL_LABELS, CONVERSATION_PRIORITIES, CONVERSATION_PRIORITY_LABELS, CONVERSATION_STATUS_LABELS, conversationPriorityTone, formatConversationDateTime, formatMessageTime } from "@/lib/conversations";
 import { formatLeadDate, getLeadActivityLabel, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, leadStatusTone } from "@/lib/leads";
@@ -528,6 +529,7 @@ export function ConversationWorkspace({
             </div>
             <p className="mt-0.5 flex items-center gap-2 truncate text-[11px] text-muted-foreground"><span className="truncate">{conversation.lead.fullName} · {CONVERSATION_CHANNEL_LABELS[conversation.channel]} channel</span><span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold", conversationPriorityTone(conversation.priority))}>{CONVERSATION_PRIORITY_LABELS[conversation.priority]}</span></p>
           </div>
+          <RealtimeStatusIndicator className="hidden sm:inline-flex" />
           <AppButton size="icon" variant={conversation.pinned ? "secondary" : "ghost"} className="shrink-0" loading={updateBusy} aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"} aria-pressed={conversation.pinned} onClick={() => onUpdate({ pinned: !conversation.pinned })}>{conversation.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}</AppButton>
           {canManage && <div className="hidden w-32 xl:block"><AppSelect aria-label="Conversation priority" value={conversation.priority} options={CONVERSATION_PRIORITIES.map((priority) => ({ value: priority, label: CONVERSATION_PRIORITY_LABELS[priority] }))} disabled={updateBusy} onValueChange={(priority) => onUpdate({ priority: priority as Conversation["priority"] })} /></div>}
           {conversation.status === "CLOSED"

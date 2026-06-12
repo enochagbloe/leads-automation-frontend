@@ -7,6 +7,7 @@ import { UserAccountMenu } from "@/components/account/user-account-menu";
 import { AppButton } from "@/components/app-button";
 import { AppErrorState } from "@/components/app-error-state";
 import { AppGlobalSearch } from "@/components/search/app-global-search";
+import { RealtimeProvider } from "@/components/providers/realtime-provider";
 import { AppSidebar, type SidebarNavItem } from "@/components/sidebar/app-sidebar";
 import { SidebarProvider, useSidebar } from "@/components/sidebar/sidebar-provider";
 import { FullScreenLoading, LogoutLoadingState } from "@/components/states/loading-states";
@@ -72,6 +73,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   };
 
   return (
+    <RealtimeProvider activeBusinessId={profile.data.activeBusiness?.id} enabled={!logout.isPending}>
     <div className="min-h-dvh bg-background">
       <AppSidebar
         navItems={navItems}
@@ -124,5 +126,6 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     </div>
+    </RealtimeProvider>
   );
 }
