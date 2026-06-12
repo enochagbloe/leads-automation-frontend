@@ -5,8 +5,10 @@ import {
   ArrowLeft,
   BookOpen,
   Bot,
+  Check,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   CircleUserRound,
   ExternalLink,
   FileText,
@@ -22,6 +24,7 @@ import {
   Plus,
   Search,
   Send,
+  TriangleAlert,
   UsersRound,
   X,
 } from "lucide-react";
@@ -101,7 +104,7 @@ function ArticleMessageCard({ article }: { article: Article }) {
   );
 }
 
-function MessageBubble({ message }: { message: ConversationMessage }) {
+function MessageBubble({ message, channel, retrying, onRetry }: { message: ConversationMessage; channel: Conversation["channel"]; retrying: boolean; onRetry: () => void }) {
   if (message.senderType === "SYSTEM") {
     return (
       <div className="my-6 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
@@ -120,6 +123,8 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
       ? `${message.senderUser.firstName} ${message.senderUser.lastName}`
       : message.senderType === "CUSTOMER" ? "Customer" : "Team";
   const article = articleFromMetadata(message.metadata);
+  const showWhatsAppStatus = channel === "WHATSAPP" && message.senderType === "STAFF" && message.direction === "OUTBOUND";
+  const failed = showWhatsAppStatus && message.deliveryStatus === "FAILED";
 
   return (
     <article className={cn("group mb-6 flex gap-3", outbound && "flex-row-reverse")}>
@@ -136,25 +141,24 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
           {message.content}
           {article && <ArticleMessageCard article={article} />}
         </div>
-        <p className={cn("mt-1.5 text-[10px] text-muted-foreground", outbound && "text-right")}>
-          {message.deliveryStatus === "FAILED"
-            ? "Could not save"
-            : message.deliveryStatus === "PENDING"
-              ? "Saving..."
-              : message.deliveryStatus === "DELIVERED"
-                ? "Delivered"
-                : message.deliveryStatus === "READ"
-                  ? "Read"
-                  : message.deliveryStatus === "SENT"
-                    ? "Sent"
-                    : "Stored internally"}
-        </p>
+        {showWhatsAppStatus && (
+          <div className={cn("mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground", outbound && "justify-end")}>
+            <span className={cn("inline-flex items-center gap-1", failed && "font-semibold text-destructive")}>
+              {message.deliveryStatus === "PENDING"
+                ? <><Clock3 className="size-3" />Sending...</>
+                : message.deliveryStatus === "FAILED"
+                  ? <><TriangleAlert className="size-3" />Failed</>
+                  : <><Check className="size-3" />Sent</>}
+            </span>
+            {failed && <AppButton size="sm" variant="ghost" className="h-6 min-h-6 px-2 text-[10px]" loading={retrying} loadingText="Retrying" onClick={onRetry}>Retry</AppButton>}
+          </div>
+        )}
       </div>
     </article>
   );
 }
 
-function ConversationTimeline({ messages, hasOlder, loadingOlder, onLoadOlder }: { messages: ConversationMessage[]; hasOlder: boolean; loadingOlder: boolean; onLoadOlder: () => void }) {
+function ConversationTimeline({ messages, channel, retryingMessageId, hasOlder, loadingOlder, onLoadOlder, onRetryMessage }: { messages: ConversationMessage[]; channel: Conversation["channel"]; retryingMessageId: string | null; hasOlder: boolean; loadingOlder: boolean; onLoadOlder: () => void; onRetryMessage: (messageId: string) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
   const lastMessageId = messages.at(-1)?.id;
@@ -176,7 +180,7 @@ function ConversationTimeline({ messages, hasOlder, loadingOlder, onLoadOlder }:
         {hasOlder && <div className="mb-7 flex justify-center"><AppButton size="sm" variant="outline" loading={loadingOlder} onClick={onLoadOlder}>Load older messages</AppButton></div>}
         {messages.length === 0
           ? <AppEmptyState className="min-h-64 border-0 bg-transparent" icon={MessageCircleMore} title="No messages yet" description="Send the first stored message to begin this conversation." />
-          : messages.map((message) => <MessageBubble key={message.id} message={message} />)}
+          : messages.map((message) => <MessageBubble key={message.id} message={message} channel={channel} retrying={retryingMessageId === message.id} onRetry={() => onRetryMessage(message.id)} />)}
       </div>
     </div>
   );
@@ -216,7 +220,7 @@ function MessageComposer({ draft, onDraftChange, onSend, sending, closed, channe
   }, [emojiOpen]);
 
   if (closed) {
-    return <div className="border-t bg-card px-4 py-3"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3"><div><p className="text-sm font-semibold">This conversation is closed</p><p className="text-xs text-muted-foreground">Reopen it before sending another stored message.</p></div></div></div>;
+    return <div className="border-t bg-card px-4 py-3"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3"><div><p className="text-sm font-semibold">This conversation is closed</p><p className="text-xs text-muted-foreground">Reopen it before sending a reply.</p></div></div></div>;
   }
 
   return (
@@ -224,7 +228,7 @@ function MessageComposer({ draft, onDraftChange, onSend, sending, closed, channe
       <div className="relative mx-auto max-w-4xl">
         <ConversationComposer
           channels={[
-            { id: channel, name: CONVERSATION_CHANNEL_LABELS[channel], description: channel === "MANUAL" ? "Stored messages" : "Delivery not active" },
+            { id: channel, name: CONVERSATION_CHANNEL_LABELS[channel], description: channel === "WHATSAPP" ? "WhatsApp delivery" : "Stored internally" },
           ]}
           activeChannelId={channel}
           senderAccounts={[{ id: "CURRENT_USER", name: senderName }]}
@@ -240,7 +244,7 @@ function MessageComposer({ draft, onDraftChange, onSend, sending, closed, channe
           onOpenEmojiPicker={() => setEmojiOpen((open) => !open)}
         />
         {emojiOpen && <div ref={emojiRef} className="absolute bottom-12 left-10 z-20 flex w-56 flex-wrap gap-1 rounded-xl border bg-popover p-2 shadow-[0_14px_40px_rgba(20,35,27,0.16)]" aria-label="Emoji picker">{["🙂", "👍", "🙏", "✅", "🎉", "📅", "📍", "💬", "❤️", "👋", "😊", "🤝"].map((emoji) => <button key={emoji} type="button" className="grid size-9 place-items-center rounded-lg text-lg transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { onDraftChange(`${draft}${emoji}`); setEmojiOpen(false); }}>{emoji}</button>)}</div>}
-        <p className="mt-1.5 px-1 text-[10px] text-muted-foreground">Stored in BizReply only. External channel delivery is not active yet.</p>
+        <p className="mt-1.5 px-1 text-[10px] text-muted-foreground">{channel === "WHATSAPP" ? "Replies are sent through the connected WhatsApp provider." : "Stored in BizReply only."}</p>
       </div>
     </div>
   );
@@ -426,6 +430,7 @@ export function ConversationWorkspace({
   senderName,
   draft,
   sending,
+  retryingMessageId,
   statusBusy,
   updateBusy,
   assignBusy,
@@ -440,6 +445,7 @@ export function ConversationWorkspace({
   onNext,
   onDraftChange,
   onSend,
+  onRetryMessage,
   onLoadOlder,
   onStatus,
   onUpdate,
@@ -456,6 +462,7 @@ export function ConversationWorkspace({
   senderName: string;
   draft: string;
   sending: boolean;
+  retryingMessageId: string | null;
   statusBusy: boolean;
   updateBusy: boolean;
   assignBusy: boolean;
@@ -470,6 +477,7 @@ export function ConversationWorkspace({
   onNext: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onRetryMessage: (messageId: string) => void;
   onLoadOlder: () => void;
   onStatus: (status: ConversationStatus) => void;
   onUpdate: (input: UpdateConversationInput) => void;
@@ -530,7 +538,7 @@ export function ConversationWorkspace({
 
         <div className="flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
-            {tab === "conversation" && <><ConversationTimeline messages={messages} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} /><MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} sending={sending} closed={conversation.status === "CLOSED"} channel={conversation.channel} senderName={senderName} /></>}
+            {tab === "conversation" && <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} /><MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} sending={sending} closed={conversation.status === "CLOSED"} channel={conversation.channel} senderName={senderName} /></>}
             {tab === "tasks" && <AppEmptyState className="m-6 min-h-72 border-0 bg-transparent" icon={FileText} title="Tasks are coming later" description="The conversation workspace is prepared for a future task module." />}
             {tab === "activity" && <ActivityPanel activities={activities} />}
             {tab === "notes" && <NotesPanel notes={leadDetail?.lead.notes} saving={notesBusy} onSave={onNotes} />}

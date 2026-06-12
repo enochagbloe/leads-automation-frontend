@@ -116,6 +116,4 @@ export interface UpdateConversationInput {
 
 export interface CreateMessageInput {
   content: string;
-  messageType: "TEXT";
-  senderType: "STAFF";
 }

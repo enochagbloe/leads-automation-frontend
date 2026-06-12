@@ -52,18 +52,25 @@ export function useCreateConversation() {
   });
 }
 
-export function useSendMessage() {
+type MessageMutationVariables = { id: string; leadId?: string };
+
+function useMessageMutation<TVariables extends MessageMutationVariables>(mutationFn: (variables: TVariables) => Promise<unknown>) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: conversationService.message,
+    mutationFn,
     retry: false,
     onSuccess: async (_data, variables) => Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.conversations.lists }),
       client.invalidateQueries({ queryKey: queryKeys.conversations.stats }),
       client.invalidateQueries({ queryKey: queryKeys.conversations.detail(variables.id) }),
+      ...(variables.leadId ? [client.invalidateQueries({ queryKey: queryKeys.leads.detail(variables.leadId) })] : []),
     ]),
   });
 }
+
+export const useSendConversationMessage = () => useMessageMutation(conversationService.message);
+export const useRetryConversationMessage = () => useMessageMutation(conversationService.retryMessage);
+export const useSendMessage = useSendConversationMessage;
 
 export const useAssignConversation = () => useConversationMutation(conversationService.assign);
 export const useUpdateConversation = () => useConversationMutation(conversationService.update);

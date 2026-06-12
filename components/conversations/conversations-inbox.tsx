@@ -31,7 +31,8 @@ import {
   useConversationStats,
   useDeleteConversation,
   useMarkConversationRead,
-  useSendMessage,
+  useRetryConversationMessage,
+  useSendConversationMessage,
   useUpdateConversation,
   useUpdateConversationStatus,
 } from "@/hooks/use-conversations";
@@ -159,7 +160,8 @@ export function ConversationsInbox() {
   const profile = useCurrentUser();
   const currentDetail = detail.data?.pages[0];
   const leadDetail = useLead(currentDetail?.conversation.leadId ?? "");
-  const sendMessage = useSendMessage();
+  const sendMessage = useSendConversationMessage();
+  const retryMessage = useRetryConversationMessage();
   const markRead = useMarkConversationRead();
   const markConversationRead = markRead.mutate;
   const updateStatus = useUpdateConversationStatus();
@@ -191,10 +193,37 @@ export function ConversationsInbox() {
   const send = () => {
     const content = draft.trim();
     if (!selectedId || !content) return;
-    sendMessage.mutate({ id: selectedId, input: { content, messageType: "TEXT", senderType: "STAFF" } }, {
+    sendMessage.mutate({ id: selectedId, leadId: selectedConversation?.leadId, input: { content } }, {
       onSuccess: () => setDraft(""),
-      onError: (error) => toast.error("Message could not be saved. Please try again.", { description: getApiErrorMessage(error) }),
+      onError: (error) => {
+        const title = error instanceof ApiError && error.code === "WHATSAPP_NOT_CONNECTED"
+          ? "WhatsApp is not connected for this business yet."
+          : error instanceof ApiError && error.code === "FORBIDDEN"
+            ? "You do not have permission to send messages in this conversation."
+            : error instanceof ApiError && error.code === "CONVERSATION_CLOSED"
+              ? "This conversation is closed."
+              : "Message could not be sent. Please try again.";
+        toast.error(title, { description: getApiErrorMessage(error) });
+      },
     });
+  };
+
+  const retry = (messageId: string) => {
+    if (!selectedConversation) return;
+    retryMessage.mutate(
+      { id: selectedConversation.id, leadId: selectedConversation.leadId, messageId },
+      {
+        onSuccess: () => toast.success("Message sent"),
+        onError: (error) => {
+          const title = error instanceof ApiError && error.code === "WHATSAPP_NOT_CONNECTED"
+            ? "WhatsApp is not connected for this business yet."
+            : error instanceof ApiError && error.code === "FORBIDDEN"
+              ? "You do not have permission to retry this message."
+              : "Message retry failed.";
+          toast.error(title, { description: getApiErrorMessage(error) });
+        },
+      },
+    );
   };
 
   const status = (value: ConversationStatus) => {
@@ -241,6 +270,7 @@ export function ConversationsInbox() {
       senderName={`${profile.data?.user.firstName ?? ""} ${profile.data?.user.lastName ?? ""}`.trim() || "BizReply Team"}
       draft={draft}
       sending={sendMessage.isPending}
+      retryingMessageId={retryMessage.isPending ? retryMessage.variables?.messageId ?? null : null}
       statusBusy={updateStatus.isPending}
       updateBusy={updateConversation.isPending}
       assignBusy={assign.isPending}
@@ -255,6 +285,7 @@ export function ConversationsInbox() {
       onNext={() => selectedIndex >= 0 && setParams({ conversationId: conversations.data?.data[selectedIndex + 1]?.id })}
       onDraftChange={setDraft}
       onSend={send}
+      onRetryMessage={retry}
       onLoadOlder={() => detail.fetchNextPage()}
       onStatus={status}
       onUpdate={(input: UpdateConversationInput) => updateConversation.mutate({ id: selectedConversation.id, input }, { onSuccess: () => toast.success("Conversation workspace updated"), onError: (error) => toast.error(getApiErrorMessage(error)) })}
