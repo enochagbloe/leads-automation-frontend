@@ -10,8 +10,14 @@ export type LeadActivityAction =
   | "CONVERSATION_CREATED"
   | "CONVERSATION_ASSIGNED"
   | "CONVERSATION_STATUS_CHANGED"
+  | "CONVERSATION_ENDED"
+  | "CONVERSATION_REOPENED"
   | "CONVERSATION_DELETED"
   | "MESSAGE_CREATED"
+  | "MESSAGE_SENT"
+  | "MESSAGE_SEND_FAILED"
+  | "MESSAGE_STATUS_UPDATED"
+  | "MESSAGE_RETRY_ATTEMPTED"
   | "CONVERSATION_MARKED_READ";
 export type LeadSortBy = "createdAt" | "updatedAt" | "fullName" | "status" | "lastContactedAt";
 export type SortOrder = "asc" | "desc";

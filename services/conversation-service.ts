@@ -31,6 +31,7 @@ export const conversationService = {
   retryMessage: ({ id, messageId }: { id: string; leadId?: string; messageId: string }) => apiRequest<ConversationMessage>(`/conversations/${id}/messages/${messageId}/retry`, { method: "POST" }),
   assign: ({ id, assignedStaffId }: { id: string; assignedStaffId: string | null }) => apiRequest<Conversation>(`/conversations/${id}/assign`, { method: "PATCH", body: JSON.stringify({ assignedStaffId }) }),
   updateStatus: ({ id, status }: { id: string; status: ConversationStatus }) => apiRequest<Conversation>(`/conversations/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  end: ({ id }: { id: string }) => apiRequest<Conversation>(`/conversations/${id}/end`, { method: "POST" }),
   markRead: (id: string) => apiRequest<Conversation>(`/conversations/${id}/read`, { method: "PATCH" }),
   remove: (id: string) => apiRequest<ApiMessage>(`/conversations/${id}`, { method: "DELETE" }),
 };

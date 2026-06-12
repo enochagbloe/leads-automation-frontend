@@ -33,8 +33,14 @@ export const LEAD_ACTIVITY_LABELS: Record<LeadActivityAction, string> = {
   CONVERSATION_CREATED: "Conversation created",
   CONVERSATION_ASSIGNED: "Conversation assigned",
   CONVERSATION_STATUS_CHANGED: "Conversation status changed",
+  CONVERSATION_ENDED: "Conversation ended",
+  CONVERSATION_REOPENED: "Conversation reopened",
   CONVERSATION_DELETED: "Conversation deleted",
   MESSAGE_CREATED: "Message created",
+  MESSAGE_SENT: "Message sent",
+  MESSAGE_SEND_FAILED: "Message send failed",
+  MESSAGE_STATUS_UPDATED: "Message delivery status updated",
+  MESSAGE_RETRY_ATTEMPTED: "Message retry attempted",
   CONVERSATION_MARKED_READ: "Conversation marked read",
 };
 
