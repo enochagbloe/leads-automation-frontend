@@ -6,6 +6,7 @@ import { conversationService } from "@/services/conversation-service";
 import type { Conversation, ConversationListQuery } from "@/types/conversation";
 
 const CONVERSATION_POLL_INTERVAL = 10_000;
+const ACTIVE_CONVERSATION_POLL_INTERVAL = 5_000;
 
 export const useConversations = (query: ConversationListQuery) => useQuery({
   queryKey: queryKeys.conversations.list(query),
@@ -25,7 +26,7 @@ export const useConversation = (id: string) => useInfiniteQuery({
   initialPageParam: undefined as string | undefined,
   getNextPageParam: (page) => page.messagePagination.nextBeforeMessageId ?? undefined,
   enabled: Boolean(id),
-  refetchInterval: id ? CONVERSATION_POLL_INTERVAL : false,
+  refetchInterval: id ? ACTIVE_CONVERSATION_POLL_INTERVAL : false,
   refetchIntervalInBackground: false,
 });
 
@@ -75,6 +76,7 @@ export const useSendMessage = useSendConversationMessage;
 export const useAssignConversation = () => useConversationMutation(conversationService.assign);
 export const useUpdateConversation = () => useConversationMutation(conversationService.update);
 export const useUpdateConversationStatus = () => useConversationMutation(conversationService.updateStatus);
+export const useEndConversation = () => useConversationMutation(conversationService.end);
 export function useMarkConversationRead() {
   const client = useQueryClient();
   return useMutation({

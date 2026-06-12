@@ -6,6 +6,7 @@ import {
   BookOpen,
   Bot,
   Check,
+  CheckCheck,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -34,8 +35,9 @@ import { AppButton } from "@/components/app-button";
 import { AppEmptyState } from "@/components/app-empty-state";
 import { AppSelect, type AppSelectOption } from "@/components/app-select";
 import { ConversationComposer, type Macro } from "@/components/conversations/composer/conversation-composer";
+import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { CONVERSATION_CHANNEL_LABELS, CONVERSATION_PRIORITIES, CONVERSATION_PRIORITY_LABELS, CONVERSATION_STATUS_LABELS, CONVERSATION_STATUSES, conversationPriorityTone, formatMessageTime } from "@/lib/conversations";
+import { ACTIVE_CONVERSATION_STATUSES, CONVERSATION_CHANNEL_LABELS, CONVERSATION_PRIORITIES, CONVERSATION_PRIORITY_LABELS, CONVERSATION_STATUS_LABELS, conversationPriorityTone, formatConversationDateTime, formatMessageTime } from "@/lib/conversations";
 import { formatLeadDate, getLeadActivityLabel, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, leadStatusTone } from "@/lib/leads";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationMessage, ConversationStatus, UpdateConversationInput } from "@/types/conversation";
@@ -144,11 +146,12 @@ function MessageBubble({ message, channel, retrying, onRetry }: { message: Conve
         {showWhatsAppStatus && (
           <div className={cn("mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground", outbound && "justify-end")}>
             <span className={cn("inline-flex items-center gap-1", failed && "font-semibold text-destructive")}>
-              {message.deliveryStatus === "PENDING"
-                ? <><Clock3 className="size-3" />Sending...</>
-                : message.deliveryStatus === "FAILED"
-                  ? <><TriangleAlert className="size-3" />Failed</>
-                  : <><Check className="size-3" />Sent</>}
+              {message.deliveryStatus === "PENDING" && <><Clock3 className="size-3" />Sending...</>}
+              {message.deliveryStatus === "SENT" && <><Check className="size-3" />Sent</>}
+              {message.deliveryStatus === "DELIVERED" && <><CheckCheck className="size-3" />Delivered</>}
+              {message.deliveryStatus === "READ" && <><CheckCheck className="size-3 text-primary" />Read</>}
+              {message.deliveryStatus === "FAILED" && <><TriangleAlert className="size-3" />Failed</>}
+              {message.deliveryStatus === "INTERNAL" && <>Stored internally</>}
             </span>
             {failed && <AppButton size="sm" variant="ghost" className="h-6 min-h-6 px-2 text-[10px]" loading={retrying} loadingText="Retrying" onClick={onRetry}>Retry</AppButton>}
           </div>
@@ -192,7 +195,7 @@ const REPLY_MACROS: Macro[] = [
   { id: "appointment", title: "Appointment request", content: "What day and time would work best for your appointment?" },
 ];
 
-function MessageComposer({ draft, onDraftChange, onSend, sending, closed, channel, senderName }: { draft: string; onDraftChange: (value: string) => void; onSend: () => void; sending: boolean; closed: boolean; channel: Conversation["channel"]; senderName: string }) {
+function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending, closed, closedAt, channel, senderName }: { draft: string; onDraftChange: (value: string) => void; onSend: () => void; onEnd: () => void; sending: boolean; ending: boolean; closed: boolean; closedAt: string | null; channel: Conversation["channel"]; senderName: string }) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const emojiRef = useRef<HTMLDivElement>(null);
 
@@ -220,7 +223,7 @@ function MessageComposer({ draft, onDraftChange, onSend, sending, closed, channe
   }, [emojiOpen]);
 
   if (closed) {
-    return <div className="border-t bg-card px-4 py-3"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3"><div><p className="text-sm font-semibold">This conversation is closed</p><p className="text-xs text-muted-foreground">Reopen it before sending a reply.</p></div></div></div>;
+    return <div className="border-t bg-card px-4 py-3"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3"><div><p className="text-sm font-semibold">This conversation is closed</p><p className="text-xs leading-5 text-muted-foreground">{closedAt ? `Closed ${formatConversationDateTime(closedAt)}. ` : ""}If the customer replies again, BizReply will automatically reopen it.</p></div></div></div>;
   }
 
   return (
@@ -236,7 +239,7 @@ function MessageComposer({ draft, onDraftChange, onSend, sending, closed, channe
           macros={REPLY_MACROS}
           message={draft}
           isSending={sending}
-          endChatDisabled
+          endChatTrigger={<ConfirmDialog trigger={<button type="button" disabled={ending} className="min-h-8 cursor-pointer px-2 text-xs font-semibold text-composer-foreground underline decoration-composer-foreground/35 underline-offset-4 outline-none hover:decoration-composer-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40">End Chat</button>} title="End this conversation?" description="The conversation will be closed. If the customer replies later, BizReply will automatically reopen it." confirmLabel="End Chat" loading={ending} onConfirm={onEnd} />}
           attachmentDisabled
           voiceNoteDisabled
           onMessageChange={onDraftChange}
@@ -348,7 +351,7 @@ function LeadProfilePanel({ conversation, leadDetail, assigneeOptions, canManage
     <div className="h-full overflow-y-auto">
       <div className="border-b p-5"><span className="grid size-14 place-items-center rounded-full bg-secondary text-sm font-bold text-primary">{initials(conversation.lead.fullName)}</span><h3 className="mt-3 text-lg font-bold">{conversation.lead.fullName}</h3><p className="mt-1 text-sm text-muted-foreground">{conversation.lead.email ?? conversation.lead.phone}</p></div>
       <div className="space-y-6 p-5">
-        <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Conversation</h4><div className="mt-3 space-y-3"><div><label htmlFor="drawer-status" className="mb-1 block text-xs font-semibold">Status</label><AppSelect id="drawer-status" value={conversation.status} options={CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} /></div>{canManage && <div><label htmlFor="drawer-assignee" className="mb-1 block text-xs font-semibold">Assigned staff</label><AppSelect id="drawer-assignee" value={conversation.assignedStaffId ?? "__unassigned"} options={assigneeOptions} disabled={assignBusy} onValueChange={(value) => onAssign(value === "__unassigned" ? null : value)} /></div>}</div></section>
+        <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Conversation</h4><div className="mt-3 space-y-3"><div><label htmlFor="drawer-status" className="mb-1 block text-xs font-semibold">Status</label>{conversation.status === "CLOSED" ? <ConversationStatusBadge status="CLOSED" /> : <AppSelect id="drawer-status" value={conversation.status} options={ACTIVE_CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} />}</div>{canManage && <div><label htmlFor="drawer-assignee" className="mb-1 block text-xs font-semibold">Assigned staff</label><AppSelect id="drawer-assignee" value={conversation.assignedStaffId ?? "__unassigned"} options={assigneeOptions} disabled={assignBusy} onValueChange={(value) => onAssign(value === "__unassigned" ? null : value)} /></div>}</div></section>
         <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Lead profile</h4><dl className="mt-3 space-y-3 text-sm"><div><dt className="text-xs text-muted-foreground">Phone</dt><dd className="mt-1 font-medium">{conversation.lead.phone}</dd></div><div><dt className="text-xs text-muted-foreground">Email</dt><dd className="mt-1 font-medium">{conversation.lead.email ?? "No email provided"}</dd></div>{lead && <><div><dt className="text-xs text-muted-foreground">Lead status</dt><dd className={cn("mt-1 inline-flex rounded-md px-2 py-1 text-xs font-bold", leadStatusTone(lead.status))}>{LEAD_STATUS_LABELS[lead.status]}</dd></div><div><dt className="text-xs text-muted-foreground">Source</dt><dd className="mt-1 font-medium">{LEAD_SOURCE_LABELS[lead.source]}</dd></div></>}</dl></section>
         <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Tags</h4><div className="mt-3 flex flex-wrap gap-1.5">{lead?.tags.length ? lead.tags.map((tag) => <span key={tag} className="rounded-lg bg-secondary px-2 py-1 text-xs font-semibold text-secondary-foreground">{tag}</span>) : <span className="text-xs text-muted-foreground">No tags</span>}</div></section>
       </div>
@@ -430,6 +433,7 @@ export function ConversationWorkspace({
   senderName,
   draft,
   sending,
+  ending,
   retryingMessageId,
   statusBusy,
   updateBusy,
@@ -445,6 +449,7 @@ export function ConversationWorkspace({
   onNext,
   onDraftChange,
   onSend,
+  onEnd,
   onRetryMessage,
   onLoadOlder,
   onStatus,
@@ -462,6 +467,7 @@ export function ConversationWorkspace({
   senderName: string;
   draft: string;
   sending: boolean;
+  ending: boolean;
   retryingMessageId: string | null;
   statusBusy: boolean;
   updateBusy: boolean;
@@ -477,6 +483,7 @@ export function ConversationWorkspace({
   onNext: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onEnd: () => void;
   onRetryMessage: (messageId: string) => void;
   onLoadOlder: () => void;
   onStatus: (status: ConversationStatus) => void;
@@ -523,12 +530,12 @@ export function ConversationWorkspace({
           </div>
           <AppButton size="icon" variant={conversation.pinned ? "secondary" : "ghost"} className="shrink-0" loading={updateBusy} aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"} aria-pressed={conversation.pinned} onClick={() => onUpdate({ pinned: !conversation.pinned })}>{conversation.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}</AppButton>
           {canManage && <div className="hidden w-32 xl:block"><AppSelect aria-label="Conversation priority" value={conversation.priority} options={CONVERSATION_PRIORITIES.map((priority) => ({ value: priority, label: CONVERSATION_PRIORITY_LABELS[priority] }))} disabled={updateBusy} onValueChange={(priority) => onUpdate({ priority: priority as Conversation["priority"] })} /></div>}
-          <div className="hidden w-44 lg:block"><AppSelect aria-label="Conversation status" value={conversation.status} options={CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} /></div>
+          {conversation.status === "CLOSED"
+            ? <ConversationStatusBadge status="CLOSED" />
+            : <div className="hidden w-44 lg:block"><AppSelect aria-label="Conversation status" value={conversation.status} options={ACTIVE_CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} /></div>}
           <AppButton size="icon" variant="ghost" aria-label="Open lead profile" className="md:hidden" onClick={() => toggleContext("profile")}><CircleUserRound className="size-4" /></AppButton>
           {canManage && <ConfirmDialog trigger={<AppButton size="icon" variant="ghost" aria-label="Delete conversation" title="Delete conversation"><MoreHorizontal className="size-4" /></AppButton>} title="Delete this conversation?" description="The conversation will disappear from this business inbox." confirmLabel="Delete conversation" loading={deleting} onConfirm={onDelete} />}
-          {conversation.status === "CLOSED"
-            ? <AppButton size="sm" variant="outline" loading={statusBusy} onClick={() => onStatus("OPEN")}>Reopen</AppButton>
-            : <ConfirmDialog trigger={<AppButton size="sm" className="hidden sm:inline-flex">Close conversation</AppButton>} title="Close this conversation?" description="The timeline will become read-only until the conversation is reopened." confirmLabel="Close conversation" loading={statusBusy} onConfirm={() => onStatus("CLOSED")} />}
+          {conversation.status !== "CLOSED" && <ConfirmDialog trigger={<AppButton size="sm" className="hidden sm:inline-flex">End Chat</AppButton>} title="End this conversation?" description="The conversation will be closed. If the customer replies later, BizReply will automatically reopen it." confirmLabel="End Chat" loading={ending} onConfirm={onEnd} />}
         </header>
 
         <ConversationTabs active={tab} onChange={setTab} activityCount={activities.length} />
@@ -538,7 +545,7 @@ export function ConversationWorkspace({
 
         <div className="flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
-            {tab === "conversation" && <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} /><MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} sending={sending} closed={conversation.status === "CLOSED"} channel={conversation.channel} senderName={senderName} /></>}
+            {tab === "conversation" && <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} /><MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} onEnd={onEnd} sending={sending} ending={ending} closed={conversation.status === "CLOSED"} closedAt={conversation.closedAt} channel={conversation.channel} senderName={senderName} /></>}
             {tab === "tasks" && <AppEmptyState className="m-6 min-h-72 border-0 bg-transparent" icon={FileText} title="Tasks are coming later" description="The conversation workspace is prepared for a future task module." />}
             {tab === "activity" && <ActivityPanel activities={activities} />}
             {tab === "notes" && <NotesPanel notes={leadDetail?.lead.notes} saving={notesBusy} onSave={onNotes} />}

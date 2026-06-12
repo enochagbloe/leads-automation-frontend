@@ -30,6 +30,7 @@ export type ConversationComposerProps = {
   disabled?: boolean;
   isSending?: boolean;
   endChatDisabled?: boolean;
+  endChatTrigger?: ReactNode;
   attachmentDisabled?: boolean;
   emojiDisabled?: boolean;
   voiceNoteDisabled?: boolean;

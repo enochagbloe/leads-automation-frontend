@@ -30,6 +30,7 @@ import {
   useConversations,
   useConversationStats,
   useDeleteConversation,
+  useEndConversation,
   useMarkConversationRead,
   useRetryConversationMessage,
   useSendConversationMessage,
@@ -165,6 +166,7 @@ export function ConversationsInbox() {
   const markRead = useMarkConversationRead();
   const markConversationRead = markRead.mutate;
   const updateStatus = useUpdateConversationStatus();
+  const endConversation = useEndConversation();
   const updateConversation = useUpdateConversation();
   const assign = useAssignConversation();
   const remove = useDeleteConversation();
@@ -234,6 +236,23 @@ export function ConversationsInbox() {
     });
   };
 
+  const end = () => {
+    if (!selectedConversation) return;
+    endConversation.mutate({ id: selectedConversation.id }, {
+      onSuccess: () => toast.success("Conversation ended."),
+      onError: (error) => {
+        const title = error instanceof ApiError && error.code === "CONVERSATION_ALREADY_CLOSED"
+          ? "This conversation is already closed."
+          : error instanceof ApiError && error.code === "FORBIDDEN"
+            ? "You do not have permission to perform this action."
+            : error instanceof ApiError && error.code === "BUSINESS_ACCESS_DENIED"
+              ? "You do not have access to this business."
+              : "Conversation could not be ended.";
+        toast.error(title, { description: getApiErrorMessage(error) });
+      },
+    });
+  };
+
   const assigneeOptions = selectedConversation ? [
     { value: "__unassigned", label: "Unassigned" },
     ...(selectedConversation.assignedStaff ? [{ value: selectedConversation.assignedStaff.id, label: assigneeName(selectedConversation), description: selectedConversation.assignedStaff.user.email }] : []),
@@ -270,6 +289,7 @@ export function ConversationsInbox() {
       senderName={`${profile.data?.user.firstName ?? ""} ${profile.data?.user.lastName ?? ""}`.trim() || "BizReply Team"}
       draft={draft}
       sending={sendMessage.isPending}
+      ending={endConversation.isPending}
       retryingMessageId={retryMessage.isPending ? retryMessage.variables?.messageId ?? null : null}
       statusBusy={updateStatus.isPending}
       updateBusy={updateConversation.isPending}
@@ -285,6 +305,7 @@ export function ConversationsInbox() {
       onNext={() => selectedIndex >= 0 && setParams({ conversationId: conversations.data?.data[selectedIndex + 1]?.id })}
       onDraftChange={setDraft}
       onSend={send}
+      onEnd={end}
       onRetryMessage={retry}
       onLoadOlder={() => detail.fetchNextPage()}
       onStatus={status}

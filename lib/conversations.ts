@@ -1,6 +1,7 @@
 import type { ConversationChannel, ConversationPriority, ConversationStatus } from "@/types/conversation";
 
 export const CONVERSATION_STATUSES: ConversationStatus[] = ["OPEN", "AI_HANDLING", "HUMAN_HANDLING", "CLOSED"];
+export const ACTIVE_CONVERSATION_STATUSES: ConversationStatus[] = ["OPEN", "AI_HANDLING", "HUMAN_HANDLING"];
 export const CONVERSATION_CHANNELS: ConversationChannel[] = ["MANUAL", "WHATSAPP", "WEBSITE_CHAT", "INSTAGRAM", "FACEBOOK", "EMAIL", "OTHER"];
 export const CONVERSATION_PRIORITIES: ConversationPriority[] = ["LOW", "NORMAL", "HIGH", "URGENT"];
 
@@ -45,4 +46,8 @@ export function formatConversationTime(value: string | null) {
 
 export function formatMessageTime(value: string) {
   return new Intl.DateTimeFormat("en-GH", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
+}
+
+export function formatConversationDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-GH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }

@@ -18,6 +18,7 @@ export function ConversationComposer({
   disabled,
   isSending,
   endChatDisabled,
+  endChatTrigger,
   attachmentDisabled,
   emojiDisabled,
   voiceNoteDisabled,
@@ -83,7 +84,7 @@ export function ConversationComposer({
       <div className="flex flex-wrap items-center gap-2">
         <ComposerToolbar macros={macros} disabled={disabled || isSending} attachmentDisabled={attachmentDisabled} emojiDisabled={emojiDisabled} voiceNoteDisabled={voiceNoteDisabled} onAttachFile={onAttachFile} onOpenEmojiPicker={onOpenEmojiPicker} onStartVoiceNote={onStartVoiceNote} onSelectMacro={selectMacro} />
         <div className="ml-auto flex items-center gap-2">
-          <button type="button" disabled={disabled || isSending || endChatDisabled} onClick={onEndChat} className="min-h-8 cursor-pointer px-2 text-xs font-semibold text-composer-foreground underline decoration-composer-foreground/35 underline-offset-4 outline-none hover:decoration-composer-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40">End Chat</button>
+          {endChatTrigger ?? <button type="button" disabled={disabled || isSending || endChatDisabled} onClick={onEndChat} className="min-h-8 cursor-pointer px-2 text-xs font-semibold text-composer-foreground underline decoration-composer-foreground/35 underline-offset-4 outline-none hover:decoration-composer-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40">End Chat</button>}
           <button type="button" disabled={disabled || isSending || !value.trim()} onClick={() => void sendMessage()} className="inline-flex min-h-9 min-w-16 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-composer-foreground px-4 text-xs font-semibold text-composer transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40">
             {isSending ? <><LoaderCircle className="size-3.5 animate-spin" />Sending</> : <><Send className="size-3.5 sm:hidden" />Send</>}
           </button>
