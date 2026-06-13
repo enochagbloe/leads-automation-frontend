@@ -22,6 +22,7 @@ function useWhatsAppMutation<TVariables>(businessId: string | undefined | null, 
     mutationFn,
     onSuccess: async () => Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.whatsapp.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
       client.invalidateQueries({ queryKey: queryKeys.conversations.all }),
       ...(businessId ? [
         client.invalidateQueries({ queryKey: queryKeys.whatsapp.status(businessId) }),

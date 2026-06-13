@@ -25,6 +25,7 @@ import { CreateConversationDialog } from "@/components/conversations/create-conv
 import { RealtimeStatusIndicator } from "@/components/conversations/realtime-status-indicator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { useBusinessSetupStatus } from "@/hooks/use-business-setup";
 import {
   useAssignConversation,
   useConversation,
@@ -161,6 +162,7 @@ export function ConversationsInbox() {
   const conversations = useConversations(query);
   const detail = useConversation(selectedId);
   const profile = useCurrentUser();
+  const businessSetup = useBusinessSetupStatus(profile.data?.activeBusiness?.id);
   const whatsapp = useWhatsAppStatus(profile.data?.activeBusiness?.id);
   const currentDetail = detail.data?.pages[0];
   const leadDetail = useLead(currentDetail?.conversation.leadId ?? "");
@@ -302,6 +304,7 @@ export function ConversationsInbox() {
       whatsappCanSend={selectedConversation.channel !== "WHATSAPP" || (whatsapp.data?.canSendMessages ?? true)}
       whatsappStatus={whatsapp.data?.status}
       isOwner={isOwner}
+      businessSetup={businessSetup.data}
       draft={draft}
       sending={sendMessage.isPending}
       ending={endConversation.isPending}
