@@ -8,6 +8,7 @@ import { SubscriptionStatusBadge } from "@/components/subscription/subscription-
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { LoadingPage } from "@/components/states/loading-states";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { WhatsAppDashboardWarning } from "@/components/whatsapp/whatsapp-dashboard-warning";
 
 export function DashboardSummary() {
   const profile = useCurrentUser();
@@ -24,6 +25,7 @@ export function DashboardSummary() {
 
   return <main className="mx-auto max-w-6xl space-y-8 p-5 sm:p-8">
     <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">{account.name} · {accountUsage.businessesCount} {accountUsage.businessesCount === 1 ? "business" : "businesses"}</p><h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Workspace overview</h1><p className="mt-2 text-sm text-muted-foreground">Viewing active-business activity for {activeBusiness.name}.</p></div><div className="flex items-center gap-2"><PlanBadge plan={plan.code} /><SubscriptionStatusBadge status={subscription.status} /></div></header>
+    <WhatsAppDashboardWarning />
     <div className="grid gap-5 lg:grid-cols-[1.4fr_.6fr]">
       <AppCard><h2 className="font-bold">Workspace usage</h2><p className="mt-1 text-sm text-muted-foreground">Shared across every business under this account.</p><div className="mt-6 space-y-6"><UsageMeter label="Businesses" value={accountUsage.businessesCount} limit={limits.maxBusinesses} /><UsageMeter label="Staff" value={accountUsage.staffCount} limit={limits.maxStaff} /><UsageMeter label="Services" value={accountUsage.servicesCount} limit={limits.maxServices} /><UsageMeter label="Appointments / month" value={accountUsage.appointmentsUsed} limit={limits.maxAppointmentsPerMonth} /></div></AppCard>
       <AppCard><h2 className="font-bold">Business access</h2><dl className="mt-5 space-y-4 text-sm"><div><dt className="text-muted-foreground">Role</dt><dd className="mt-1 font-semibold">{membership.role.replaceAll("_", " ")}</dd></div><div><dt className="text-muted-foreground">Industry</dt><dd className="mt-1 font-semibold">{activeBusiness.industry}</dd></div><div><dt className="text-muted-foreground">Permissions</dt><dd className="mt-1 font-semibold">{permissions.length} enabled</dd></div></dl></AppCard>

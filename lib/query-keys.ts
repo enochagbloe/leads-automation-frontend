@@ -3,6 +3,11 @@ export const queryKeys = {
   businesses: { all: ["businesses"] as const },
   plans: { all: ["plans"] as const },
   subscription: { current: ["subscription", "current"] as const },
+  whatsapp: {
+    all: ["whatsapp"] as const,
+    status: (businessId: string) => ["whatsapp", "status", businessId] as const,
+    health: (businessId: string) => ["whatsapp", "health", businessId] as const,
+  },
   leads: {
     all: ["leads"] as const,
     lists: ["leads", "list"] as const,

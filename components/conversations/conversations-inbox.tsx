@@ -39,6 +39,7 @@ import {
   useUpdateConversationStatus,
 } from "@/hooks/use-conversations";
 import { useLead, useUpdateLead } from "@/hooks/use-leads";
+import { useWhatsAppStatus } from "@/hooks/use-whatsapp";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import {
   CONVERSATION_CHANNEL_LABELS,
@@ -160,6 +161,7 @@ export function ConversationsInbox() {
   const conversations = useConversations(query);
   const detail = useConversation(selectedId);
   const profile = useCurrentUser();
+  const whatsapp = useWhatsAppStatus(profile.data?.activeBusiness?.id);
   const currentDetail = detail.data?.pages[0];
   const leadDetail = useLead(currentDetail?.conversation.leadId ?? "");
   const sendMessage = useSendConversationMessage();
@@ -176,6 +178,7 @@ export function ConversationsInbox() {
   const [createOpen, setCreateOpen] = useState(false);
   const selectedConversation = currentDetail?.conversation;
   const canManage = profile.data?.role !== "STAFF";
+  const isOwner = profile.data?.membership?.role === "BUSINESS_OWNER";
   const messages = useMemo(() => detail.data ? [...detail.data.pages].reverse().flatMap((page) => page.messages) : [], [detail.data]);
   const selectedIndex = conversations.data?.data.findIndex((item) => item.id === selectedId) ?? -1;
 
@@ -200,7 +203,11 @@ export function ConversationsInbox() {
       onSuccess: () => setDraft(""),
       onError: (error) => {
         const title = error instanceof ApiError && error.code === "WHATSAPP_NOT_CONNECTED"
-          ? "WhatsApp is not connected for this business yet."
+          ? "WhatsApp is not connected for this business. Connect WhatsApp in Settings before sending replies."
+          : error instanceof ApiError && error.code === "WHATSAPP_DEACTIVATED"
+            ? "WhatsApp has been deactivated for this business. Reconnect or change the number to send replies."
+            : error instanceof ApiError && error.code === "WHATSAPP_RECONNECTION_REQUIRED"
+              ? "This WhatsApp connection needs to be reconnected before messages can be sent."
           : error instanceof ApiError && error.code === "FORBIDDEN"
             ? "You do not have permission to send messages in this conversation."
             : error instanceof ApiError && error.code === "CONVERSATION_CLOSED"
@@ -220,6 +227,10 @@ export function ConversationsInbox() {
         onError: (error) => {
           const title = error instanceof ApiError && error.code === "WHATSAPP_NOT_CONNECTED"
             ? "WhatsApp is not connected for this business yet."
+            : error instanceof ApiError && error.code === "WHATSAPP_DEACTIVATED"
+              ? "WhatsApp has been deactivated for this business."
+              : error instanceof ApiError && error.code === "WHATSAPP_RECONNECTION_REQUIRED"
+                ? "This WhatsApp connection needs to be reconnected."
             : error instanceof ApiError && error.code === "FORBIDDEN"
               ? "You do not have permission to retry this message."
               : "Message retry failed.";
@@ -288,6 +299,9 @@ export function ConversationsInbox() {
       assigneeOptions={assigneeOptions}
       canManage={canManage}
       senderName={`${profile.data?.user.firstName ?? ""} ${profile.data?.user.lastName ?? ""}`.trim() || "BizReply Team"}
+      whatsappCanSend={selectedConversation.channel !== "WHATSAPP" || (whatsapp.data?.canSendMessages ?? true)}
+      whatsappStatus={whatsapp.data?.status}
+      isOwner={isOwner}
       draft={draft}
       sending={sendMessage.isPending}
       ending={endConversation.isPending}
