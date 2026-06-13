@@ -95,6 +95,7 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
   if (["whatsapp.connection.updated", "whatsapp.connection.deactivated", "whatsapp.connection.error"].includes(type)) {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.whatsapp.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
       client.invalidateQueries({ queryKey: queryKeys.conversations.all }),
     ]);
   }

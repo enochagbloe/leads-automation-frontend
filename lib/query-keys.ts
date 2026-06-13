@@ -8,6 +8,10 @@ export const queryKeys = {
     status: (businessId: string) => ["whatsapp", "status", businessId] as const,
     health: (businessId: string) => ["whatsapp", "health", businessId] as const,
   },
+  businessSetup: {
+    all: ["business-setup-status"] as const,
+    status: (businessId: string) => ["business-setup-status", businessId] as const,
+  },
   leads: {
     all: ["leads"] as const,
     lists: ["leads", "list"] as const,

@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { AppButton } from "@/components/app-button";
 import { AppEmptyState } from "@/components/app-empty-state";
 import { AppSelect, type AppSelectOption } from "@/components/app-select";
+import { IncompleteBusinessNotice } from "@/components/business-setup/incomplete-business-notice";
 import { ConversationComposer, type Macro } from "@/components/conversations/composer/conversation-composer";
 import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
 import { RealtimeStatusIndicator } from "@/components/conversations/realtime-status-indicator";
@@ -42,6 +43,7 @@ import { ACTIVE_CONVERSATION_STATUSES, CONVERSATION_CHANNEL_LABELS, CONVERSATION
 import { formatLeadDate, getLeadActivityLabel, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS, leadStatusTone } from "@/lib/leads";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationMessage, ConversationStatus, UpdateConversationInput } from "@/types/conversation";
+import type { BusinessSetupStatus } from "@/types/business-setup";
 import type { LeadActivity, LeadDetailResponse } from "@/types/lead";
 
 type WorkspaceTab = "conversation" | "tasks" | "activity" | "notes";
@@ -444,6 +446,7 @@ export function ConversationWorkspace({
   whatsappCanSend,
   whatsappStatus,
   isOwner,
+  businessSetup,
   draft,
   sending,
   ending,
@@ -481,6 +484,7 @@ export function ConversationWorkspace({
   whatsappCanSend: boolean;
   whatsappStatus?: string;
   isOwner: boolean;
+  businessSetup?: BusinessSetupStatus;
   draft: string;
   sending: boolean;
   ending: boolean;
@@ -556,6 +560,7 @@ export function ConversationWorkspace({
         </header>
 
         <ConversationTabs active={tab} onChange={setTab} activityCount={activities.length} />
+        {businessSetup && <IncompleteBusinessNotice status={businessSetup} canManage={canManage} />}
         <div className="flex gap-1 overflow-x-auto border-b bg-card px-2 py-1.5 md:hidden" aria-label="Conversation context tools">
           {RAIL_ITEMS.map(({ id, label, icon: Icon }) => <AppButton key={id} size="sm" variant={context === id ? "secondary" : "ghost"} className="shrink-0" aria-pressed={context === id} onClick={() => toggleContext(id)}><Icon className="size-4" />{label}</AppButton>)}
         </div>
