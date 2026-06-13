@@ -12,6 +12,10 @@ export const queryKeys = {
     all: ["business-setup-status"] as const,
     status: (businessId: string) => ["business-setup-status", businessId] as const,
   },
+  businessProfile: {
+    all: ["business-profile"] as const,
+    detail: (businessId: string) => ["business-profile", businessId] as const,
+  },
   leads: {
     all: ["leads"] as const,
     lists: ["leads", "list"] as const,
