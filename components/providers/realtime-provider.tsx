@@ -128,6 +128,7 @@ export function RealtimeProvider({ activeBusinessId, enabled = true, children }:
     await Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.conversations.all }),
       client.invalidateQueries({ queryKey: queryKeys.leads.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
     ]);
   }, [client]);
 
