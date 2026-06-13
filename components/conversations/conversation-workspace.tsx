@@ -196,7 +196,7 @@ const REPLY_MACROS: Macro[] = [
   { id: "appointment", title: "Appointment request", content: "What day and time would work best for your appointment?" },
 ];
 
-function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending, closed, closedAt, channel, senderName }: { draft: string; onDraftChange: (value: string) => void; onSend: () => void; onEnd: () => void; sending: boolean; ending: boolean; closed: boolean; closedAt: string | null; channel: Conversation["channel"]; senderName: string }) {
+function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending, closed, closedAt, channel, senderName, whatsappCanSend, whatsappStatus, isOwner }: { draft: string; onDraftChange: (value: string) => void; onSend: () => void; onEnd: () => void; sending: boolean; ending: boolean; closed: boolean; closedAt: string | null; channel: Conversation["channel"]; senderName: string; whatsappCanSend: boolean; whatsappStatus?: string; isOwner: boolean }) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const emojiRef = useRef<HTMLDivElement>(null);
 
@@ -227,9 +227,17 @@ function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending,
     return <div className="border-t bg-card px-4 py-3"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3"><div><p className="text-sm font-semibold">This conversation is closed</p><p className="text-xs leading-5 text-muted-foreground">{closedAt ? `Closed ${formatConversationDateTime(closedAt)}. ` : ""}If the customer replies again, BizReply will automatically reopen it.</p></div></div></div>;
   }
 
+  const whatsAppBlocked = channel === "WHATSAPP" && !whatsappCanSend;
+  const blockedMessage = whatsappStatus === "DEACTIVATED"
+    ? "WhatsApp has been deactivated for this business. Reconnect or change the number to send replies."
+    : whatsappStatus === "ERROR"
+      ? "This WhatsApp connection needs to be reconnected before messages can be sent."
+      : "WhatsApp is not connected for this business. Connect WhatsApp in Settings before sending replies.";
+
   return (
     <div className="border-t bg-card px-3 py-3 sm:px-6">
       <div className="relative mx-auto max-w-4xl">
+        {whatsAppBlocked && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/20 bg-warning/5 px-3 py-2 text-xs text-muted-foreground"><span>{blockedMessage}</span>{isOwner ? <a href="/settings/business/whatsapp" className="font-semibold text-primary underline underline-offset-4">Go to WhatsApp Settings</a> : <span className="font-semibold">Ask the business owner to reconnect WhatsApp.</span>}</div>}
         <ConversationComposer
           channels={[
             { id: channel, name: CONVERSATION_CHANNEL_LABELS[channel], description: channel === "WHATSAPP" ? "WhatsApp delivery" : "Stored internally" },
@@ -240,6 +248,7 @@ function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending,
           macros={REPLY_MACROS}
           message={draft}
           isSending={sending}
+          disabled={whatsAppBlocked}
           endChatTrigger={<ConfirmDialog trigger={<button type="button" disabled={ending} className="min-h-8 cursor-pointer px-2 text-xs font-semibold text-composer-foreground underline decoration-composer-foreground/35 underline-offset-4 outline-none hover:decoration-composer-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40">End Chat</button>} title="End this conversation?" description="The conversation will be closed. If the customer replies later, BizReply will automatically reopen it." confirmLabel="End Chat" loading={ending} onConfirm={onEnd} />}
           attachmentDisabled
           voiceNoteDisabled
@@ -432,6 +441,9 @@ export function ConversationWorkspace({
   assigneeOptions,
   canManage,
   senderName,
+  whatsappCanSend,
+  whatsappStatus,
+  isOwner,
   draft,
   sending,
   ending,
@@ -466,6 +478,9 @@ export function ConversationWorkspace({
   assigneeOptions: AppSelectOption[];
   canManage: boolean;
   senderName: string;
+  whatsappCanSend: boolean;
+  whatsappStatus?: string;
+  isOwner: boolean;
   draft: string;
   sending: boolean;
   ending: boolean;
@@ -547,7 +562,7 @@ export function ConversationWorkspace({
 
         <div className="flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
-            {tab === "conversation" && <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} /><MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} onEnd={onEnd} sending={sending} ending={ending} closed={conversation.status === "CLOSED"} closedAt={conversation.closedAt} channel={conversation.channel} senderName={senderName} /></>}
+            {tab === "conversation" && <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} /><MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} onEnd={onEnd} sending={sending} ending={ending} closed={conversation.status === "CLOSED"} closedAt={conversation.closedAt} channel={conversation.channel} senderName={senderName} whatsappCanSend={whatsappCanSend} whatsappStatus={whatsappStatus} isOwner={isOwner} /></>}
             {tab === "tasks" && <AppEmptyState className="m-6 min-h-72 border-0 bg-transparent" icon={FileText} title="Tasks are coming later" description="The conversation workspace is prepared for a future task module." />}
             {tab === "activity" && <ActivityPanel activities={activities} />}
             {tab === "notes" && <NotesPanel notes={leadDetail?.lead.notes} saving={notesBusy} onSave={onNotes} />}
