@@ -92,6 +92,15 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if (type === "business.profile.updated") {
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.businessProfile.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+      client.invalidateQueries({ queryKey: queryKeys.auth.currentUser }),
+    ]);
+    return;
+  }
+
   if (["whatsapp.connection.updated", "whatsapp.connection.deactivated", "whatsapp.connection.error"].includes(type)) {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.whatsapp.all }),
