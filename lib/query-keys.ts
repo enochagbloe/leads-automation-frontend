@@ -25,7 +25,7 @@ export const queryKeys = {
   businessAvailability: {
     all: ["business-availability"] as const,
     detail: (businessId: string) => ["business-availability", businessId] as const,
-    summary: (businessId: string) => ["business-availability-summary", businessId] as const,
+    summary: (businessId: string) => ["business-availability", "summary", businessId] as const,
   },
   leads: {
     all: ["leads"] as const,
