@@ -129,6 +129,14 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if (type === "business.knowledge_preview.updated") {
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+    ]);
+    return;
+  }
+
   if (["whatsapp.connection.updated", "whatsapp.connection.deactivated", "whatsapp.connection.error"].includes(type)) {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.whatsapp.all }),
@@ -157,6 +165,7 @@ export function RealtimeProvider({ activeBusinessId, enabled = true, children }:
       client.invalidateQueries({ queryKey: queryKeys.conversations.all }),
       client.invalidateQueries({ queryKey: queryKeys.leads.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
     ]);
   }, [client]);
 
