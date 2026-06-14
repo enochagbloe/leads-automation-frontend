@@ -1,4 +1,5 @@
 import type { BusinessSetupStatus } from "@/types/business-setup";
+import { getMockPoliciesSummary } from "@/services/mock-business-policy-service";
 
 const mockBusinessSetupStatus: BusinessSetupStatus = {
   businessId: "biz_demo",
@@ -49,7 +50,7 @@ const mockBusinessSetupStatus: BusinessSetupStatus = {
       planRequired: "BASIC",
     },
     {
-      key: "policies",
+      key: "business-policies",
       label: "Add terms and policies",
       description: "Policies help BizReply answer safely about payments, cancellations, delays, and fees.",
       route: "/settings/business/policies",
@@ -79,6 +80,20 @@ const mockBusinessSetupStatus: BusinessSetupStatus = {
 export const mockBusinessSetupService = {
   async status(): Promise<BusinessSetupStatus> {
     await new Promise((resolve) => setTimeout(resolve, 350));
-    return mockBusinessSetupStatus;
+    const policies = getMockPoliciesSummary();
+    const policyComplete = policies.customerFacing > 0;
+    return {
+      ...mockBusinessSetupStatus,
+      completionPercentage: mockBusinessSetupStatus.completionPercentage + (policyComplete ? 5 : 0),
+      missingItems: mockBusinessSetupStatus.missingItems.filter((item) => item.key !== "business-policies" || !policyComplete),
+      completedItems: policyComplete
+        ? [...mockBusinessSetupStatus.completedItems, { key: "business-policies", label: "Add business policies" }]
+        : mockBusinessSetupStatus.completedItems,
+      policyProgress: {
+        policiesAdded: policies.total - policies.archived,
+        customerFacingPolicies: policies.customerFacing,
+        missingRecommendedPolicyCategories: policies.missingRecommendedCategories,
+      },
+    };
   },
 };
