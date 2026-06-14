@@ -33,6 +33,10 @@ export const queryKeys = {
     detail: (businessId: string, policyId: string) => ["business-policies", "detail", businessId, policyId] as const,
     summary: (businessId: string) => ["business-policies", "summary", businessId] as const,
   },
+  businessKnowledge: {
+    all: ["business-knowledge-preview"] as const,
+    detail: (businessId: string) => ["business-knowledge-preview", businessId] as const,
+  },
   leads: {
     all: ["leads"] as const,
     lists: ["leads", "list"] as const,
