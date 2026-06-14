@@ -98,16 +98,17 @@ const CHECKLIST = [
   { key: "profile", label: "Business profile", description: "Add your basic business details", sourceKeys: ["businessBasicInfo", "industryDescription", "location"] },
   { key: "services", label: "Add services", description: "Define the services you offer", sourceKeys: ["services"] },
   { key: "pricing", label: "Set pricing", description: "Configure your service pricing", sourceKeys: ["servicePricing"] },
-  { key: "availability", label: "Configure availability", description: "Set your business hours", sourceKeys: ["businessHours"] },
+  { key: "availability", label: "Configure availability", description: "Set your business hours", sourceKeys: ["business-availability"] },
   { key: "policies", label: "Add policies", description: "Add terms, privacy & refund policies", sourceKeys: ["policies"] },
 ];
 
 function SetupChecklist({ status }: { status: BusinessSetupStatus }) {
   const completed = new Set(status.completedItems.map((item) => item.key));
+  const isCompleted = (key: string) => completed.has(key) || (key === "business-availability" && completed.has("businessHours"));
   const missing = new Map(status.missingItems.map((item) => [item.key, item]));
-  const remaining = CHECKLIST.filter((item) => !item.sourceKeys.every((key) => completed.has(key))).length;
+  const remaining = CHECKLIST.filter((item) => !item.sourceKeys.every(isCompleted)).length;
   return <AppCard className="shadow-none"><div className="flex items-center justify-between gap-3"><h2 className="text-base font-bold">Complete your setup</h2><span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-bold text-primary">{remaining} {remaining === 1 ? "step" : "steps"} remaining</span></div><ol className="mt-5 space-y-0">{CHECKLIST.map((item, index) => {
-    const done = item.sourceKeys.every((key) => completed.has(key));
+    const done = item.sourceKeys.every(isCompleted);
     const missingItem = item.sourceKeys.map((key) => missing.get(key)).find(Boolean);
     const route = resolveSetupRoute(missingItem?.route);
     const content = <><span className={`relative z-10 grid size-6 shrink-0 place-items-center rounded-full border ${done ? "border-primary bg-primary text-primary-foreground" : "border-input bg-card text-muted-foreground"}`}>{done ? <Check className="size-3.5" /> : <Circle className="size-2 fill-current" />}</span><span className="min-w-0"><span className="block text-sm font-semibold">{item.label}</span><span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{item.description}</span></span></>;

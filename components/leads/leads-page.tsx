@@ -32,6 +32,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppButton } from "@/components/app-button";
+import { AppIsoDatePicker, parseDateValue } from "@/components/app-date-picker";
 import { AppEmptyState } from "@/components/app-empty-state";
 import { AppErrorState } from "@/components/app-error-state";
 import { AppInput } from "@/components/app-input";
@@ -100,6 +101,8 @@ export function LeadsPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const selectedLeadId = searchParams.get("lead");
   const canDelete = profile.data?.role !== "STAFF";
+  const dateFrom = parseDateValue(query.dateFrom);
+  const dateTo = parseDateValue(query.dateTo);
 
   const setParams = (updates: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -203,7 +206,7 @@ export function LeadsPage() {
         </div>
 
         {filtersOpen && (
-          <div className="grid gap-3 border-b bg-muted/25 p-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 border-b bg-muted/25 p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
             <AppSelect
               aria-label="Filter by status"
               value={query.status ?? "ALL"}
@@ -217,6 +220,20 @@ export function LeadsPage() {
               onValueChange={(value) => setParams({ source: value === "ALL" ? undefined : value, page: 1 })}
             />
             <AppInput aria-label="Filter by tag" placeholder="Filter by tag" value={query.tag ?? ""} onChange={(event) => setParams({ tag: event.target.value || undefined, page: 1 })} />
+            <AppIsoDatePicker
+              aria-label="Filter leads created from date"
+              value={query.dateFrom}
+              onChange={(value) => setParams({ dateFrom: value || undefined, page: 1 })}
+              placeholder="Created from"
+              disabledDates={dateTo ? { after: dateTo } : undefined}
+            />
+            <AppIsoDatePicker
+              aria-label="Filter leads created to date"
+              value={query.dateTo}
+              onChange={(value) => setParams({ dateTo: value || undefined, page: 1 })}
+              placeholder="Created to"
+              disabledDates={dateFrom ? { before: dateFrom } : undefined}
+            />
             <AppSelect
               aria-label="Sort leads"
               value={`${query.sortBy}:${query.sortOrder}`}

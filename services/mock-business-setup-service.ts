@@ -41,7 +41,7 @@ const mockBusinessSetupStatus: BusinessSetupStatus = {
       planRequired: "BASIC",
     },
     {
-      key: "businessHours",
+      key: "business-availability",
       label: "Add business working hours",
       description: "Working hours help BizReply know when your business is available.",
       route: "/settings/business/availability",

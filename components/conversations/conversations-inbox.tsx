@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppButton } from "@/components/app-button";
+import { AppIsoDatePicker, parseDateValue } from "@/components/app-date-picker";
 import { AppEmptyState } from "@/components/app-empty-state";
 import { AppErrorState } from "@/components/app-error-state";
 import { AppInput } from "@/components/app-input";
@@ -64,6 +65,8 @@ function parseQuery(params: URLSearchParams): ConversationListQuery {
     assignedStaffId: params.get("assignedStaffId") || undefined,
     priority: (params.get("priority") || undefined) as ConversationListQuery["priority"],
     pinned: params.get("pinned") === "true" ? true : undefined,
+    dateFrom: params.get("dateFrom") || undefined,
+    dateTo: params.get("dateTo") || undefined,
     sortBy: "lastMessageAt",
     sortOrder: "desc",
   };
@@ -108,6 +111,8 @@ function InboxList({
 }) {
   const conversations = useConversations(query);
   const stats = useConversationStats();
+  const dateFrom = parseDateValue(query.dateFrom);
+  const dateTo = parseDateValue(query.dateTo);
 
   return (
     <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6">
@@ -120,10 +125,12 @@ function InboxList({
         <section className="mt-6 rounded-2xl border bg-card">
           <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center">
             <label className="relative min-w-0 flex-1"><span className="sr-only">Search conversations</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><AppInput className="pl-9" placeholder="Search conversations" value={query.search ?? ""} onChange={(event) => onParams({ search: event.target.value || undefined, page: 1 })} /></label>
-            <div className="grid grid-cols-2 gap-2 lg:w-[540px] lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 lg:w-[860px] lg:grid-cols-5">
               <AppSelect aria-label="Filter conversation status" value={query.status ?? "ALL"} options={[{ value: "ALL", label: "All statuses" }, ...CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))]} onValueChange={(value) => onParams({ status: value === "ALL" ? undefined : value, page: 1 })} />
               <AppSelect aria-label="Filter conversation channel" value={query.channel ?? "ALL"} options={[{ value: "ALL", label: "All channels" }, ...CONVERSATION_CHANNELS.map((channel) => ({ value: channel, label: CONVERSATION_CHANNEL_LABELS[channel] }))]} onValueChange={(value) => onParams({ channel: value === "ALL" ? undefined : value, page: 1 })} />
               <AppSelect aria-label="Filter conversation priority" value={query.priority ?? "ALL"} options={[{ value: "ALL", label: "All priorities" }, ...CONVERSATION_PRIORITIES.map((priority) => ({ value: priority, label: CONVERSATION_PRIORITY_LABELS[priority] }))]} onValueChange={(value) => onParams({ priority: value === "ALL" ? undefined : value, page: 1 })} />
+              <AppIsoDatePicker aria-label="Filter conversations created from date" value={query.dateFrom} onChange={(value) => onParams({ dateFrom: value || undefined, page: 1 })} placeholder="Created from" disabledDates={dateTo ? { after: dateTo } : undefined} />
+              <AppIsoDatePicker aria-label="Filter conversations created to date" value={query.dateTo} onChange={(value) => onParams({ dateTo: value || undefined, page: 1 })} placeholder="Created to" disabledDates={dateFrom ? { before: dateFrom } : undefined} />
             </div>
             <AppButton variant={query.pinned ? "secondary" : "outline"} aria-pressed={Boolean(query.pinned)} onClick={() => onParams({ pinned: query.pinned ? undefined : "true", page: 1 })}><Pin className="size-4" />Pinned</AppButton>
             <AppButton size="icon" variant="outline" aria-label="Refresh inbox" onClick={() => Promise.all([conversations.refetch(), stats.refetch()])}><RefreshCw className="size-4" /></AppButton>
