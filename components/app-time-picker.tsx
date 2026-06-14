@@ -61,14 +61,20 @@ export function AppTimePicker({
 }: AppTimePickerProps) {
   const [open, setOpen] = useState(false);
   const current = parts(value);
+  const [draft, setDraft] = useState(current);
   const hours = useMemo(() => Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")), []);
   const minutes = useMemo(() => Array.from({ length: Math.ceil(60 / minuteStep) }, (_, index) => String(index * minuteStep).padStart(2, "0")), [minuteStep]);
-  const choose = (hour = current.hour, minute = current.minute, period = current.period) => onChange?.(valueFromParts(hour, minute, period));
+
+  const choose = (next: Partial<typeof draft>) => {
+    const updated = { ...draft, ...next };
+    setDraft(updated);
+    onChange?.(valueFromParts(updated.hour, updated.minute, updated.period));
+  };
 
   return (
     <>
       {name && <input type="hidden" name={name} value={value} />}
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); setDraft(parts(value)); }}>
         <div className="relative">
           <PopoverTrigger asChild>
             <button
@@ -96,11 +102,11 @@ export function AppTimePicker({
           {clearable && value && !disabled && <button type="button" onClick={() => onChange?.("")} className="absolute right-10 top-1/2 z-10 grid size-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Clear selected time"><X className="size-3.5" /></button>}
         </div>
         <PopoverContent align="start" className="w-[min(310px,calc(100vw-2rem))] p-3">
-          <div className="flex items-center justify-between gap-3 border-b pb-3"><div><p className="text-sm font-bold">Select time</p><p className="mt-0.5 text-xs text-muted-foreground">{formatTimeValue(value) || "Choose hour, minute, and period"}</p></div>{value && <span className="rounded-lg bg-secondary px-2.5 py-1.5 text-xs font-bold text-primary">{value}</span>}</div>
+          <div className="flex items-center justify-between gap-3 border-b pb-3"><div><p className="text-sm font-bold">Select time</p><p className="mt-0.5 text-xs text-muted-foreground">{formatTimeValue(value) || (draft.hour ? `${draft.hour}:${draft.minute || "--"} ${draft.period}` : "Choose hour, minute, and period")}</p></div>{value && <span className="rounded-lg bg-secondary px-2.5 py-1.5 text-xs font-bold text-primary">{value}</span>}</div>
           <div className="mt-3 grid grid-cols-[1fr_1fr_76px] gap-2">
-            <TimeColumn label="Hour" values={hours} selected={current.hour} onSelect={(next) => choose(next)} />
-            <TimeColumn label="Minute" values={minutes} selected={current.minute} onSelect={(next) => choose(current.hour || "08", next)} />
-            <TimeColumn label="Period" values={["AM", "PM"]} selected={current.period} onSelect={(next) => choose(current.hour || "08", current.minute || "00", next as "AM" | "PM")} />
+            <TimeColumn label="Hour" values={hours} selected={draft.hour} onSelect={(hour) => choose({ hour, minute: draft.minute || "00" })} />
+            <TimeColumn label="Minute" values={minutes} selected={draft.minute} onSelect={(minute) => choose({ hour: draft.hour || "08", minute })} />
+            <TimeColumn label="Period" values={["AM", "PM"]} selected={draft.period} onSelect={(period) => choose({ hour: draft.hour || "08", minute: draft.minute || "00", period: period as "AM" | "PM" })} />
           </div>
           <div className="mt-3 flex items-center justify-between gap-2 border-t pt-3"><button type="button" onClick={() => onChange?.("")} disabled={!value} className="min-h-9 rounded-md px-2 text-xs font-semibold text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">Clear</button><button type="button" onClick={() => setOpen(false)} disabled={!value} className="min-h-9 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">Done</button></div>
         </PopoverContent>
