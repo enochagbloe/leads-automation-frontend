@@ -120,6 +120,15 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if (["business.policy.created", "business.policy.updated", "business.policy.archived", "business.policy.restored", "business.policy.reordered", "business.policies.summary.updated"].includes(type)) {
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.businessPolicies.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+      client.invalidateQueries({ queryKey: queryKeys.auth.currentUser }),
+    ]);
+    return;
+  }
+
   if (["whatsapp.connection.updated", "whatsapp.connection.deactivated", "whatsapp.connection.error"].includes(type)) {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.whatsapp.all }),

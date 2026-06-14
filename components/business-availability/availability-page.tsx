@@ -184,7 +184,7 @@ function SetupChecklist({ setup }: { setup?: BusinessSetupStatus }) {
     { label: "Business profile", description: "Add your core business details", href: "/settings/business/profile", done: ["businessBasicInfo", "industryDescription", "location"].every((key) => completed.has(key)) },
     { label: "Services & Pricing", description: "Define what your business offers", href: "/settings/business/services", done: completed.has("services") && completed.has("servicePricing") },
     { label: "Availability", description: "Set your weekly business hours", href: "/settings/business/availability", done: availabilityComplete },
-    { label: "Policies", description: "Add customer-facing policies", href: "/settings/business/policies", done: completed.has("policies") },
+    { label: "Policies", description: "Add customer-facing policies", href: "/settings/business/policies", done: completed.has("business-policies") || completed.has("policies") },
   ];
   return <AppCard className="shadow-none"><h2 className="font-bold">Complete your setup</h2><div className="mt-5 space-y-4">{items.map((item) => <Link key={item.label} href={item.href} className="flex gap-3 rounded-lg outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"><span className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border", item.done ? "border-primary bg-primary text-primary-foreground" : "border-input")} >{item.done ? <Check className="size-3" /> : <Circle className="size-2 fill-current text-muted-foreground" />}</span><span><span className="block text-sm font-semibold">{item.label}</span><span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{item.description}</span></span></Link>)}</div></AppCard>;
 }

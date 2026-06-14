@@ -30,4 +30,9 @@ export interface BusinessSetupStatus {
     missingServicePrices: number;
     missingServiceDurations: number;
   };
+  policyProgress?: {
+    policiesAdded: number;
+    customerFacingPolicies: number;
+    missingRecommendedPolicyCategories: string[];
+  };
 }
