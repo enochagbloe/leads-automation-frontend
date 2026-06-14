@@ -1,4 +1,5 @@
-import { apiRequest } from "@/lib/api-client";
+import { ApiError, apiRequest } from "@/lib/api-client";
+import { businessStore } from "@/lib/business-store";
 import { env } from "@/lib/env";
 import { tokenStore } from "@/lib/token-store";
 import { mockAuthService } from "@/services/mock-auth-service";
@@ -27,5 +28,14 @@ export const authService = {
   resendVerification: (input: EmailInput) => env.useMockApi ? mockAuthService.resendVerification(input) : apiRequest<ApiMessage>("/auth/resend-verification", { method: "POST", body: JSON.stringify(input) }),
   forgotPassword: (input: EmailInput) => env.useMockApi ? mockAuthService.forgotPassword(input) : apiRequest<ApiMessage>("/auth/forgot-password", { method: "POST", body: JSON.stringify(input) }),
   resetPassword: (input: ResetPasswordInput) => env.useMockApi ? mockAuthService.resetPassword(input) : apiRequest<ApiMessage>("/auth/reset-password", { method: "POST", body: JSON.stringify(input) }),
-  currentUser: () => env.useMockApi ? mockAuthService.currentUser() : apiRequest<AuthProfile>("/auth/me"),
+  async currentUser() {
+    if (env.useMockApi) return mockAuthService.currentUser();
+    try {
+      return await apiRequest<AuthProfile>("/auth/me");
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.code !== "BUSINESS_ACCESS_DENIED") throw error;
+      businessStore.clear();
+      return apiRequest<AuthProfile>("/auth/me");
+    }
+  },
 };

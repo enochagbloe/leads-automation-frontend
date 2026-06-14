@@ -21,6 +21,7 @@ import { AppFormField } from "@/components/app-form-field";
 import { AppInput } from "@/components/app-input";
 import { AppSelect, type AppSelectOption } from "@/components/app-select";
 import { BusinessReadinessBadge } from "@/components/business-setup/business-readiness-badge";
+import { BusinessSetupTabs } from "@/components/business-setup/business-setup-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBusinessProfile, useUpdateBusinessProfile } from "@/hooks/use-business-profile";
 import { useBusinessSetupStatus } from "@/hooks/use-business-setup";
@@ -165,6 +166,7 @@ export function BusinessProfilePage() {
   return <form onSubmit={submit} noValidate className="pb-24">
     <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
       <div><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Business profile</h1><p className="mt-1.5 text-sm text-muted-foreground">Set up your business details so BizReply can automate replies accurately.</p></div>
+      <BusinessSetupTabs activeKey="business-profile" className="mt-5" />
       {setup.data ? <SetupProgress status={setup.data} /> : <Skeleton className="mt-6 h-28 rounded-xl" />}
       <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
         <AppCard className="shadow-none"><h2 className="text-base font-bold">Business information</h2><p className="mt-1 text-xs text-muted-foreground">{canEdit ? "Keep customer-facing details accurate and current." : "You can view this profile, but only an owner or manager can update it."}</p>

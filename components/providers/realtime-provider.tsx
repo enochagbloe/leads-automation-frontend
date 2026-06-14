@@ -3,6 +3,7 @@
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { refreshAccessToken } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { queryKeys } from "@/lib/query-keys";
 import { tokenStore } from "@/lib/token-store";
@@ -101,6 +102,15 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if (["business.service.created", "business.service.updated", "business.service.archived", "business.service.restored", "business.service.reordered", "business.services.summary.updated"].includes(type)) {
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.businessServices.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+      client.invalidateQueries({ queryKey: queryKeys.auth.currentUser }),
+    ]);
+    return;
+  }
+
   if (["whatsapp.connection.updated", "whatsapp.connection.deactivated", "whatsapp.connection.error"].includes(type)) {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.whatsapp.all }),
@@ -128,6 +138,7 @@ export function RealtimeProvider({ activeBusinessId, enabled = true, children }:
     await Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.conversations.all }),
       client.invalidateQueries({ queryKey: queryKeys.leads.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
     ]);
   }, [client]);
 
@@ -159,6 +170,10 @@ export function RealtimeProvider({ activeBusinessId, enabled = true, children }:
           },
           signal: controller.signal,
         });
+        if (response.status === 401 && await refreshAccessToken()) {
+          reconnectAttempt = 0;
+          return void connect();
+        }
         if (!response.ok || !response.body) throw new Error(`Realtime stream failed with status ${response.status}`);
 
         setStatus("connected");

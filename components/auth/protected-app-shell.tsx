@@ -3,6 +3,7 @@
 import { Building2, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { UserAccountMenu } from "@/components/account/user-account-menu";
 import { AppButton } from "@/components/app-button";
 import { AppErrorState } from "@/components/app-error-state";
@@ -14,6 +15,9 @@ import { FullScreenLoading, LogoutLoadingState } from "@/components/states/loadi
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
 import { useBusinesses, useSelectBusiness } from "@/hooks/use-businesses";
 import { useCurrentSubscription } from "@/hooks/use-subscription";
+import { ApiError } from "@/lib/api-client";
+import { resetBusinessContext } from "@/lib/business-query-cache";
+import { BUSINESS_ACCESS_DENIED_EVENT } from "@/lib/business-store";
 import { canCreateBusiness } from "@/lib/subscription";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +27,7 @@ export function ProtectedAppShell({ children }: { children: React.ReactNode }) {
 
 function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const client = useQueryClient();
   const { mode, toggleMobile } = useSidebar();
   const profile = useCurrentUser();
   const logout = useLogout();
@@ -30,15 +35,26 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const selectBusiness = useSelectBusiness();
   const subscription = useCurrentSubscription();
   const businessCreation = subscription.data ? canCreateBusiness(subscription.data) : null;
+  const sessionEnded = profile.error instanceof ApiError && profile.error.status === 401;
 
   useEffect(() => {
-    if (profile.isError) router.replace("/login");
+    if (sessionEnded) router.replace("/login");
     if (profile.data?.activeBusiness?.status === "PENDING_SETUP") router.replace("/onboarding");
     if (businesses.data?.length === 0) router.replace("/businesses/new");
-  }, [businesses.data?.length, profile.data?.activeBusiness?.status, profile.isError, router]);
+  }, [businesses.data?.length, profile.data?.activeBusiness?.status, router, sessionEnded]);
+
+  useEffect(() => {
+    const recoverBusinessAccess = () => void resetBusinessContext(client);
+    window.addEventListener(BUSINESS_ACCESS_DENIED_EVENT, recoverBusinessAccess);
+    return () => window.removeEventListener(BUSINESS_ACCESS_DENIED_EVENT, recoverBusinessAccess);
+  }, [client]);
 
   if (profile.isPending) return <FullScreenLoading />;
-  if (profile.isError) return <AppErrorState title="Your session has ended" description="Redirecting you to sign in again." />;
+  if (profile.isError) {
+    return sessionEnded
+      ? <AppErrorState title="Your session has ended" description="Redirecting you to sign in again." />
+      : <AppErrorState title="Unable to load your account" description="Your session is still active. Refresh the page or try again shortly." />;
+  }
   if (logout.isPending) return <LogoutLoadingState />;
 
   const fullName = `${profile.data.user.firstName} ${profile.data.user.lastName}`;
