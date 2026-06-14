@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "react-day-picker/style.css";
 
 :root {
   --background: #f7f9f7;
@@ -215,6 +216,60 @@ select {
 
 .app-select-content[data-state="closed"] {
   animation: account-menu-out 120ms ease-in;
+}
+
+.app-calendar {
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-background-color: var(--secondary);
+  --rdp-day-height: 40px;
+  --rdp-day-width: 40px;
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-width: 38px;
+  --rdp-day_button-border-radius: 0.5rem;
+  --rdp-selected-border: 1px solid var(--primary);
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+
+.app-calendar .rdp-month_caption {
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.app-calendar .rdp-button_next,
+.app-calendar .rdp-button_previous {
+  border-radius: 0.5rem;
+  transition: background-color 180ms ease;
+}
+
+.app-calendar .rdp-button_next:hover,
+.app-calendar .rdp-button_previous:hover,
+.app-calendar .rdp-day_button:hover {
+  background: var(--muted);
+}
+
+.app-calendar .rdp-day_button:focus-visible,
+.app-calendar .rdp-button_next:focus-visible,
+.app-calendar .rdp-button_previous:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.app-calendar .rdp-selected .rdp-day_button {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700;
+}
+
+.app-calendar .rdp-today:not(.rdp-selected) .rdp-day_button {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-weight: 700;
+}
+
+.app-calendar .rdp-outside {
+  color: var(--muted-foreground);
+  opacity: 0.55;
 }
 
 .global-search-dialog {

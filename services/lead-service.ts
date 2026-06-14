@@ -1,11 +1,15 @@
 import { apiRequest } from "@/lib/api-client";
+import { apiDateFrom, apiDateTo } from "@/lib/date-query";
 import type { ApiMessage } from "@/types/auth";
 import type { Lead, LeadDetailResponse, LeadInput, LeadListQuery, LeadListResponse, LeadStats, LeadStatus, UpdateLeadInput } from "@/types/lead";
 
 function queryString(query: LeadListQuery) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== "") params.set(key, String(value));
+    if (value === undefined || value === "") continue;
+    if (key === "dateFrom") params.set(key, apiDateFrom(String(value)));
+    else if (key === "dateTo") params.set(key, apiDateTo(String(value)));
+    else params.set(key, String(value));
   }
   return params.toString();
 }
