@@ -1,5 +1,5 @@
 import { env } from "@/lib/env";
-import { businessStore } from "@/lib/business-store";
+import { BUSINESS_ACCESS_DENIED_EVENT, businessStore } from "@/lib/business-store";
 import { tokenStore } from "@/lib/token-store";
 import type { ApiErrorResponse, RefreshResponse } from "@/types/auth";
 import type { PlanCode } from "@/types/subscription";
@@ -39,11 +39,19 @@ async function refreshSession() {
     body: JSON.stringify({ refreshToken }),
   });
   if (!response.ok) {
-    tokenStore.clear();
+    if ([400, 401, 422].includes(response.status)) tokenStore.clear();
+    if (response.status >= 500 || response.status === 429) {
+      throw new Error("Unable to refresh session. Please try again.");
+    }
     return false;
   }
   tokenStore.setTokens(await response.json() as RefreshResponse);
   return true;
+}
+
+export function refreshAccessToken() {
+  refreshPromise ??= refreshSession().finally(() => { refreshPromise = null; });
+  return refreshPromise;
 }
 
 async function request<T>(path: string, init: RequestInit, allowRefresh: boolean): Promise<T> {
@@ -60,15 +68,25 @@ async function request<T>(path: string, init: RequestInit, allowRefresh: boolean
   });
 
   if (response.status === 401 && allowRefresh && tokenStore.getRefreshToken()) {
-    refreshPromise ??= refreshSession().finally(() => { refreshPromise = null; });
-    if (await refreshPromise) return request<T>(path, init, false);
+    if (await refreshAccessToken()) {
+      try {
+        return await request<T>(path, init, false);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) tokenStore.clear();
+        throw error;
+      }
+    }
   }
 
   const body = await response.json().catch(() => null) as ApiErrorResponse | T | null;
   if (!response.ok) {
     const responseError = body as ApiErrorResponse | null;
     const error = responseError?.error ?? responseError;
-    if (error?.code === "BUSINESS_ACCESS_DENIED") businessStore.clear();
+    if (error?.code === "BUSINESS_ACCESS_DENIED") {
+      businessStore.clear();
+      if (path !== "/auth/me" && typeof window !== "undefined") window.dispatchEvent(new Event(BUSINESS_ACCESS_DENIED_EVENT));
+    }
+    if (response.status === 401 && allowRefresh) tokenStore.clear();
     throw new ApiError(
       error?.code ?? "REQUEST_FAILED",
       error?.message ?? "Request failed. Please try again.",

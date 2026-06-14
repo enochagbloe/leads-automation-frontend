@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { resetBusinessContext } from "@/lib/business-query-cache";
 import { businessStore } from "@/lib/business-store";
 import { queryKeys } from "@/lib/query-keys";
 import { businessService } from "@/services/business-service";
@@ -13,8 +14,8 @@ export const useCreateBusiness = () => useMutation({ mutationFn: businessService
 export function useSelectBusiness() {
   const client = useQueryClient();
   return (businessId: string) => {
+    if (businessStore.get() === businessId) return;
     businessStore.set(businessId);
-    client.clear();
-    window.location.href = "/dashboard";
+    void resetBusinessContext(client);
   };
 }

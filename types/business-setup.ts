@@ -22,4 +22,12 @@ export interface BusinessSetupStatus {
   missingItems: BusinessSetupItem[];
   completedItems: Array<{ key: string; label: string }>;
   nextRecommendedStep: { key: string; label: string; route: string } | null;
+  serviceProgress?: {
+    servicesAdded: number;
+    servicesWithPricing: number;
+    servicesReadyForAi: number;
+    servicesReadyForBooking: number;
+    missingServicePrices: number;
+    missingServiceDurations: number;
+  };
 }

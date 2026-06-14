@@ -66,6 +66,14 @@ const mockBusinessSetupStatus: BusinessSetupStatus = {
     label: "Add business country and city",
     route: "/settings/business/profile",
   },
+  serviceProgress: {
+    servicesAdded: 2,
+    servicesWithPricing: 1,
+    servicesReadyForAi: 1,
+    servicesReadyForBooking: 1,
+    missingServicePrices: 1,
+    missingServiceDurations: 1,
+  },
 };
 
 export const mockBusinessSetupService = {
