@@ -137,6 +137,20 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if (["business.appointment.created", "business.appointment.updated", "business.appointment.rescheduled", "business.appointment.cancelled", "business.appointment.completed", "business.appointment.no_show", "business.appointment.assigned", "business.appointments.calendar.updated"].includes(type)) {
+    const appointmentId = typeof payload.appointmentId === "string" ? payload.appointmentId : undefined;
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
+      ...(appointmentId ? [client.invalidateQueries({ queryKey: ["business-appointments", "detail", appointmentId] })] : []),
+      ...(leadId ? [client.invalidateQueries({ queryKey: queryKeys.leads.detail(leadId) })] : []),
+      ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) })] : []),
+    ]);
+    return;
+  }
+
   if (["whatsapp.connection.updated", "whatsapp.connection.deactivated", "whatsapp.connection.error"].includes(type)) {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.whatsapp.all }),
@@ -164,6 +178,8 @@ export function RealtimeProvider({ activeBusinessId, enabled = true, children }:
     await Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.conversations.all }),
       client.invalidateQueries({ queryKey: queryKeys.leads.all }),
+      client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
     ]);
