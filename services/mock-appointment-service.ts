@@ -9,15 +9,51 @@ import type {
   AppointmentDetailResponse,
   AppointmentListQuery,
   AppointmentListResponse,
+  AppointmentSettings,
   CalendarAppointment,
   CancelAppointmentInput,
+  CompleteAppointmentInput,
+  ConfirmAppointmentInput,
   CreateAppointmentInput,
+  MissedAppointmentInput,
+  NoShowAppointmentInput,
   RescheduleAppointmentInput,
+  UpdateAppointmentSettingsInput,
 } from "@/types/appointment";
 
 const now = new Date();
+let appointmentSettings: AppointmentSettings = {
+  appointmentConfirmationMode: "MANUAL_CONFIRMATION_REQUIRED",
+  updatedAt: now.toISOString(),
+};
 
 let appointments: CalendarAppointment[] = [
+  {
+    id: "appt_demo_pending",
+    title: "Client Consultation - New Build",
+    status: "PENDING_BUSINESS_CONFIRMATION",
+    source: "CUSTOMER_REQUESTED",
+    startTime: formatISO(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0)),
+    endTime: formatISO(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 13, 0)),
+    timezone: "Africa/Accra",
+    locationType: "TO_BE_CONFIRMED",
+    locationStatus: "NEEDS_CONFIRMATION",
+    location: null,
+    assignedStaffId: "member_demo",
+    leadId: "lead_demo_ama",
+    conversationId: "conv_demo_ama",
+    serviceId: "svc_demo_consultation",
+    lead: { id: "lead_demo_ama", fullName: "Ama Boateng", phone: "+233 20 555 0198", email: "ama@example.com" },
+    service: { id: "svc_demo_consultation", name: "Consultation", durationMinutes: 60 },
+    assignedStaff: { id: "member_demo", role: "BUSINESS_OWNER", user: { id: "usr_demo", firstName: "Enoch", lastName: "Agbloe", email: "enoch@example.com" } },
+    availableActions: ["CONFIRM", "RESCHEDULE", "CANCEL"],
+    humanConfirmationRequired: true,
+    humanConfirmationReason: "BUSINESS_CONFIRMATION_REQUIRED",
+    rescheduleCount: 0,
+    outcomeRequiredAt: null,
+    outcomeConfirmedAt: null,
+    appointmentConfirmationMode: "MANUAL_CONFIRMATION_REQUIRED",
+  },
   {
     id: "appt_demo_1",
     title: "Property Viewing with Kwame",
@@ -36,6 +72,39 @@ let appointments: CalendarAppointment[] = [
     lead: { id: "lead_demo_kwame", fullName: "Kwame Mensah", phone: "+233 24 123 4567", email: "kwame@example.com" },
     service: { id: "svc_demo_viewing", name: "Property Viewing", durationMinutes: 45 },
     assignedStaff: { id: "member_demo", role: "BUSINESS_OWNER", user: { id: "usr_demo", firstName: "Enoch", lastName: "Agbloe", email: "enoch@example.com" } },
+    availableActions: ["CONFIRM", "RESCHEDULE", "CANCEL"],
+    humanConfirmationRequired: true,
+    humanConfirmationReason: "LOCATION_REQUIRED",
+    rescheduleCount: 0,
+    outcomeRequiredAt: null,
+    outcomeConfirmedAt: null,
+    appointmentConfirmationMode: "MANUAL_CONFIRMATION_REQUIRED",
+  },
+  {
+    id: "appt_demo_outcome",
+    title: "Follow-up Call - John Mensah",
+    status: "NEEDS_OUTCOME_CONFIRMATION",
+    source: "MANUAL",
+    startTime: formatISO(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0)),
+    endTime: formatISO(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 30)),
+    timezone: "Africa/Accra",
+    locationType: "PHONE_CALL",
+    locationStatus: "NOT_REQUIRED",
+    location: "Phone call",
+    assignedStaffId: "member_demo",
+    leadId: "lead_demo_john",
+    conversationId: null,
+    serviceId: "svc_demo_followup",
+    lead: { id: "lead_demo_john", fullName: "John Mensah", phone: "+233 27 555 0123", email: "john@example.com" },
+    service: { id: "svc_demo_followup", name: "Follow-up Call", durationMinutes: 30 },
+    assignedStaff: { id: "member_demo", role: "BUSINESS_OWNER", user: { id: "usr_demo", firstName: "Enoch", lastName: "Agbloe", email: "enoch@example.com" } },
+    availableActions: ["COMPLETE", "NO_SHOW", "MISSED"],
+    humanConfirmationRequired: false,
+    humanConfirmationReason: null,
+    rescheduleCount: 1,
+    outcomeRequiredAt: formatISO(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 35)),
+    outcomeConfirmedAt: null,
+    appointmentConfirmationMode: "MANUAL_CONFIRMATION_REQUIRED",
   },
 ];
 
@@ -65,10 +134,13 @@ function toDetail(appointment: CalendarAppointment): AppointmentDetail {
     description: null,
     notes: null,
     appointmentDate: appointment.startTime.slice(0, 10),
-    humanConfirmationRequired: appointment.status === "NEEDS_HUMAN_CONFIRMATION",
-    humanConfirmationReason: appointment.status === "NEEDS_HUMAN_CONFIRMATION" ? "LOCATION_REQUIRED" : null,
+    humanConfirmationRequired: appointment.humanConfirmationRequired ?? (appointment.status === "NEEDS_HUMAN_CONFIRMATION" || appointment.status === "PENDING_BUSINESS_CONFIRMATION"),
+    humanConfirmationReason: appointment.humanConfirmationReason ?? (appointment.status === "NEEDS_HUMAN_CONFIRMATION" ? "LOCATION_REQUIRED" : appointment.status === "PENDING_BUSINESS_CONFIRMATION" ? "BUSINESS_CONFIRMATION_REQUIRED" : null),
     cancellationReason: null,
     rescheduleReason: null,
+    completedNote: null,
+    noShowReason: null,
+    missedReason: null,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
   };
@@ -97,7 +169,10 @@ export const mockAppointmentService = {
       view: query.view,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
-      appointments: appointments.filter((appointment) => inRange(appointment, query)).sort((a, b) => a.startTime.localeCompare(b.startTime)),
+      appointments: appointments
+        .filter((appointment) => inRange(appointment, query))
+        .filter((appointment) => !query.assignedStaffId || (query.assignedStaffId === "unassigned" ? !appointment.assignedStaffId : appointment.assignedStaffId === query.assignedStaffId))
+        .sort((a, b) => a.startTime.localeCompare(b.startTime)),
     };
   },
   async list(query: AppointmentListQuery): Promise<AppointmentListResponse> {
@@ -106,7 +181,7 @@ export const mockAppointmentService = {
       .filter((appointment) => !query.status || appointment.status === query.status)
       .filter((appointment) => !query.source || appointment.source === query.source)
       .filter((appointment) => !query.serviceId || appointment.serviceId === query.serviceId)
-      .filter((appointment) => !query.assignedStaffId || appointment.assignedStaffId === query.assignedStaffId)
+      .filter((appointment) => !query.assignedStaffId || (query.assignedStaffId === "unassigned" ? !appointment.assignedStaffId : appointment.assignedStaffId === query.assignedStaffId))
       .filter((appointment) => !query.leadId || appointment.leadId === query.leadId)
       .filter((appointment) => !query.conversationId || appointment.conversationId === query.conversationId)
       .filter((appointment) => !query.dateFrom || appointment.startTime.slice(0, 10) >= query.dateFrom)
@@ -148,15 +223,27 @@ export const mockAppointmentService = {
     const end = addMinutes(start, input.durationMinutes ?? 45);
     return { available: true, reason: null, startTime: start.toISOString(), endTime: end.toISOString(), durationMinutes: input.durationMinutes ?? 45, warnings: [] };
   },
+  async settings(): Promise<AppointmentSettings> {
+    await delay();
+    return appointmentSettings;
+  },
+  async updateSettings(input: UpdateAppointmentSettingsInput): Promise<AppointmentSettings> {
+    await delay();
+    appointmentSettings = { appointmentConfirmationMode: input.appointmentConfirmationMode, updatedAt: new Date().toISOString() };
+    return appointmentSettings;
+  },
   async create(input: CreateAppointmentInput): Promise<CalendarAppointment> {
     await delay();
     const [hour, minute] = input.time.split(":").map(Number);
     const start = new Date(`${input.date}T${input.time}:00`);
     const end = addMinutes(start, input.durationMinutes ?? 45);
+    const safeForAutoConfirm = input.locationType !== "TO_BE_CONFIRMED" && !input.notes?.toLowerCase().includes("unsafe");
+    const autoConfirmWithStaff = appointmentSettings.appointmentConfirmationMode === "AUTO_CONFIRM_WHEN_STAFF_ASSIGNED" && Boolean(input.assignedStaffId);
+    const safeAutoConfirmed = appointmentSettings.appointmentConfirmationMode === "AUTO_CONFIRM_SAFE_BOOKINGS" && safeForAutoConfirm;
     const appointment: CalendarAppointment = {
       id: `appt_${Date.now()}`,
       title: input.title,
-      status: input.locationType === "TO_BE_CONFIRMED" ? "NEEDS_HUMAN_CONFIRMATION" : "CONFIRMED",
+      status: autoConfirmWithStaff || safeAutoConfirmed ? "CONFIRMED" : input.locationType === "TO_BE_CONFIRMED" || appointmentSettings.appointmentConfirmationMode === "AUTO_CONFIRM_SAFE_BOOKINGS" ? "NEEDS_HUMAN_CONFIRMATION" : "PENDING_BUSINESS_CONFIRMATION",
       source: input.source ?? "MANUAL",
       startTime: Number.isNaN(start.getTime()) ? formatISO(new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour ?? 9, minute ?? 0)) : start.toISOString(),
       endTime: Number.isNaN(end.getTime()) ? formatISO(addMinutes(new Date(), 45)) : end.toISOString(),
@@ -171,15 +258,42 @@ export const mockAppointmentService = {
       lead: input.leadId ? { id: input.leadId, fullName: input.customerName ?? "Selected customer", phone: input.customerPhone ?? null, email: input.customerEmail ?? null } : null,
       service: input.serviceId ? { id: input.serviceId, name: "Selected service", durationMinutes: input.durationMinutes ?? 45 } : null,
       assignedStaff: { id: input.assignedStaffId ?? "member_demo", role: "BUSINESS_OWNER", user: { id: "usr_demo", firstName: "Enoch", lastName: "Agbloe", email: "enoch@example.com" } },
+      availableActions: autoConfirmWithStaff || safeAutoConfirmed ? ["RESCHEDULE", "CANCEL", "COMPLETE", "NO_SHOW"] : ["CONFIRM", "RESCHEDULE", "CANCEL"],
+      humanConfirmationRequired: !autoConfirmWithStaff && !safeAutoConfirmed && (input.locationType === "TO_BE_CONFIRMED" || appointmentSettings.appointmentConfirmationMode === "AUTO_CONFIRM_SAFE_BOOKINGS"),
+      humanConfirmationReason: input.locationType === "TO_BE_CONFIRMED" ? "LOCATION_REQUIRED" : appointmentSettings.appointmentConfirmationMode === "AUTO_CONFIRM_SAFE_BOOKINGS" && !safeForAutoConfirm ? "SAFETY_REVIEW_REQUIRED" : null,
+      rescheduleCount: 0,
+      outcomeRequiredAt: null,
+      outcomeConfirmedAt: null,
+      appointmentConfirmationMode: appointmentSettings.appointmentConfirmationMode,
+      autoConfirmed: autoConfirmWithStaff || safeAutoConfirmed,
     };
     appointments = [...appointments, appointment].sort((a, b) => a.startTime.localeCompare(b.startTime));
     return appointment;
   },
+  async confirm(appointmentId: string, input: ConfirmAppointmentInput): Promise<AppointmentDetail> {
+    await delay();
+    void input;
+    return replaceAppointment({
+      ...findAppointment(appointmentId),
+      status: "CONFIRMED",
+      locationStatus: "CONFIRMED",
+      humanConfirmationRequired: false,
+      humanConfirmationReason: null,
+      availableActions: ["RESCHEDULE", "CANCEL", "COMPLETE", "NO_SHOW"],
+      outcomeRequiredAt: null,
+      outcomeConfirmedAt: null,
+    });
+  },
   async reschedule(appointmentId: string, input: RescheduleAppointmentInput): Promise<AppointmentDetail> {
     await delay();
-    if (!input.reason.trim()) throw new Error("Please provide a reason before rescheduling this appointment.");
+    const reason = input.reason ?? input.rescheduleReason;
+    if (!reason?.trim()) throw new Error("Please provide a reason before rescheduling this appointment.");
     const appointment = findAppointment(appointmentId);
-    const start = new Date(`${input.date}T${input.time}:00`);
+    if ((appointment.rescheduleCount ?? 0) >= 1) throw new Error("This appointment has already been rescheduled once. Please create a new appointment request instead.");
+    if (new Date(appointment.endTime).getTime() < Date.now()) throw new Error("Past appointments cannot be rescheduled. Please record the appointment outcome or create a new appointment.");
+    const date = input.date ?? input.newDate;
+    const time = input.time ?? input.newStartTime;
+    const start = new Date(`${date}T${time}:00`);
     const duration = appointment.service?.durationMinutes ?? 45;
     return replaceAppointment({
       ...appointment,
@@ -187,30 +301,45 @@ export const mockAppointmentService = {
       startTime: start.toISOString(),
       endTime: addMinutes(start, duration).toISOString(),
       timezone: input.timezone,
+      rescheduleCount: (appointment.rescheduleCount ?? 0) + 1,
+      availableActions: ["CANCEL", "COMPLETE", "NO_SHOW"],
     });
   },
   async cancel(appointmentId: string, input: CancelAppointmentInput): Promise<AppointmentDetail> {
     await delay();
-    if (!input.reason.trim()) throw new Error("Please provide a reason before cancelling this appointment.");
-    return replaceAppointment({ ...findAppointment(appointmentId), status: "CANCELLED" });
+    const reason = input.reason ?? input.cancellationReason;
+    if (!reason?.trim()) throw new Error("Please provide a reason before cancelling this appointment.");
+    return replaceAppointment({ ...findAppointment(appointmentId), status: "CANCELLED", availableActions: [] });
   },
-  async complete(appointmentId: string): Promise<AppointmentDetail> {
+  async complete(appointmentId: string, input: CompleteAppointmentInput = {}): Promise<AppointmentDetail> {
     await delay();
-    return replaceAppointment({ ...findAppointment(appointmentId), status: "COMPLETED" });
+    void input;
+    return replaceAppointment({ ...findAppointment(appointmentId), status: "COMPLETED", outcomeConfirmedAt: new Date().toISOString(), availableActions: [] });
   },
-  async noShow(appointmentId: string): Promise<AppointmentDetail> {
+  async noShow(appointmentId: string, input: NoShowAppointmentInput = {}): Promise<AppointmentDetail> {
     await delay();
-    return replaceAppointment({ ...findAppointment(appointmentId), status: "NO_SHOW" });
+    void input;
+    return replaceAppointment({ ...findAppointment(appointmentId), status: "NO_SHOW", outcomeConfirmedAt: new Date().toISOString(), availableActions: [] });
+  },
+  async missed(appointmentId: string, input: MissedAppointmentInput = {}): Promise<AppointmentDetail> {
+    await delay();
+    void input;
+    return replaceAppointment({ ...findAppointment(appointmentId), status: "MISSED", outcomeConfirmedAt: new Date().toISOString(), availableActions: [] });
   },
   async assign(appointmentId: string, input: AssignAppointmentInput): Promise<AppointmentDetail> {
     await delay();
     const appointment = findAppointment(appointmentId);
+    const autoConfirmWithStaff = appointmentSettings.appointmentConfirmationMode === "AUTO_CONFIRM_WHEN_STAFF_ASSIGNED" && Boolean(input.assignedStaffId);
     return replaceAppointment({
       ...appointment,
       assignedStaffId: input.assignedStaffId,
       assignedStaff: input.assignedStaffId
         ? { id: input.assignedStaffId, role: "MANAGER", user: { id: "usr_assigned", firstName: "Assigned", lastName: "Staff", email: "assigned@example.com" } }
         : null,
+      status: autoConfirmWithStaff ? "CONFIRMED" : appointment.status,
+      availableActions: autoConfirmWithStaff ? ["RESCHEDULE", "CANCEL", "COMPLETE", "NO_SHOW"] : appointment.availableActions,
+      appointmentConfirmationMode: appointmentSettings.appointmentConfirmationMode,
+      autoConfirmed: autoConfirmWithStaff || appointment.autoConfirmed,
     });
   },
 };

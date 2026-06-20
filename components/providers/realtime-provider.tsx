@@ -3,6 +3,7 @@
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { refreshAccessToken } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { queryKeys } from "@/lib/query-keys";
@@ -137,14 +138,29 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
-  if (["business.appointment.created", "business.appointment.updated", "business.appointment.rescheduled", "business.appointment.cancelled", "business.appointment.completed", "business.appointment.no_show", "business.appointment.assigned", "business.appointments.calendar.updated"].includes(type)) {
+  if (["business.appointment.created", "business.appointment.updated", "business.appointment.confirmation_required", "business.appointment.needs_confirmation", "business.appointment.confirmed", "business.appointment.rescheduled", "business.appointment.cancelled", "business.appointment.outcome_required", "business.appointment.completed", "business.appointment.no_show", "business.appointment.missed", "business.appointment.reschedule_limit_reached", "business.appointment.assigned", "business.notification.created", "business.appointments.calendar.updated"].includes(type)) {
     const appointmentId = typeof payload.appointmentId === "string" ? payload.appointmentId : undefined;
+    if (type === "business.appointment.confirmation_required") {
+      toast.info("New appointment needs confirmation.");
+    }
+    if (type === "business.appointment.needs_confirmation") {
+      toast.info("Appointment needs review.");
+    }
+    if (type === "business.appointment.outcome_required") {
+      toast.info("Appointment outcome needed.");
+    }
+    if (type === "business.appointment.assigned") {
+      toast.info("New appointment assigned.");
+    }
+    if (type === "business.appointment.confirmed") {
+      toast.success("Appointment assigned and confirmed.");
+    }
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
-      ...(appointmentId ? [client.invalidateQueries({ queryKey: ["business-appointments", "detail", appointmentId] })] : []),
+      ...(appointmentId ? [client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all })] : []),
       ...(leadId ? [client.invalidateQueries({ queryKey: queryKeys.leads.detail(leadId) })] : []),
       ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) })] : []),
     ]);

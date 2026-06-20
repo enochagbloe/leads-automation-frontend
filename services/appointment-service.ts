@@ -10,12 +10,18 @@ import type {
   AppointmentDetailResponse,
   AppointmentListQuery,
   AppointmentListResponse,
+  AppointmentSettings,
   AppointmentStatus,
   CalendarAppointment,
   CancelAppointmentInput,
   CheckAppointmentAvailabilityInput,
+  CompleteAppointmentInput,
+  ConfirmAppointmentInput,
   CreateAppointmentInput,
+  MissedAppointmentInput,
+  NoShowAppointmentInput,
   RescheduleAppointmentInput,
+  UpdateAppointmentSettingsInput,
 } from "@/types/appointment";
 
 function queryString(query: object) {
@@ -69,21 +75,33 @@ export const appointmentService = {
   checkAvailability: (input: CheckAppointmentAvailabilityInput) => env.useMockApi
     ? mockAppointmentService.checkAvailability(input)
     : apiRequest<AppointmentAvailabilityResponse>("/business/appointments/check-availability", { method: "POST", body: JSON.stringify(input) }),
+  settings: () => env.useMockApi
+    ? mockAppointmentService.settings()
+    : apiRequest<AppointmentSettings>("/business/appointments/settings"),
+  updateSettings: (input: UpdateAppointmentSettingsInput) => env.useMockApi
+    ? mockAppointmentService.updateSettings(input)
+    : apiRequest<AppointmentSettings>("/business/appointments/settings", { method: "PATCH", body: JSON.stringify(input) }),
   create: (input: CreateAppointmentInput) => env.useMockApi
     ? mockAppointmentService.create(input)
     : apiRequest<ApiAppointmentLike>("/business/appointments", { method: "POST", body: JSON.stringify(input) }).then(normalizeAppointment),
+  confirm: (appointmentId: string, input: ConfirmAppointmentInput = {}) => env.useMockApi
+    ? mockAppointmentService.confirm(appointmentId, input)
+    : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/confirm`, { method: "PATCH", body: JSON.stringify(input) }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
   reschedule: (appointmentId: string, input: RescheduleAppointmentInput) => env.useMockApi
     ? mockAppointmentService.reschedule(appointmentId, input)
     : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/reschedule`, { method: "PATCH", body: JSON.stringify(input) }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
   cancel: (appointmentId: string, input: CancelAppointmentInput) => env.useMockApi
     ? mockAppointmentService.cancel(appointmentId, input)
     : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/cancel`, { method: "PATCH", body: JSON.stringify(input) }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
-  complete: (appointmentId: string) => env.useMockApi
-    ? mockAppointmentService.complete(appointmentId)
-    : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/complete`, { method: "PATCH" }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
-  noShow: (appointmentId: string) => env.useMockApi
-    ? mockAppointmentService.noShow(appointmentId)
-    : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/no-show`, { method: "PATCH" }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
+  complete: (appointmentId: string, input: CompleteAppointmentInput = {}) => env.useMockApi
+    ? mockAppointmentService.complete(appointmentId, input)
+    : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/complete`, { method: "PATCH", body: JSON.stringify(input) }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
+  noShow: (appointmentId: string, input: NoShowAppointmentInput = {}) => env.useMockApi
+    ? mockAppointmentService.noShow(appointmentId, input)
+    : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/no-show`, { method: "PATCH", body: JSON.stringify(input) }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
+  missed: (appointmentId: string, input: MissedAppointmentInput = {}) => env.useMockApi
+    ? mockAppointmentService.missed(appointmentId, input)
+    : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/missed`, { method: "PATCH", body: JSON.stringify(input) }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
   assign: (appointmentId: string, input: AssignAppointmentInput) => env.useMockApi
     ? mockAppointmentService.assign(appointmentId, input)
     : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/assign`, { method: "PATCH", body: JSON.stringify(input) }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),

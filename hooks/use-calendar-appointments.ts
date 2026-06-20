@@ -14,7 +14,12 @@ import type {
   AppointmentListQuery,
   CancelAppointmentInput,
   CheckAppointmentAvailabilityInput,
+  CompleteAppointmentInput,
+  ConfirmAppointmentInput,
+  MissedAppointmentInput,
+  NoShowAppointmentInput,
   RescheduleAppointmentInput,
+  UpdateAppointmentSettingsInput,
 } from "@/types/appointment";
 
 export const useCalendarAppointments = (businessId: string | null | undefined, query: AppointmentCalendarQuery) => useQuery({
@@ -35,9 +40,32 @@ export const useAppointment = (businessId: string | null | undefined, appointmen
   enabled: Boolean(businessId && appointmentId),
 });
 
+export const useAppointmentSettings = (businessId: string | null | undefined) => useQuery({
+  queryKey: queryKeys.businessAppointments.settings(businessId ?? ""),
+  queryFn: () => appointmentService.settings(),
+  enabled: Boolean(businessId),
+});
+
 export const useCheckAppointmentAvailability = () => useMutation({
   mutationFn: (input: CheckAppointmentAvailabilityInput) => appointmentService.checkAvailability(input),
 });
+
+export function useUpdateAppointmentSettings(businessId: string | null | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateAppointmentSettingsInput) => appointmentService.updateSettings(input),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.businessAppointments.settings(businessId ?? "") }),
+        client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+        client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
+        client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+        client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
+        client.invalidateQueries({ queryKey: queryKeys.auth.currentUser }),
+      ]);
+    },
+  });
+}
 
 async function invalidateAppointmentQueries(client: ReturnType<typeof useQueryClient>, businessId?: string | null, appointmentId?: string | null, leadId?: string | null, conversationId?: string | null) {
   await Promise.all([
@@ -64,6 +92,14 @@ export function useCreateAppointment(businessId: string | null | undefined) {
   });
 }
 
+export function useConfirmAppointment(businessId: string | null | undefined, appointmentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ConfirmAppointmentInput) => appointmentService.confirm(appointmentId, input),
+    onSuccess: async (appointment) => invalidateAppointmentQueries(client, businessId, appointment.id, appointment.leadId, appointment.conversationId),
+  });
+}
+
 export function useRescheduleAppointment(businessId: string | null | undefined, appointmentId: string) {
   const client = useQueryClient();
   return useMutation({
@@ -80,18 +116,26 @@ export function useCancelAppointment(businessId: string | null | undefined, appo
   });
 }
 
-export function useCompleteAppointment(businessId: string | null | undefined, appointmentId: string) {
+export function useCompleteAppointment(businessId: string | null | undefined, appointmentId = "") {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => appointmentService.complete(appointmentId),
+    mutationFn: ({ appointmentId: targetAppointmentId, input = {} }: { appointmentId?: string; input?: CompleteAppointmentInput }) => appointmentService.complete(targetAppointmentId ?? appointmentId, input),
     onSuccess: async (appointment) => invalidateAppointmentQueries(client, businessId, appointment.id, appointment.leadId, appointment.conversationId),
   });
 }
 
-export function useNoShowAppointment(businessId: string | null | undefined, appointmentId: string) {
+export function useNoShowAppointment(businessId: string | null | undefined, appointmentId = "") {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => appointmentService.noShow(appointmentId),
+    mutationFn: ({ appointmentId: targetAppointmentId, input = {} }: { appointmentId?: string; input?: NoShowAppointmentInput }) => appointmentService.noShow(targetAppointmentId ?? appointmentId, input),
+    onSuccess: async (appointment) => invalidateAppointmentQueries(client, businessId, appointment.id, appointment.leadId, appointment.conversationId),
+  });
+}
+
+export function useMissedAppointment(businessId: string | null | undefined, appointmentId = "") {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ appointmentId: targetAppointmentId, input = {} }: { appointmentId?: string; input?: MissedAppointmentInput }) => appointmentService.missed(targetAppointmentId ?? appointmentId, input),
     onSuccess: async (appointment) => invalidateAppointmentQueries(client, businessId, appointment.id, appointment.leadId, appointment.conversationId),
   });
 }
