@@ -37,6 +37,25 @@ export const queryKeys = {
     all: ["business-knowledge-preview"] as const,
     detail: (businessId: string) => ["business-knowledge-preview", businessId] as const,
   },
+  calendarAppointments: {
+    all: ["calendar-appointments"] as const,
+    business: (businessId: string) => ["calendar-appointments", businessId] as const,
+    calendar: (businessId: string, query: unknown) => ["calendar-appointments", businessId, query] as const,
+  },
+  businessAppointments: {
+    all: ["business-appointments"] as const,
+    business: (businessId: string) => ["business-appointments", businessId] as const,
+    list: (businessId: string, query: unknown) => ["business-appointments", "list", businessId, query] as const,
+    detail: (businessId: string, appointmentId: string) => ["business-appointments", "detail", businessId, appointmentId] as const,
+  },
+  businessLeads: {
+    all: ["business-leads"] as const,
+    list: (businessId: string, search: string) => ["business-leads", businessId, search] as const,
+  },
+  businessMembers: {
+    all: ["business-members"] as const,
+    list: (businessId: string) => ["business-members", businessId] as const,
+  },
   leads: {
     all: ["leads"] as const,
     lists: ["leads", "list"] as const,

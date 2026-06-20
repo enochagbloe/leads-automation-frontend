@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
+import { Building2, CalendarDays, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -81,6 +81,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main" },
     { label: "Leads", href: "/leads", icon: ContactRound, section: "main" },
     { label: "Inbox", href: "/conversations", icon: MessageSquareText, section: "main" },
+    { label: "Appointments", href: "/appointments/calendar", icon: CalendarDays, section: "main" },
     { label: "Business profile", href: "/settings/business/profile", icon: Building2, section: "workspace" },
     { label: "Team members", href: "/settings/members", icon: Users, section: "workspace", visible: profile.data.permissions.includes("members:manage") },
     { label: "WhatsApp connection", href: "/settings/business/whatsapp", icon: Smartphone, section: "workspace" },
