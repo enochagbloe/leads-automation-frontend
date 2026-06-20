@@ -3,8 +3,8 @@
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { useState } from "react";
-import { toast, Toaster } from "sonner";
 import { ApiError, isPlanLimitError } from "@/lib/api-client";
+import { systemNotify } from "@/lib/system-notifications";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -13,10 +13,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         mutationCache: new MutationCache({
           onError: (error) => {
             if (isPlanLimitError(error) || (error instanceof ApiError && error.code === "PLAN_UPGRADE_REQUIRED")) {
-              toast.warning(isPlanLimitError(error) ? "Plan limit reached" : "Upgrade required", { description: error.message, action: { label: error.recommendedPlan ? `View ${error.recommendedPlan.toLowerCase()}` : "View plans", onClick: () => { window.location.href = "/settings/billing"; } } });
+              systemNotify.warning(isPlanLimitError(error) ? "Plan limit reached" : "Upgrade required", { description: error.message, actions: [{ label: error.recommendedPlan ? `View ${error.recommendedPlan.toLowerCase()}` : "View plans", action: "OPEN_URL", href: "/settings/billing" }] });
             }
             if (error instanceof ApiError && error.code === "SUBSCRIPTION_REQUIRED") {
-              toast.error("Subscription required", { description: error.message, action: { label: "View plans", onClick: () => { window.location.href = "/settings/billing"; } } });
+              systemNotify.error("Subscription required", { description: error.message, actions: [{ label: "View plans", action: "OPEN_URL", href: "/settings/billing" }] });
             }
           },
         }),
@@ -31,7 +31,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <QueryClientProvider client={queryClient}>
         {children}
-        <Toaster richColors closeButton position="top-right" />
       </QueryClientProvider>
     </ThemeProvider>
   );

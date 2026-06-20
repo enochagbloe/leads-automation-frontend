@@ -30,7 +30,7 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppIsoDatePicker, parseDateValue } from "@/components/app-date-picker";
 import { AppEmptyState } from "@/components/app-empty-state";
@@ -115,10 +115,10 @@ export function LeadsPage() {
 
   const resetFilters = () => router.push("/leads");
   const hasFilters = Boolean(query.search || query.status || query.source || query.tag || query.dateFrom || query.dateTo || query.assignedStaffId);
-  const handlePlaceholder = (label: string) => toast.info(`${label} is coming soon`);
+  const handlePlaceholder = (label: string) => systemNotify.info(`${label} is coming soon`);
   const refresh = async () => {
     await Promise.all([leads.refetch(), stats.refetch()]);
-    toast.success("Lead data refreshed");
+    systemNotify.success("Lead data refreshed");
   };
   const openLead = (id: string) => setParams({ lead: id });
   const closeLead = () => setParams({ lead: undefined });
@@ -314,7 +314,7 @@ export function LeadsPage() {
                             description={`${lead.fullName} will be removed from the active business. This action is soft-delete but cannot be undone from this screen.`}
                             confirmLabel="Delete lead"
                             loading={removeLead.isPending}
-                            onConfirm={() => removeLead.mutate(lead.id, { onSuccess: () => toast.success("Lead deleted"), onError: (error) => toast.error("Could not delete lead", { description: getApiErrorMessage(error) }) })}
+                            onConfirm={() => removeLead.mutate(lead.id, { onSuccess: () => systemNotify.success("Lead deleted"), onError: (error) => systemNotify.error("Could not delete lead", { description: getApiErrorMessage(error) }) })}
                           />
                         )}
                       </div>

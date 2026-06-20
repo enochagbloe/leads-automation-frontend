@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarCheck2, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppCard } from "@/components/app-card";
 import { AppErrorState } from "@/components/app-error-state";
 import { AppointmentConfirmationSettings } from "@/components/calendar/appointment-confirmation-settings";
@@ -47,14 +47,14 @@ export function AppointmentSettingsPage() {
   const mode = settings.data?.appointmentConfirmationMode ?? "MANUAL_CONFIRMATION_REQUIRED";
   const changeMode = (appointmentConfirmationMode: AppointmentConfirmationMode) => {
     if (!canEdit) {
-      toast.error("You do not have permission to update appointment settings.");
+      systemNotify.error("You do not have permission to update appointment settings.");
       return;
     }
     update.mutate({ appointmentConfirmationMode }, {
       onSuccess: () => {
-        toast.success(appointmentConfirmationMode === "AUTO_CONFIRM_SAFE_BOOKINGS" ? "Premium auto-confirmation enabled." : "Appointment confirmation setting updated.");
+        systemNotify.success(appointmentConfirmationMode === "AUTO_CONFIRM_SAFE_BOOKINGS" ? "Premium auto-confirmation enabled." : "Appointment confirmation setting updated.");
       },
-      onError: (error) => toast.error("Could not update appointment setting", { description: settingsError(error) }),
+      onError: (error) => systemNotify.error("Could not update appointment setting", { description: settingsError(error) }),
     });
   };
 

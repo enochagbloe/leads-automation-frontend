@@ -94,8 +94,14 @@ export function useCreateAppointment(businessId: string | null | undefined) {
 
 export function useConfirmAppointment(businessId: string | null | undefined, appointmentId: string) {
   const client = useQueryClient();
+  type TargetedConfirmInput = { appointmentId?: string; input?: ConfirmAppointmentInput };
+  const isTargetedConfirmInput = (input: ConfirmAppointmentInput | TargetedConfirmInput): input is TargetedConfirmInput => "appointmentId" in input || "input" in input;
   return useMutation({
-    mutationFn: (input: ConfirmAppointmentInput) => appointmentService.confirm(appointmentId, input),
+    mutationFn: (input: ConfirmAppointmentInput | { appointmentId?: string; input?: ConfirmAppointmentInput }) => {
+      return isTargetedConfirmInput(input)
+        ? appointmentService.confirm(input.appointmentId ?? appointmentId, input.input ?? {})
+        : appointmentService.confirm(appointmentId, input);
+    },
     onSuccess: async (appointment) => invalidateAppointmentQueries(client, businessId, appointment.id, appointment.leadId, appointment.conversationId),
   });
 }

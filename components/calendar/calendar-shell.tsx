@@ -2,7 +2,7 @@
 
 import { addDays, format, subDays } from "date-fns";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppErrorState } from "@/components/app-error-state";
 import { AppointmentActionDialog } from "@/components/calendar/appointment-action-dialogs";
 import { AppointmentAssignmentDialog } from "@/components/calendar/appointment-assignment-dialog";
@@ -105,7 +105,7 @@ export function CalendarShell() {
   const handleAppointmentAction = (appointment: CalendarAppointment, action: AppointmentAction) => {
     setActionAppointment(appointment);
     if (action === "REVIEW") {
-      toast.info("Review appointment", { description: "Appointment detail review will be connected in the next pass." });
+      systemNotify.info("Review appointment", { description: "Appointment detail review will be connected in the next pass." });
       return;
     }
     if (action === "VIEW_DETAILS") {
@@ -181,10 +181,10 @@ export function CalendarShell() {
         onConfirm={(note) => {
           confirmAppointment.mutate({ note: note || null }, {
             onSuccess: () => {
-              toast.success("Appointment confirmed.");
+              systemNotify.success("Appointment confirmed.");
               closeDialog();
             },
-            onError: (error) => toast.error("Could not confirm appointment", { description: appointmentActionError(error) }),
+            onError: (error) => systemNotify.error("Could not confirm appointment", { description: appointmentActionError(error) }),
           });
         }}
         onReschedule={async (values) => {
@@ -199,54 +199,54 @@ export function CalendarShell() {
               excludeAppointmentId: actionAppointment?.id,
             });
             if (!availability.available) {
-              toast.error("Could not reschedule appointment", { description: availability.message ?? "This time slot is no longer available. Please choose another time." });
+              systemNotify.error("Could not reschedule appointment", { description: availability.message ?? "This time slot is no longer available. Please choose another time." });
               return;
             }
             rescheduleAppointment.mutate(values, {
               onSuccess: () => {
-                toast.success("Appointment rescheduled.");
+                systemNotify.success("Appointment rescheduled.");
                 closeDialog();
               },
-              onError: (error) => toast.error("Could not reschedule appointment", { description: appointmentActionError(error) }),
+              onError: (error) => systemNotify.error("Could not reschedule appointment", { description: appointmentActionError(error) }),
             });
           } catch (error) {
-            toast.error("Could not reschedule appointment", { description: appointmentActionError(error) });
+            systemNotify.error("Could not reschedule appointment", { description: appointmentActionError(error) });
           }
         }}
         onCancelAppointment={(values) => {
           cancelAppointment.mutate(values, {
             onSuccess: () => {
-              toast.success("Appointment cancelled.");
+              systemNotify.success("Appointment cancelled.");
               closeDialog();
             },
-            onError: (error) => toast.error("Could not cancel appointment", { description: appointmentActionError(error) }),
+            onError: (error) => systemNotify.error("Could not cancel appointment", { description: appointmentActionError(error) }),
           });
         }}
         onComplete={(values) => {
           completeAppointment.mutate({ input: values }, {
             onSuccess: () => {
-              toast.success("Appointment marked as completed.");
+              systemNotify.success("Appointment marked as completed.");
               closeDialog();
             },
-            onError: (error) => toast.error("Could not complete appointment", { description: appointmentActionError(error) }),
+            onError: (error) => systemNotify.error("Could not complete appointment", { description: appointmentActionError(error) }),
           });
         }}
         onNoShow={(values) => {
           noShowAppointment.mutate({ input: values }, {
             onSuccess: () => {
-              toast.success("Appointment marked as no-show.");
+              systemNotify.success("Appointment marked as no-show.");
               closeDialog();
             },
-            onError: (error) => toast.error("Could not update appointment", { description: appointmentActionError(error) }),
+            onError: (error) => systemNotify.error("Could not update appointment", { description: appointmentActionError(error) }),
           });
         }}
         onMissed={(values) => {
           missedAppointment.mutate({ input: values }, {
             onSuccess: () => {
-              toast.success("Appointment marked as missed.");
+              systemNotify.success("Appointment marked as missed.");
               closeDialog();
             },
-            onError: (error) => toast.error("Could not update appointment", { description: appointmentActionError(error) }),
+            onError: (error) => systemNotify.error("Could not update appointment", { description: appointmentActionError(error) }),
           });
         }}
       />
@@ -267,11 +267,11 @@ export function CalendarShell() {
           assignAppointmentMutation.mutate({ assignedStaffId: assignStaffId || null }, {
             onSuccess: (appointment) => {
               const wasAutoConfirmed = assignAppointment.status !== "CONFIRMED" && appointment.status === "CONFIRMED";
-              toast.success(wasAutoConfirmed ? "Appointment assigned and confirmed." : "Staff assigned to appointment.");
+              systemNotify.success(wasAutoConfirmed ? "Appointment assigned and confirmed." : "Staff assigned to appointment.");
               setAssignAppointment(null);
               setAssignStaffId("");
             },
-            onError: (error) => toast.error("Could not assign staff", { description: appointmentActionError(error) }),
+            onError: (error) => systemNotify.error("Could not assign staff", { description: appointmentActionError(error) }),
           });
         }}
       />

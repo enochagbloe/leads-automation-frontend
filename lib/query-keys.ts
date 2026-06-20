@@ -49,6 +49,12 @@ export const queryKeys = {
     detail: (businessId: string, appointmentId: string) => ["business-appointments", "detail", businessId, appointmentId] as const,
     settings: (businessId: string) => ["business-appointments", "settings", businessId] as const,
   },
+  notifications: {
+    all: ["notifications"] as const,
+    business: (businessId: string) => ["notifications", businessId] as const,
+    list: (businessId: string, query: unknown) => ["notifications", "list", businessId, query] as const,
+    counts: (businessId: string) => ["notifications", "counts", businessId] as const,
+  },
   businessLeads: {
     all: ["business-leads"] as const,
     list: (businessId: string, search: string) => ["business-leads", businessId, search] as const,

@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppCard } from "@/components/app-card";
 import { AppErrorState } from "@/components/app-error-state";
@@ -77,14 +77,14 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, businessId, connecti
   const [provider, setProvider] = useState<WhatsAppProvider>(connecting || !mockAvailable ? "META_WHATSAPP" : "MOCK_WHATSAPP");
   const [phone, setPhone] = useState("");
   const [meta, setMeta] = useState<CompleteWhatsAppConnectionInput>({ provider: "META_WHATSAPP", phoneNumberId: "", wabaId: "", businessAccountId: "", authorizationCode: "" });
-  const fail = (error: unknown) => toast.error("WhatsApp connection failed", { description: whatsappError(error) });
+  const fail = (error: unknown) => systemNotify.error("WhatsApp connection failed", { description: whatsappError(error) });
 
   const startConnection = () => start.mutate({ provider, displayPhoneNumber: phone.trim() || undefined }, {
-    onSuccess: () => { toast.success(provider === "MOCK_WHATSAPP" ? "Mock WhatsApp connected" : "Meta connection started"); onOpenChange(false); },
+    onSuccess: () => { systemNotify.success(provider === "MOCK_WHATSAPP" ? "Mock WhatsApp connected" : "Meta connection started"); onOpenChange(false); },
     onError: fail,
   });
   const completeConnection = () => complete.mutate({ ...meta, businessAccountId: meta.businessAccountId || undefined }, {
-    onSuccess: () => { toast.success("WhatsApp connected"); onOpenChange(false); },
+    onSuccess: () => { systemNotify.success("WhatsApp connected"); onOpenChange(false); },
     onError: fail,
   });
 
@@ -99,12 +99,12 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, businessId, connecti
 export function DeactivateWhatsAppDialog({ open, onOpenChange, businessId }: { open: boolean; onOpenChange: (open: boolean) => void; businessId: string }) {
   const mutation = useDeactivateWhatsAppConnection(businessId);
   const [reason, setReason] = useState("Disconnected from settings.");
-  return <ModalShell open={open} onOpenChange={onOpenChange} title="Deactivate WhatsApp?" description="Outbound replies and automation will stop. Existing leads, conversations, and messages will remain available."><label htmlFor="deactivate-reason" className="mb-1.5 block text-sm font-semibold">Reason</label><AppInput id="deactivate-reason" value={reason} onChange={(event) => setReason(event.target.value)} /><div className="mt-6 flex justify-end gap-2"><DialogClose asChild><AppButton variant="outline">Cancel</AppButton></DialogClose><AppButton variant="destructive" loading={mutation.isPending} loadingText="Deactivating" onClick={() => mutation.mutate(reason, { onSuccess: () => { toast.success("WhatsApp deactivated"); onOpenChange(false); }, onError: (error) => toast.error("Could not deactivate WhatsApp", { description: whatsappError(error) }) })}>Deactivate</AppButton></div></ModalShell>;
+  return <ModalShell open={open} onOpenChange={onOpenChange} title="Deactivate WhatsApp?" description="Outbound replies and automation will stop. Existing leads, conversations, and messages will remain available."><label htmlFor="deactivate-reason" className="mb-1.5 block text-sm font-semibold">Reason</label><AppInput id="deactivate-reason" value={reason} onChange={(event) => setReason(event.target.value)} /><div className="mt-6 flex justify-end gap-2"><DialogClose asChild><AppButton variant="outline">Cancel</AppButton></DialogClose><AppButton variant="destructive" loading={mutation.isPending} loadingText="Deactivating" onClick={() => mutation.mutate(reason, { onSuccess: () => { systemNotify.success("WhatsApp deactivated"); onOpenChange(false); }, onError: (error) => systemNotify.error("Could not deactivate WhatsApp", { description: whatsappError(error) }) })}>Deactivate</AppButton></div></ModalShell>;
 }
 
 export function ChangeWhatsAppNumberDialog({ open, onOpenChange, businessId, onStarted }: { open: boolean; onOpenChange: (open: boolean) => void; businessId: string; onStarted: () => void }) {
   const mutation = useStartWhatsAppNumberChange(businessId);
-  return <ModalShell open={open} onOpenChange={onOpenChange} title="Change WhatsApp number?" description="The current number will be deactivated first. Its conversation history remains available while you connect a new number."><div className="rounded-xl border bg-muted/40 p-4 text-sm leading-6 text-muted-foreground">There may be a short period where WhatsApp replies are unavailable until the new connection is complete.</div><div className="mt-6 flex justify-end gap-2"><DialogClose asChild><AppButton variant="outline">Cancel</AppButton></DialogClose><AppButton loading={mutation.isPending} loadingText="Starting change" onClick={() => mutation.mutate(undefined, { onSuccess: () => { toast.success("Previous number deactivated"); onOpenChange(false); onStarted(); }, onError: (error) => toast.error("Could not change WhatsApp number", { description: whatsappError(error) }) })}>Continue</AppButton></div></ModalShell>;
+  return <ModalShell open={open} onOpenChange={onOpenChange} title="Change WhatsApp number?" description="The current number will be deactivated first. Its conversation history remains available while you connect a new number."><div className="rounded-xl border bg-muted/40 p-4 text-sm leading-6 text-muted-foreground">There may be a short period where WhatsApp replies are unavailable until the new connection is complete.</div><div className="mt-6 flex justify-end gap-2"><DialogClose asChild><AppButton variant="outline">Cancel</AppButton></DialogClose><AppButton loading={mutation.isPending} loadingText="Starting change" onClick={() => mutation.mutate(undefined, { onSuccess: () => { systemNotify.success("Previous number deactivated"); onOpenChange(false); onStarted(); }, onError: (error) => systemNotify.error("Could not change WhatsApp number", { description: whatsappError(error) }) })}>Continue</AppButton></div></ModalShell>;
 }
 
 export function WhatsAppConnectionErrorAlert({ status }: { status: WhatsAppStatus }) {

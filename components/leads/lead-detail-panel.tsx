@@ -18,7 +18,7 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { DetailSidePanel } from "@/components/detail-side-panel";
 import { AppButton } from "@/components/app-button";
 import { AppSelect } from "@/components/app-select";
@@ -122,7 +122,7 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
   const updateStatus = useUpdateLeadStatus();
   const assignLead = useAssignLead();
   const canManage = profile.data?.role !== "STAFF";
-  const placeholder = (label: string) => toast.info(`${label} is coming soon`);
+  const placeholder = (label: string) => systemNotify.info(`${label} is coming soon`);
   const lead = detail.data?.lead;
   const assigneeOptions = lead ? [
     { value: "__unassigned", label: "Unassigned" },
@@ -198,7 +198,7 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
                 disabled={updateStatus.isPending}
                 onValueChange={(status) => updateStatus.mutate(
                   { id: detail.data.lead.id, status: status as LeadStatus },
-                  { onSuccess: () => toast.success("Status updated"), onError: (error) => toast.error("Could not update status", { description: getApiErrorMessage(error) }) },
+                  { onSuccess: () => systemNotify.success("Status updated"), onError: (error) => systemNotify.error("Could not update status", { description: getApiErrorMessage(error) }) },
                 )}
               />
             </div>
@@ -213,10 +213,10 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
                   onValueChange={(assignedStaffId) => assignLead.mutate(
                     { id: detail.data.lead.id, assignedStaffId: assignedStaffId === "__unassigned" ? null : assignedStaffId },
                     {
-                      onSuccess: () => toast.success("Assignment updated"),
+                      onSuccess: () => systemNotify.success("Assignment updated"),
                       onError: (error) => {
                         if (error instanceof ApiError && error.code === "INVALID_LEAD_ASSIGNEE") void detail.refetch();
-                        toast.error("Could not update assignment", { description: getApiErrorMessage(error) });
+                        systemNotify.error("Could not update assignment", { description: getApiErrorMessage(error) });
                       },
                     },
                   )}
