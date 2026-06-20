@@ -2,11 +2,12 @@ import { format } from "date-fns";
 import { CalendarEmptyState } from "@/components/calendar/calendar-empty-state";
 import { AppointmentCard } from "@/components/calendar/appointment-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { appointmentDateKey } from "@/lib/appointment-dates";
 import type { AppointmentAction, CalendarAppointment } from "@/types/appointment";
 
 function groupedByDay(appointments: CalendarAppointment[]) {
   return appointments.reduce<Record<string, CalendarAppointment[]>>((groups, appointment) => {
-    const key = appointment.startTime.slice(0, 10);
+    const key = appointmentDateKey(appointment.startTime, appointment.timezone);
     groups[key] = [...(groups[key] ?? []), appointment];
     return groups;
   }, {});

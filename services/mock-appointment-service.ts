@@ -1,4 +1,5 @@
 import { addMinutes, formatISO } from "date-fns";
+import { appointmentDateKey } from "@/lib/appointment-dates";
 import type {
   AssignAppointmentInput,
   AppointmentActivity,
@@ -124,6 +125,8 @@ const activities: AppointmentActivity[] = [
 ];
 
 function toDetail(appointment: CalendarAppointment): AppointmentDetail {
+  const appointmentDate = appointmentDateKey(appointment.startTime, appointment.timezone);
+
   return {
     ...appointment,
     businessId: "biz_demo",
@@ -133,7 +136,7 @@ function toDetail(appointment: CalendarAppointment): AppointmentDetail {
     customerEmail: appointment.lead?.email ?? null,
     description: null,
     notes: null,
-    appointmentDate: appointment.startTime.slice(0, 10),
+    appointmentDate,
     humanConfirmationRequired: appointment.humanConfirmationRequired ?? (appointment.status === "NEEDS_HUMAN_CONFIRMATION" || appointment.status === "PENDING_BUSINESS_CONFIRMATION"),
     humanConfirmationReason: appointment.humanConfirmationReason ?? (appointment.status === "NEEDS_HUMAN_CONFIRMATION" ? "LOCATION_REQUIRED" : appointment.status === "PENDING_BUSINESS_CONFIRMATION" ? "BUSINESS_CONFIRMATION_REQUIRED" : null),
     cancellationReason: null,
@@ -158,7 +161,7 @@ function replaceAppointment(next: CalendarAppointment) {
 }
 
 function inRange(appointment: CalendarAppointment, query: AppointmentCalendarQuery) {
-  const day = appointment.startTime.slice(0, 10);
+  const day = appointmentDateKey(appointment.startTime, appointment.timezone);
   return day >= query.dateFrom && day <= query.dateTo;
 }
 
@@ -184,8 +187,8 @@ export const mockAppointmentService = {
       .filter((appointment) => !query.assignedStaffId || (query.assignedStaffId === "unassigned" ? !appointment.assignedStaffId : appointment.assignedStaffId === query.assignedStaffId))
       .filter((appointment) => !query.leadId || appointment.leadId === query.leadId)
       .filter((appointment) => !query.conversationId || appointment.conversationId === query.conversationId)
-      .filter((appointment) => !query.dateFrom || appointment.startTime.slice(0, 10) >= query.dateFrom)
-      .filter((appointment) => !query.dateTo || appointment.startTime.slice(0, 10) <= query.dateTo)
+      .filter((appointment) => !query.dateFrom || appointmentDateKey(appointment.startTime, appointment.timezone) >= query.dateFrom)
+      .filter((appointment) => !query.dateTo || appointmentDateKey(appointment.startTime, appointment.timezone) <= query.dateTo)
       .filter((appointment) => {
         if (!query.search) return true;
         const search = query.search.toLowerCase();
