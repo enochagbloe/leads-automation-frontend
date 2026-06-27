@@ -6,6 +6,14 @@ const BUSINESS_SCOPED_QUERY_KEYS = [
   queryKeys.businessSetup.all,
   queryKeys.businessProfile.all,
   queryKeys.businessServices.all,
+  queryKeys.businessAvailability.all,
+  queryKeys.businessPolicies.all,
+  queryKeys.businessKnowledge.all,
+  queryKeys.calendarAppointments.all,
+  queryKeys.businessAppointments.all,
+  queryKeys.notifications.all,
+  queryKeys.businessLeads.all,
+  queryKeys.businessMembers.all,
   queryKeys.leads.all,
   queryKeys.conversations.all,
 ] as const;
@@ -15,10 +23,12 @@ export async function resetBusinessContext(client: QueryClient) {
     ...BUSINESS_SCOPED_QUERY_KEYS.map((queryKey) => client.cancelQueries({ queryKey })),
     client.cancelQueries({ queryKey: queryKeys.auth.currentUser }),
     client.cancelQueries({ queryKey: queryKeys.subscription.current }),
+    client.cancelQueries({ queryKey: queryKeys.businesses.all }),
   ]);
   for (const queryKey of BUSINESS_SCOPED_QUERY_KEYS) client.removeQueries({ queryKey });
   await Promise.all([
     client.resetQueries({ queryKey: queryKeys.auth.currentUser }),
     client.resetQueries({ queryKey: queryKeys.subscription.current }),
+    client.resetQueries({ queryKey: queryKeys.businesses.all }),
   ]);
 }

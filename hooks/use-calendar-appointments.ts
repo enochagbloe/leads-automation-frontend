@@ -22,10 +22,10 @@ import type {
   UpdateAppointmentSettingsInput,
 } from "@/types/appointment";
 
-export const useCalendarAppointments = (businessId: string | null | undefined, query: AppointmentCalendarQuery) => useQuery({
+export const useCalendarAppointments = (businessId: string | null | undefined, query: AppointmentCalendarQuery, enabled = true) => useQuery({
   queryKey: queryKeys.calendarAppointments.calendar(businessId ?? "", query),
   queryFn: () => appointmentService.calendar(query),
-  enabled: Boolean(businessId),
+  enabled: Boolean(businessId) && enabled,
 });
 
 export const useAppointments = (businessId: string | null | undefined, query: AppointmentListQuery) => useQuery({
@@ -151,6 +151,17 @@ export function useAssignAppointment(businessId: string | null | undefined, appo
   return useMutation({
     mutationFn: (input: AssignAppointmentInput) => appointmentService.assign(appointmentId, input),
     onSuccess: async (appointment) => invalidateAppointmentQueries(client, businessId, appointment.id, appointment.leadId, appointment.conversationId),
+  });
+}
+
+export function useClaimAppointment(businessId: string | null | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (appointmentId: string) => appointmentService.claim(appointmentId),
+    onSuccess: async (appointment) => Promise.all([
+      invalidateAppointmentQueries(client, businessId, appointment.id, appointment.leadId, appointment.conversationId),
+      ...(businessId ? [client.invalidateQueries({ queryKey: queryKeys.notifications.business(businessId) })] : []),
+    ]),
   });
 }
 

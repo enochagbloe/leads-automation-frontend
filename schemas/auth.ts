@@ -15,8 +15,14 @@ export const registerSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, { message: "Passwords do not match", path: ["confirmPassword"] });
 export const emailSchema = z.object({ email });
 export const resetPasswordSchema = z.object({ password, confirmPassword: z.string() }).refine((data) => data.password === data.confirmPassword, { message: "Passwords do not match", path: ["confirmPassword"] });
+export const inviteSignupSchema = z.object({
+  name: z.string().trim().min(2, "Enter your full name").max(120, "Keep your name under 120 characters"),
+  password,
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, { message: "Passwords do not match", path: ["confirmPassword"] });
 
 export type LoginValues = z.infer<typeof loginSchema>;
 export type RegisterValues = z.infer<typeof registerSchema>;
 export type EmailValues = z.infer<typeof emailSchema>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+export type InviteSignupValues = z.infer<typeof inviteSignupSchema>;

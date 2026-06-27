@@ -1,5 +1,6 @@
 export const queryKeys = {
   auth: { currentUser: ["auth", "current-user"] as const },
+  invites: { detail: (token: string) => ["invites", token] as const },
   businesses: { all: ["businesses"] as const },
   plans: { all: ["plans"] as const },
   subscription: { current: ["subscription", "current"] as const },

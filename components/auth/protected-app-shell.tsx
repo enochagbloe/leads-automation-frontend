@@ -22,9 +22,39 @@ import { resetBusinessContext } from "@/lib/business-query-cache";
 import { BUSINESS_ACCESS_DENIED_EVENT } from "@/lib/business-store";
 import { canCreateBusiness } from "@/lib/subscription";
 import { cn } from "@/lib/utils";
+import { canAccessOperationalPage, canManageBilling as userCanManageBilling, canManageBusinessSettings as userCanManageBusinessSettings, canManageTeam as userCanManageTeam, getWorkspacePermissions } from "@/lib/workspace-permissions";
+import type { MembershipStatus } from "@/types/auth";
 
 export function ProtectedAppShell({ children }: { children: React.ReactNode }) {
   return <SidebarProvider><ProtectedAppShellContent>{children}</ProtectedAppShellContent></SidebarProvider>;
+}
+
+function getMembershipAccessMessage(status?: MembershipStatus) {
+  if (status === "SUSPENDED_BY_PLAN") {
+    return {
+      title: "Business access limited",
+      description: "Your access to this business is currently limited by your organization’s subscription plan. Contact your organization for further information.",
+    };
+  }
+  if (status === "DISABLED") {
+    return {
+      title: "Business access disabled",
+      description: "Your access to this business has been disabled. Contact your organization for further information.",
+    };
+  }
+  if (status === "REMOVED") {
+    return {
+      title: "Business access removed",
+      description: "Your access to this business has been removed. Contact your organization for further information.",
+    };
+  }
+  if (status === "INVITED") {
+    return {
+      title: "Invite not accepted",
+      description: "This business invitation has not been accepted yet. Open your invite link to join the workspace.",
+    };
+  }
+  return null;
 }
 
 function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
@@ -35,17 +65,29 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const logout = useLogout();
   const businesses = useBusinesses();
   const selectBusiness = useSelectBusiness();
-  const subscription = useCurrentSubscription();
+  const permissions = getWorkspacePermissions(profile.data);
+  const canManageBilling = userCanManageBilling(profile.data);
+  const accountCanCreateBusiness = Boolean(
+    profile.data && (
+      profile.data.account.canCreateBusiness ??
+      profile.data.canCreateBusiness ??
+      profile.data.account.accountType !== "STAFF_ONLY"
+    ),
+  );
+  const canManageBusinessSettings = userCanManageBusinessSettings(profile.data);
+  const canManageTeam = userCanManageTeam(profile.data);
+  const subscription = useCurrentSubscription(canManageBilling || accountCanCreateBusiness);
   const activeBusinessId = profile.data?.activeBusiness?.id;
-  const notificationCounts = useNotificationCounts(activeBusinessId);
+  const canViewNotifications = permissions.canViewNotifications || permissions.canManageOwnNotifications;
+  const notificationCounts = useNotificationCounts(canViewNotifications ? activeBusinessId : null);
   const businessCreation = subscription.data ? canCreateBusiness(subscription.data) : null;
   const sessionEnded = profile.error instanceof ApiError && profile.error.status === 401;
 
   useEffect(() => {
     if (sessionEnded) router.replace("/login");
     if (profile.data?.activeBusiness?.status === "PENDING_SETUP") router.replace("/onboarding");
-    if (businesses.data?.length === 0) router.replace("/businesses/new");
-  }, [businesses.data?.length, profile.data?.activeBusiness?.status, router, sessionEnded]);
+    if (businesses.data?.length === 0 && accountCanCreateBusiness) router.replace("/businesses/new");
+  }, [accountCanCreateBusiness, businesses.data?.length, profile.data?.activeBusiness?.status, router, sessionEnded]);
 
   useEffect(() => {
     const recoverBusinessAccess = () => void resetBusinessContext(client);
@@ -60,6 +102,14 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
       : <AppErrorState title="Unable to load your account" description="Your session is still active. Refresh the page or try again shortly." />;
   }
   if (logout.isPending) return <LogoutLoadingState />;
+  if (businesses.data?.length === 0 && !accountCanCreateBusiness) {
+    return <AppErrorState title="No business access" description="You do not currently have access to any business workspace. Ask your organization to send you an invitation." />;
+  }
+  const membershipStatus = profile.data.membership?.status;
+  const membershipAccessMessage = getMembershipAccessMessage(membershipStatus);
+  if (membershipAccessMessage) {
+    return <AppErrorState title={membershipAccessMessage.title} description={membershipAccessMessage.description} />;
+  }
 
   const fullName = `${profile.data.user.firstName} ${profile.data.user.lastName}`;
   const logoutUser = () => logout.mutate(undefined, { onSettled: () => router.replace("/login") });
@@ -74,25 +124,31 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
     "from-[#4f7cff] via-[#7767dc] to-[#df82ba]",
     "from-[#e7865b] via-[#d55d76] to-[#9f6dcc]",
   ];
-  const businessProfiles = businesses.data?.map(({ business }, index) => ({
+
+  const memberships = businesses.data ?? [];
+  const businessProfiles = memberships.map(({ business }, index) => ({
     id: business.id,
     name: business.name,
     email: business.email || profile.data.user.email,
     avatarGradient: businessGradients[index % businessGradients.length],
     shortcut: `⌘${index + 1}`,
-  })) ?? [];
+  }));
+
+  const canViewLeads = canAccessOperationalPage(profile.data, "leads");
+  const canViewConversations = canAccessOperationalPage(profile.data, "conversations");
+  const canViewAppointments = canAccessOperationalPage(profile.data, "appointments");
   const navItems: SidebarNavItem[] = [
-    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main" },
-    { label: "Leads", href: "/leads", icon: ContactRound, section: "main" },
-    { label: "Inbox", href: "/conversations", icon: MessageSquareText, section: "main" },
-    { label: "Appointments", href: "/appointments/calendar", icon: CalendarDays, section: "main" },
-    { label: "Business profile", href: "/settings/business/profile", icon: Building2, section: "workspace" },
-    { label: "Team members", href: "/settings/members", icon: Users, section: "workspace", visible: profile.data.permissions.includes("members:manage") },
-    { label: "WhatsApp connection", href: "/settings/business/whatsapp", icon: Smartphone, section: "workspace" },
-    { label: "Billing & plan", href: "/settings/billing", icon: CreditCard, section: "workspace" },
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main", visible: permissions.canViewDashboard },
+    { label: "Leads", href: "/leads", icon: ContactRound, section: "main", visible: canViewLeads },
+    { label: "Inbox", href: "/conversations", icon: MessageSquareText, section: "main", visible: canViewConversations },
+    { label: "Appointments", href: "/appointments/calendar", icon: CalendarDays, section: "main", visible: canViewAppointments },
+    { label: "Business profile", href: "/settings/business/profile", icon: Building2, section: "workspace", visible: canManageBusinessSettings },
+    { label: "Team members", href: "/settings/members", icon: Users, section: "workspace", visible: canManageTeam },
+    { label: "WhatsApp connection", href: "/settings/business/whatsapp", icon: Smartphone, section: "workspace", visible: canManageBusinessSettings },
+    { label: "Billing & plan", href: "/settings/billing", icon: CreditCard, section: "workspace", visible: canManageBilling },
   ];
   const openCreateBusiness = () => {
-    if (businessCreation?.allowed) router.push("/businesses/new");
+    if (accountCanCreateBusiness && businessCreation?.allowed) router.push("/businesses/new");
   };
 
   return (
@@ -100,7 +156,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh bg-background">
       <AppSidebar
         navItems={navItems}
-        businesses={businesses.data ?? []}
+        businesses={memberships}
         activeBusinessId={profile.data.activeBusiness?.id}
         activeBusinessName={profile.data.activeBusiness?.name ?? "BizReply AI"}
         workspaceName={profile.data.account.name}
@@ -108,8 +164,10 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
         userName={fullName}
         userEmail={profile.data.user.email}
         currentPlan={subscription.data?.plan.code ?? profile.data.plan?.code}
-        canCreateBusiness={businessCreation?.allowed ?? false}
-        createBusinessReason={businessCreation && !businessCreation.allowed ? businessCreation.reason : undefined}
+        showBillingActions={canManageBilling}
+        canCreateBusiness={accountCanCreateBusiness && (businessCreation?.allowed ?? false)}
+        showCreateBusiness={accountCanCreateBusiness}
+        createBusinessReason={accountCanCreateBusiness && businessCreation && !businessCreation.allowed ? businessCreation.reason : undefined}
         onSelectBusiness={selectBusiness}
         onCreateBusiness={openCreateBusiness}
         onOpenBilling={() => router.push("/settings/billing")}
@@ -135,9 +193,11 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
               currentPlan={subscription.data?.plan.code ?? profile.data.plan?.code}
               onSelectAccount={(business) => selectBusiness(business.id)}
               onAddAccount={openCreateBusiness}
-              canAddAccount={businessCreation?.allowed ?? false}
+              canAddAccount={accountCanCreateBusiness && (businessCreation?.allowed ?? false)}
+              showAddAccount={accountCanCreateBusiness}
               addAccountLabel="Create new business"
-              addAccountDisabledReason={businessCreation && !businessCreation.allowed ? businessCreation.reason : undefined}
+              addAccountDisabledReason={accountCanCreateBusiness && businessCreation && !businessCreation.allowed ? businessCreation.reason : undefined}
+              showBillingActions={canManageBilling}
               onMenuAction={(actionId) => {
                 if (actionId === "billing-plan") router.push("/settings/billing");
               }}
@@ -147,7 +207,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         {children}
-        <ActionableNotificationHost key={profile.data.activeBusiness?.id ?? "no-active-business"} activeBusinessId={profile.data.activeBusiness?.id} />
+        {canViewNotifications && <ActionableNotificationHost key={profile.data.activeBusiness?.id ?? "no-active-business"} activeBusinessId={profile.data.activeBusiness?.id} />}
       </div>
     </div>
     </RealtimeProvider>

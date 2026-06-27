@@ -17,6 +17,7 @@ import {
   useBusinessMembers,
   useCalendarAppointments,
   useCancelAppointment,
+  useClaimAppointment,
   useCheckAppointmentAvailability,
   useCompleteAppointment,
   useConfirmAppointment,
@@ -25,6 +26,7 @@ import {
   useRescheduleAppointment,
 } from "@/hooks/use-calendar-appointments";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
+import { canAccessOperationalPage, getWorkspacePermissions } from "@/lib/workspace-permissions";
 import type { AppointmentAction, AppointmentCalendarQuery, CalendarAppointment } from "@/types/appointment";
 
 type DialogAction = Extract<AppointmentAction, "CONFIRM" | "RESCHEDULE" | "CANCEL" | "COMPLETE" | "NO_SHOW" | "MISSED">;
@@ -56,8 +58,12 @@ export function CalendarShell() {
   const profile = useCurrentUser();
   const activeBusinessId = profile.data?.activeBusiness?.id ?? "";
   const role = profile.data?.membership?.role;
-  const canCreate = role === "BUSINESS_OWNER" || role === "MANAGER";
-  const canAssignStaff = role === "BUSINESS_OWNER" || role === "MANAGER";
+  const permissions = getWorkspacePermissions(profile.data);
+  const canViewAppointments = canAccessOperationalPage(profile.data, "appointments");
+  const canCreate = permissions.canViewAllOperationalAppointments || role === "BUSINESS_OWNER" || role === "MANAGER";
+  const canAssignStaff = permissions.canReassignAppointmentsToOthers;
+  const canClaimAppointments = permissions.canClaimUnassignedAppointments;
+  const staffView = role === "STAFF" && permissions.canViewOperationalQueues;
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [composerOpen, setComposerOpen] = useState(false);
   const [newlyCreatedAppointmentId, setNewlyCreatedAppointmentId] = useState<string | null>(null);
@@ -74,8 +80,8 @@ export function CalendarShell() {
     view: "week",
     assignedStaffId: staffFilter === "all" ? undefined : staffFilter,
   }), [selectedDate, staffFilter]);
-  const appointments = useCalendarAppointments(activeBusinessId, query);
-  const members = useBusinessMembers(activeBusinessId);
+  const appointments = useCalendarAppointments(activeBusinessId, query, Boolean(profile.data && canViewAppointments));
+  const members = useBusinessMembers(canViewAppointments ? activeBusinessId : null);
   const availabilityCheck = useCheckAppointmentAvailability();
   const confirmAppointment = useConfirmAppointment(activeBusinessId, actionAppointment?.id ?? "");
   const rescheduleAppointment = useRescheduleAppointment(activeBusinessId, actionAppointment?.id ?? "");
@@ -84,6 +90,7 @@ export function CalendarShell() {
   const noShowAppointment = useNoShowAppointment(activeBusinessId, actionAppointment?.id ?? "");
   const missedAppointment = useMissedAppointment(activeBusinessId, actionAppointment?.id ?? "");
   const assignAppointmentMutation = useAssignAppointment(activeBusinessId, assignAppointment?.id ?? "");
+  const claimAppointment = useClaimAppointment(activeBusinessId);
   const orderedAppointments = useMemo(
     () => [...(appointments.data?.appointments ?? [])].sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [appointments.data?.appointments],
@@ -117,10 +124,27 @@ export function CalendarShell() {
       setAssignStaffId(appointment.assignedStaffId ?? "");
       return;
     }
+    if (action === "CLAIM") {
+      claimAppointment.mutate(appointment.id, {
+        onSuccess: () => systemNotify.success("Appointment assigned to you."),
+        onError: (error) => {
+          const description = error instanceof ApiError && error.code === "WORK_ALREADY_ASSIGNED"
+            ? "This appointment is already assigned to another team member."
+            : error instanceof ApiError && error.code === "STAFF_SCHEDULE_CONFLICT"
+              ? "You already have another appointment at this time."
+              : appointmentActionError(error);
+          systemNotify.error("Could not take appointment", { description });
+          void appointments.refetch();
+        },
+      });
+      return;
+    }
     setDialogAction(action);
   };
 
+  if (profile.isPending) return <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6"><AppErrorState title="Loading calendar access" description="Checking your workspace permissions." /></main>;
   if (!activeBusinessId) return <AppErrorState title="No active business" description="Select a business before viewing the calendar." />;
+  if (!canViewAppointments) return <main className="grid min-h-[calc(100dvh-4rem)] place-items-center bg-background p-6"><AppErrorState title="You do not have permission to access this area." description="Switch workspace or ask an owner or manager to update your access." /></main>;
 
   return (
     <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6">
@@ -136,6 +160,25 @@ export function CalendarShell() {
             onStaffFilterChange={setStaffFilter}
             onCreate={() => setComposerOpen(true)}
           />
+          {staffView && (
+            <div className="flex flex-wrap gap-2 rounded-2xl border bg-card p-2" aria-label="Operational appointment queue filters">
+              {[
+                { label: "Available", value: "all" },
+                { label: "Assigned to me", value: profile.data?.membership?.id ?? "" },
+                { label: "Unassigned", value: "unassigned" },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  disabled={item.label === "Assigned to me" && !item.value}
+                  onClick={() => setStaffFilter(item.value)}
+                  className={`min-h-9 rounded-lg px-3 text-xs font-bold transition ${staffFilter === item.value ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary/60 hover:text-primary"}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
           {pendingConfirmationCount > 0 && (
             <div className="rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-sm text-warning">
               <p className="font-bold">{pendingConfirmationCount} {pendingConfirmationCount === 1 ? "appointment needs" : "appointments need"} confirmation</p>
@@ -156,6 +199,7 @@ export function CalendarShell() {
               loading={appointments.isPending}
               canCreate={canCreate}
               canAssignStaff={canAssignStaff}
+              canClaimAppointments={canClaimAppointments}
               newlyCreatedAppointmentId={newlyCreatedAppointmentId}
               onCreate={() => setComposerOpen(true)}
               onAppointmentAction={handleAppointmentAction}

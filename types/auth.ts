@@ -4,7 +4,8 @@ export type UserRole = "PLATFORM_ADMIN" | "BUSINESS_OWNER" | "MANAGER" | "STAFF"
 export type BusinessRole = "BUSINESS_OWNER" | "MANAGER" | "STAFF";
 export type BusinessStatus = "ACTIVE" | "SUSPENDED" | "PENDING_SETUP";
 export type UserStatus = "ACTIVE" | "DISABLED";
-export type MembershipStatus = "ACTIVE" | "INVITED" | "DISABLED" | "REMOVED";
+export type MembershipStatus = "ACTIVE" | "INVITED" | "SUSPENDED_BY_PLAN" | "DISABLED" | "REMOVED";
+export type AccountType = "OWNER_CAPABLE" | "STAFF_ONLY";
 
 export interface User {
   id: string;
@@ -51,6 +52,8 @@ export interface Account {
   id: string;
   name: string;
   ownerId: string;
+  accountType?: AccountType;
+  canCreateBusiness?: boolean;
 }
 
 export interface ApiLimits {
@@ -83,6 +86,10 @@ export interface ActiveMembership {
   role: BusinessRole;
   status: MembershipStatus;
   joinedAt: string | null;
+  positionTitle?: string | null;
+  specialties?: string[];
+  serviceTags?: string[];
+  isAiHandoffEligible?: boolean;
 }
 
 export interface ActivePlan {
@@ -98,6 +105,8 @@ export interface ActivePlan {
 export interface AuthProfile {
   user: User;
   account: Account;
+  accountType?: AccountType;
+  canCreateBusiness?: boolean;
   businesses: Business[];
   activeBusiness: Business | null;
   membership: ActiveMembership | null;
@@ -109,16 +118,120 @@ export interface AuthProfile {
   limits: ApiLimits;
   features: ApiPlanFeatures;
   permissions: string[];
+  workspacePermissions?: Partial<WorkspacePermissions>;
 }
 
 export interface LoginResponse extends AuthProfile { accessToken: string; refreshToken: string }
 export interface RegisterResponse { user: User; business: Business; message: string }
 export interface RefreshResponse { accessToken: string; refreshToken: string }
-export interface BusinessMembership extends ActiveMembership { business: Business }
+export interface BusinessMembership extends ActiveMembership {
+  business: Business;
+  accountType?: AccountType;
+  canCreateBusiness?: boolean;
+  lastAccessedAt?: string | null;
+}
+export interface BusinessMembershipItem {
+  membershipId: string;
+  businessId: string;
+  businessName: string;
+  businessLogoUrl?: string | null;
+  role: BusinessRole;
+  status: MembershipStatus;
+  accountType?: AccountType;
+  canCreateBusiness?: boolean;
+  positionTitle?: string | null;
+  specialties?: string[];
+  serviceTags?: string[];
+  isAiHandoffEligible?: boolean;
+  lastAccessedAt?: string | null;
+}
+
+export interface BusinessMemberOption {
+  id: string;
+  membershipId: string;
+  role: BusinessRole;
+  status: MembershipStatus;
+  canReceiveAssignedWork: boolean;
+  positionTitle?: string | null;
+  specialties?: string[];
+  serviceTags?: string[];
+  isAiHandoffEligible?: boolean;
+  user: {
+    id?: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    avatarUrl?: string | null;
+  };
+}
+export interface WorkspacePermissions {
+  canViewDashboard: boolean;
+  canViewOperationalQueues: boolean;
+  canViewLeads: boolean;
+  canViewAllOperationalLeads: boolean;
+  canClaimUnassignedLeads: boolean;
+  canAssignLeadsToSelf: boolean;
+  canReassignLeadsToOthers: boolean;
+  canViewConversations: boolean;
+  canViewAllOperationalConversations: boolean;
+  canClaimUnassignedConversations: boolean;
+  canAssignConversationsToSelf: boolean;
+  canReassignConversationsToOthers: boolean;
+  canViewAppointments: boolean;
+  canViewAllOperationalAppointments: boolean;
+  canClaimUnassignedAppointments: boolean;
+  canAssignAppointmentsToSelf: boolean;
+  canReassignAppointmentsToOthers: boolean;
+  canViewNotifications: boolean;
+  canManageOwnNotifications: boolean;
+  canManageTeam: boolean;
+  canInviteStaff: boolean;
+  canRemoveStaff: boolean;
+  canManageBusinessSettings: boolean;
+  canManageBilling: boolean;
+  canManageSubscription: boolean;
+  canUseAi: boolean;
+  canManageAiSettings: boolean;
+}
+export interface ActiveBusinessContext {
+  business: { id: string; name: string; logoUrl?: string | null };
+  membership: Omit<ActiveMembership, "joinedAt"> & { joinedAt?: string | null };
+  account: { accountType: AccountType; canCreateBusiness: boolean };
+  permissions: Partial<WorkspacePermissions>;
+}
+export interface SwitchBusinessResponse extends Partial<ActiveBusinessContext> {
+  activeBusinessId?: string;
+  activeMembershipId?: string;
+  role?: BusinessRole;
+}
 export interface BusinessInvitation { id: string; email: string; role: "MANAGER" | "STAFF"; status: string; expiresAt: string }
 export interface InviteMemberInput { email: string; role: "MANAGER" | "STAFF" }
 export interface InviteMemberResponse { invitation: BusinessInvitation; emailSent: boolean }
 export interface AcceptInvitationInput { token: string; firstName?: string; lastName?: string; password?: string }
+
+export type InviteStatus = "PENDING" | "EXPIRED" | "CANCELLED" | "ACCEPTED";
+export interface InviteDetails {
+  id: string;
+  token?: string;
+  email: string;
+  role: "MANAGER" | "STAFF";
+  status: InviteStatus;
+  expiresAt: string;
+  business: {
+    id?: string;
+    name: string;
+    logoUrl?: string | null;
+  };
+}
+export interface SignupFromInviteInput { name: string; password: string }
+export interface InviteAcceptResponse {
+  message?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  activeBusinessId?: string;
+  activeMembershipId?: string;
+  role?: "MANAGER" | "STAFF";
+}
 
 export interface ApiErrorResponse {
   error?: {

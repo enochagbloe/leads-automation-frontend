@@ -45,7 +45,14 @@ export function OnboardingFlow({ mode = "onboarding" }: { mode?: "onboarding" | 
   const profile = useCurrentUser();
   const mutation = useCompleteOnboarding();
   const createBusiness = useCreateBusiness();
-  const subscription = useCurrentSubscription();
+  const accountCanCreateBusiness = Boolean(
+    profile.data && (
+      profile.data.account.canCreateBusiness ??
+      profile.data.canCreateBusiness ??
+      profile.data.account.accountType !== "STAFF_ONLY"
+    ),
+  );
+  const subscription = useCurrentSubscription(mode === "create-business" && accountCanCreateBusiness);
   const activeMutation = mode === "create-business" ? createBusiness : mutation;
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -88,6 +95,9 @@ export function OnboardingFlow({ mode = "onboarding" }: { mode?: "onboarding" | 
 
   if (profile.isPending) return <FullScreenLoading />;
   if (profile.isError) return <AppErrorState title="Your session has ended" description="Sign in again to continue setting up your workspace." />;
+  if (mode === "create-business" && !accountCanCreateBusiness) {
+    return <OnboardingShell><div className="w-full"><AppErrorState title="Staff account" description="This account was created as a staff account. Staff accounts cannot create businesses." /></div></OnboardingShell>;
+  }
   if (mode === "create-business" && subscription.data) {
     const access = canCreateBusiness(subscription.data);
     if (!access.allowed) return <OnboardingShell><div className="w-full"><UpgradePrompt message={access.reason} recommendedPlan={access.recommendedPlan} /></div></OnboardingShell>;

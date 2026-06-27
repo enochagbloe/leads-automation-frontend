@@ -54,8 +54,10 @@ export interface UserAccountMenuProps {
   onSelectAccount?: (account: AccountMenuAccount) => void;
   onAddAccount?: () => void;
   canAddAccount?: boolean;
+  showAddAccount?: boolean;
   addAccountLabel?: string;
   addAccountDisabledReason?: string;
+  showBillingActions?: boolean;
   onUpdateStatus?: () => void;
   onSwitchSpace?: () => void;
   onLogout?: () => void;
@@ -139,8 +141,10 @@ export function UserAccountMenu({
   onSelectAccount,
   onAddAccount,
   canAddAccount = true,
+  showAddAccount = true,
   addAccountLabel = "Add new account",
   addAccountDisabledReason,
+  showBillingActions = true,
   onUpdateStatus,
   onSwitchSpace,
   onLogout,
@@ -168,8 +172,10 @@ export function UserAccountMenu({
         badge: notificationCount > 0 ? String(notificationCount) : undefined,
       },
     ],
-    [
+    showBillingActions ? [
       planMenuItem,
+      { id: "referrals", label: "Referrals", icon: Gift },
+    ] : [
       { id: "referrals", label: "Referrals", icon: Gift },
     ],
     [
@@ -266,20 +272,24 @@ export function UserAccountMenu({
                     <ShortcutBadge>{account.shortcut ?? `⌘${index + 1}`}</ShortcutBadge>
                   </DropdownMenu.Item>
                 ))}
-                <DropdownMenu.Separator className="my-1 h-px bg-border/70" />
-                <DropdownMenu.Item
-                  disabled={!canAddAccount}
-                  onSelect={onAddAccount}
-                  className="flex min-h-10 cursor-pointer select-none items-center gap-2.5 rounded-xl px-2.5 text-[12px] font-semibold outline-none transition-colors data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
-                >
-                  <span className="grid size-6 place-items-center rounded-full border bg-card">
-                    <Plus className="size-3.5" aria-hidden />
-                  </span>
-                  <span>{addAccountLabel}</span>
-                  <ShortcutBadge>⌘P</ShortcutBadge>
-                </DropdownMenu.Item>
-                {!canAddAccount && addAccountDisabledReason && (
-                  <p className="px-2.5 pb-2 pt-1 text-[10px] leading-4 text-muted-foreground">{addAccountDisabledReason}</p>
+                {showAddAccount && (
+                  <>
+                    <DropdownMenu.Separator className="my-1 h-px bg-border/70" />
+                    <DropdownMenu.Item
+                      disabled={!canAddAccount}
+                      onSelect={onAddAccount}
+                      className="flex min-h-10 cursor-pointer select-none items-center gap-2.5 rounded-xl px-2.5 text-[12px] font-semibold outline-none transition-colors data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+                    >
+                      <span className="grid size-6 place-items-center rounded-full border bg-card">
+                        <Plus className="size-3.5" aria-hidden />
+                      </span>
+                      <span>{addAccountLabel}</span>
+                      <ShortcutBadge>⌘P</ShortcutBadge>
+                    </DropdownMenu.Item>
+                    {!canAddAccount && addAccountDisabledReason && (
+                      <p className="px-2.5 pb-2 pt-1 text-[10px] leading-4 text-muted-foreground">{addAccountDisabledReason}</p>
+                    )}
+                  </>
                 )}
               </DropdownMenu.SubContent>
             </DropdownMenu.Portal>

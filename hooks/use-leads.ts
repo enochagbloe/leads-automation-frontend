@@ -7,7 +7,7 @@ import type { Lead, LeadListQuery } from "@/types/lead";
 
 export const useLeads = (query: LeadListQuery, enabled = true) => useQuery({ queryKey: queryKeys.leads.list(query), queryFn: () => leadService.list(query), enabled });
 export const useLead = (id: string) => useQuery({ queryKey: queryKeys.leads.detail(id), queryFn: () => leadService.detail(id), enabled: Boolean(id) });
-export const useLeadStats = () => useQuery({ queryKey: queryKeys.leads.stats, queryFn: leadService.stats });
+export const useLeadStats = (enabled = true) => useQuery({ queryKey: queryKeys.leads.stats, queryFn: leadService.stats, enabled });
 
 function useLeadMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<Lead>) {
   const client = useQueryClient();
@@ -37,6 +37,19 @@ export function useCreateLead() {
 export const useUpdateLead = () => useLeadMutation(leadService.update);
 export const useAssignLead = () => useLeadMutation(leadService.assign);
 export const useUpdateLeadStatus = () => useLeadMutation(leadService.updateStatus);
+
+export function useClaimLead(activeBusinessId?: string | null) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: leadService.claim,
+    onSuccess: async (lead) => Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.leads.lists }),
+      client.invalidateQueries({ queryKey: queryKeys.leads.stats }),
+      client.invalidateQueries({ queryKey: queryKeys.leads.detail(lead.id) }),
+      ...(activeBusinessId ? [client.invalidateQueries({ queryKey: queryKeys.notifications.business(activeBusinessId) })] : []),
+    ]),
+  });
+}
 
 export function useDeleteLead() {
   const client = useQueryClient();

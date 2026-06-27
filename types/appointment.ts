@@ -17,7 +17,7 @@ export type AppointmentLocationType = "BUSINESS_LOCATION" | "CUSTOMER_LOCATION" 
 export type AppointmentLocationStatus = "CONFIRMED" | "NEEDS_CONFIRMATION" | "NOT_REQUIRED";
 export type AppointmentView = "day" | "week" | "month";
 export type AppointmentConfirmationMode = "MANUAL_CONFIRMATION_REQUIRED" | "AUTO_CONFIRM_WHEN_STAFF_ASSIGNED" | "AUTO_CONFIRM_SAFE_BOOKINGS";
-export type AppointmentAction = "CONFIRM" | "RESCHEDULE" | "CANCEL" | "COMPLETE" | "NO_SHOW" | "MISSED" | "ASSIGN_STAFF" | "REVIEW" | "VIEW_DETAILS";
+export type AppointmentAction = "CONFIRM" | "RESCHEDULE" | "CANCEL" | "COMPLETE" | "NO_SHOW" | "MISSED" | "ASSIGN_STAFF" | "CLAIM" | "REVIEW" | "VIEW_DETAILS";
 
 export interface AppointmentPerson {
   id: string;
