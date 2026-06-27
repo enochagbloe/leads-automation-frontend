@@ -41,7 +41,9 @@ type AppSidebarProps = {
   userName: string;
   userEmail: string;
   currentPlan?: PlanCode;
+  showBillingActions?: boolean;
   canCreateBusiness: boolean;
+  showCreateBusiness?: boolean;
   createBusinessReason?: string;
   onSelectBusiness: (businessId: string) => void;
   onCreateBusiness: () => void;
@@ -53,6 +55,7 @@ const MODES: { value: SidebarMode; label: string; description: string }[] = [
   { value: "COLLAPSED", label: "Collapsed", description: "Keep navigation icon-only" },
   { value: "AUTO", label: "Auto", description: "Expand while hovering" },
 ];
+
 
 function SidebarModeMenu({ expanded }: { expanded: boolean }) {
   const { mode, setMode, setInteractionOpen } = useSidebar();
@@ -79,7 +82,22 @@ function SidebarModeMenu({ expanded }: { expanded: boolean }) {
   );
 }
 
-function BusinessSwitcher({ expanded, businesses, activeBusinessId, activeBusinessName, workspaceName, businessCount, canCreateBusiness, createBusinessReason, onSelectBusiness, onCreateBusiness }: Pick<AppSidebarProps, "businesses" | "activeBusinessId" | "activeBusinessName" | "workspaceName" | "businessCount" | "canCreateBusiness" | "createBusinessReason" | "onSelectBusiness" | "onCreateBusiness"> & { expanded: boolean }) {
+function roleLabel(role: BusinessMembership["role"]) {
+  if (role === "BUSINESS_OWNER") return "Owner";
+  if (role === "MANAGER") return "Manager";
+  return "Staff";
+}
+
+function membershipStatusLabel(status: BusinessMembership["status"]) {
+  if (status === "SUSPENDED_BY_PLAN") return "Suspended";
+  if (status === "DISABLED") return "Disabled";
+  if (status === "REMOVED") return "Removed";
+  if (status === "INVITED") return "Invite pending";
+  return null;
+}
+
+function BusinessSwitcher({ expanded, businesses, activeBusinessId, activeBusinessName, workspaceName, businessCount, canCreateBusiness, showCreateBusiness = true, createBusinessReason, onSelectBusiness, onCreateBusiness }: Pick<AppSidebarProps, "businesses" | "activeBusinessId" | "activeBusinessName" | "workspaceName" | "businessCount" | "canCreateBusiness" | "showCreateBusiness" | "createBusinessReason" | "onSelectBusiness" | "onCreateBusiness"> & { expanded: boolean }) {
+  const memberships = Array.isArray(businesses) ? businesses : [];
   const { setInteractionOpen } = useSidebar();
   return (
     <DropdownMenu.Root onOpenChange={setInteractionOpen}>
@@ -93,18 +111,29 @@ function BusinessSwitcher({ expanded, businesses, activeBusinessId, activeBusine
       <DropdownMenu.Portal>
         <DropdownMenu.Content side="right" align="start" sideOffset={10} collisionPadding={12} className="account-menu-content z-[70] w-72 rounded-2xl border bg-popover p-2 shadow-[0_18px_55px_rgba(20,35,27,0.16)] outline-none">
           <div className="px-2 pb-2 pt-1"><p className="text-xs font-bold">{workspaceName}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{businessCount} {businessCount === 1 ? "business" : "businesses"} on this workspace plan</p></div>
-          {businesses.map(({ business }) => (
-            <DropdownMenu.Item key={business.id} onSelect={() => onSelectBusiness(business.id)} className="flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-xl px-2 outline-none data-[highlighted]:bg-muted">
+          {memberships.map(({ business, role, status }) => {
+            const unavailable = status !== "ACTIVE";
+            const statusLabel = membershipStatusLabel(status);
+            return (
+            <DropdownMenu.Item key={business.id} disabled={unavailable} onSelect={() => onSelectBusiness(business.id)} className="flex min-h-12 cursor-pointer select-none items-center gap-3 rounded-xl px-2 outline-none data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55">
               <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary text-xs font-bold text-primary">{business.name[0]?.toUpperCase()}</span>
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{business.name}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{business.name}</span>
+                <span className="mt-0.5 block truncate text-[10px] font-semibold text-muted-foreground">{statusLabel ?? roleLabel(role)}{activeBusinessId === business.id ? " · Current workspace" : ""}</span>
+              </span>
               {activeBusinessId === business.id && <Check className="size-4 text-primary" />}
             </DropdownMenu.Item>
-          ))}
-          <DropdownMenu.Separator className="my-1 h-px bg-border" />
-          <DropdownMenu.Item disabled={!canCreateBusiness} onSelect={onCreateBusiness} className="flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-xl px-2 text-sm font-semibold outline-none data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50">
-            <span className="grid size-7 place-items-center rounded-lg border bg-card"><Plus className="size-4" /></span>Create new business
-          </DropdownMenu.Item>
-          {!canCreateBusiness && createBusinessReason && <p className="px-2 py-1 text-xs leading-5 text-muted-foreground">{createBusinessReason}</p>}
+            );
+          })}
+          {showCreateBusiness && (
+            <>
+              <DropdownMenu.Separator className="my-1 h-px bg-border" />
+              <DropdownMenu.Item disabled={!canCreateBusiness} onSelect={onCreateBusiness} className="flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-xl px-2 text-sm font-semibold outline-none data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50">
+                <span className="grid size-7 place-items-center rounded-lg border bg-card"><Plus className="size-4" /></span>Create new business
+              </DropdownMenu.Item>
+              {!canCreateBusiness && createBusinessReason && <p className="px-2 py-1 text-xs leading-5 text-muted-foreground">{createBusinessReason}</p>}
+            </>
+          )}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
@@ -148,7 +177,7 @@ export function AppSidebar(props: AppSidebarProps) {
         ))}
       </nav>
       <footer className="space-y-2 border-t p-3">
-        {props.currentPlan !== "PREMIUM" && <button type="button" onClick={props.onOpenBilling} className={cn("w-full overflow-hidden rounded-xl border border-primary/15 bg-secondary/55 p-3 text-left transition-colors hover:bg-secondary", !expanded && "px-2")}><div className="flex items-center gap-3"><Sparkles className="size-5 shrink-0 text-primary" /><span className={cn("min-w-0 transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}><span className="block whitespace-nowrap text-xs font-bold">Upgrade your plan</span><span className="mt-0.5 block whitespace-nowrap text-[10px] text-muted-foreground">{props.currentPlan ?? "Basic"} plan active</span></span></div></button>}
+        {props.showBillingActions !== false && props.currentPlan !== "PREMIUM" && <button type="button" onClick={props.onOpenBilling} className={cn("w-full overflow-hidden rounded-xl border border-primary/15 bg-secondary/55 p-3 text-left transition-colors hover:bg-secondary", !expanded && "px-2")}><div className="flex items-center gap-3"><Sparkles className="size-5 shrink-0 text-primary" /><span className={cn("min-w-0 transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}><span className="block whitespace-nowrap text-xs font-bold">Upgrade your plan</span><span className="mt-0.5 block whitespace-nowrap text-[10px] text-muted-foreground">{props.currentPlan ?? "Basic"} plan active</span></span></div></button>}
         <SidebarModeMenu expanded={expanded} />
         <div className="flex min-h-12 items-center gap-3 rounded-xl px-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground"><UserRound className="size-4" /></span>

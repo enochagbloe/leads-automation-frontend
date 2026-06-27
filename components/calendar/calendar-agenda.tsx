@@ -18,6 +18,7 @@ export function CalendarAgenda({
   loading,
   canCreate,
   canAssignStaff,
+  canClaimAppointments,
   newlyCreatedAppointmentId,
   onCreate,
   onAppointmentAction,
@@ -26,6 +27,7 @@ export function CalendarAgenda({
   loading: boolean;
   canCreate: boolean;
   canAssignStaff?: boolean;
+  canClaimAppointments?: boolean;
   newlyCreatedAppointmentId?: string | null;
   onCreate: () => void;
   onAppointmentAction?: (appointment: CalendarAppointment, action: AppointmentAction) => void;
@@ -53,7 +55,7 @@ export function CalendarAgenda({
           <div className="space-y-3">
             {items.map((appointment) => (
               <div key={appointment.id} className={appointment.id === newlyCreatedAppointmentId ? "animate-[calendar-card-in_260ms_cubic-bezier(0.16,1,0.3,1)]" : undefined}>
-                <AppointmentCard appointment={appointment} highlighted={appointment.id === newlyCreatedAppointmentId} canAssignStaff={canAssignStaff} onAction={onAppointmentAction} />
+                <AppointmentCard appointment={appointment} highlighted={appointment.id === newlyCreatedAppointmentId} canAssignStaff={canAssignStaff} canClaim={canClaimAppointments} onAction={onAppointmentAction} />
               </div>
             ))}
           </div>

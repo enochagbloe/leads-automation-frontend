@@ -345,4 +345,14 @@ export const mockAppointmentService = {
       autoConfirmed: autoConfirmWithStaff || appointment.autoConfirmed,
     });
   },
+  async claim(appointmentId: string): Promise<AppointmentDetail> {
+    await delay();
+    const appointment = findAppointment(appointmentId);
+    if (appointment.assignedStaffId) throw new Error("This appointment is already assigned to another team member.");
+    return replaceAppointment({
+      ...appointment,
+      assignedStaffId: "member_demo",
+      assignedStaff: { id: "member_demo", role: "STAFF", user: { id: "usr_demo", firstName: "Enoch", lastName: "Agbloe", email: "enoch@example.com" } },
+    });
+  },
 };

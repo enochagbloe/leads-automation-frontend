@@ -27,10 +27,12 @@ import { AppErrorState } from "@/components/states/app-error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeadStatusBadge } from "@/components/leads/lead-status-badge";
 import { useCurrentUser } from "@/hooks/use-auth";
+import { useBusinessMembers } from "@/hooks/use-business-members";
 import { useAssignLead, useLead, useUpdateLeadStatus } from "@/hooks/use-leads";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import { formatLeadDate, getLeadActivityLabel, LEAD_SOURCE_LABELS, LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/leads";
 import { cn } from "@/lib/utils";
+import { getWorkspacePermissions } from "@/lib/workspace-permissions";
 import type { Lead, LeadActivity, LeadStatus } from "@/types/lead";
 
 const STATUS_PROGRESS: Record<LeadStatus, number> = {
@@ -121,14 +123,20 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
   const profile = useCurrentUser();
   const updateStatus = useUpdateLeadStatus();
   const assignLead = useAssignLead();
-  const canManage = profile.data?.role !== "STAFF";
+  const canManage = getWorkspacePermissions(profile.data).canReassignLeadsToOthers;
+  const members = useBusinessMembers(profile.data?.activeBusiness?.id, canManage);
   const placeholder = (label: string) => systemNotify.info(`${label} is coming soon`);
   const lead = detail.data?.lead;
+  const assignableMembers = (members.data ?? []).filter((member) => member.status === "ACTIVE" && member.canReceiveAssignedWork);
   const assigneeOptions = lead ? [
     { value: "__unassigned", label: "Unassigned" },
-    ...(lead.assignedStaff ? [{ value: lead.assignedStaff.id, label: `${lead.assignedStaff.user.firstName} ${lead.assignedStaff.user.lastName}`, description: lead.assignedStaff.user.email }] : []),
-    ...(profile.data?.membership && profile.data.membership.id !== lead.assignedStaffId
-      ? [{ value: profile.data.membership.id, label: "Assign to me", description: profile.data.user.email }]
+    ...assignableMembers.map((member) => ({
+      value: member.membershipId || member.id,
+      label: `${member.user.firstName} ${member.user.lastName}`,
+      description: [member.positionTitle, member.user.email].filter(Boolean).join(" · "),
+    })),
+    ...(lead.assignedStaff && !assignableMembers.some((member) => (member.membershipId || member.id) === lead.assignedStaff?.id)
+      ? [{ value: lead.assignedStaff.id, label: `${lead.assignedStaff.user.firstName} ${lead.assignedStaff.user.lastName}`, description: lead.assignedStaff.user.email }]
       : []),
   ] : [];
 
@@ -209,7 +217,7 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
                   id="panel-lead-assignee"
                   value={detail.data.lead.assignedStaffId ?? "__unassigned"}
                   options={assigneeOptions}
-                  disabled={assignLead.isPending}
+                  disabled={assignLead.isPending || members.isPending}
                   onValueChange={(assignedStaffId) => assignLead.mutate(
                     { id: detail.data.lead.id, assignedStaffId: assignedStaffId === "__unassigned" ? null : assignedStaffId },
                     {

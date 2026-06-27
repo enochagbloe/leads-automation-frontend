@@ -56,6 +56,7 @@ const actionLabels: Record<AppointmentAction, string> = {
   NO_SHOW: "No-show",
   MISSED: "Missed",
   ASSIGN_STAFF: "Assign staff",
+  CLAIM: "Take appointment",
   REVIEW: "Review",
   VIEW_DETAILS: "View details",
 };
@@ -66,11 +67,13 @@ export function AppointmentCard({
   appointment,
   highlighted,
   canAssignStaff,
+  canClaim,
   onAction,
 }: {
   appointment: CalendarAppointment;
   highlighted?: boolean;
   canAssignStaff?: boolean;
+  canClaim?: boolean;
   onAction?: (appointment: CalendarAppointment, action: AppointmentAction) => void;
 }) {
   const start = new Date(appointment.startTime);
@@ -80,7 +83,8 @@ export function AppointmentCard({
   const urgent = isUrgent(appointment);
   const directActions = urgent ? actions.filter((action) => action !== "ASSIGN_STAFF") : [];
   const assignAction = canAssignStaff && !finalStatuses.has(appointment.status) && !actions.includes("ASSIGN_STAFF") ? ["ASSIGN_STAFF" as AppointmentAction] : [];
-  const menuActions = urgent ? ["VIEW_DETAILS" as AppointmentAction, ...assignAction] : ["VIEW_DETAILS" as AppointmentAction, ...assignAction, ...actions];
+  const claimAction = canClaim && !appointment.assignedStaffId && !finalStatuses.has(appointment.status) ? ["CLAIM" as AppointmentAction] : [];
+  const menuActions = urgent ? ["VIEW_DETAILS" as AppointmentAction, ...claimAction, ...assignAction] : ["VIEW_DETAILS" as AppointmentAction, ...claimAction, ...assignAction, ...actions];
 
   return (
     <article
@@ -148,8 +152,18 @@ export function AppointmentCard({
         </p>
       ) : null}
 
-      {directActions.length > 0 && (
+      {(directActions.length > 0 || claimAction.length > 0) && (
         <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+          {claimAction.map((action) => (
+            <button
+              key={action}
+              type="button"
+              onClick={() => onAction?.(appointment, action)}
+              className="inline-flex min-h-9 items-center justify-center rounded-lg bg-secondary px-3 text-xs font-bold text-primary transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {actionLabels[action]}
+            </button>
+          ))}
           {directActions.map((action) => (
             <button
               key={action}

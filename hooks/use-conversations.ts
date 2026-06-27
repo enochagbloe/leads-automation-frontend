@@ -8,15 +8,17 @@ import type { Conversation, ConversationListQuery } from "@/types/conversation";
 const CONVERSATION_POLL_INTERVAL = 10_000;
 const ACTIVE_CONVERSATION_POLL_INTERVAL = 5_000;
 
-export const useConversations = (query: ConversationListQuery) => useQuery({
+export const useConversations = (query: ConversationListQuery, enabled = true) => useQuery({
   queryKey: queryKeys.conversations.list(query),
   queryFn: () => conversationService.list(query),
+  enabled,
   refetchInterval: CONVERSATION_POLL_INTERVAL,
   refetchIntervalInBackground: false,
 });
-export const useConversationStats = () => useQuery({
+export const useConversationStats = (enabled = true) => useQuery({
   queryKey: queryKeys.conversations.stats,
   queryFn: conversationService.stats,
+  enabled,
   refetchInterval: CONVERSATION_POLL_INTERVAL,
   refetchIntervalInBackground: false,
 });
@@ -74,6 +76,18 @@ export const useRetryConversationMessage = () => useMessageMutation(conversation
 export const useSendMessage = useSendConversationMessage;
 
 export const useAssignConversation = () => useConversationMutation(conversationService.assign);
+export function useClaimConversation(activeBusinessId?: string | null) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: conversationService.claim,
+    onSuccess: async (conversation) => Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.conversations.lists }),
+      client.invalidateQueries({ queryKey: queryKeys.conversations.stats }),
+      client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversation.id) }),
+      ...(activeBusinessId ? [client.invalidateQueries({ queryKey: queryKeys.notifications.business(activeBusinessId) })] : []),
+    ]),
+  });
+}
 export const useUpdateConversation = () => useConversationMutation(conversationService.update);
 export const useUpdateConversationStatus = () => useConversationMutation(conversationService.updateStatus);
 export const useEndConversation = () => useConversationMutation(conversationService.end);

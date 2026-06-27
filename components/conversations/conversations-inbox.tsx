@@ -29,6 +29,7 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { useBusinessSetupStatus } from "@/hooks/use-business-setup";
 import {
   useAssignConversation,
+  useClaimConversation,
   useConversation,
   useConversations,
   useConversationStats,
@@ -53,6 +54,7 @@ import {
   formatConversationTime,
 } from "@/lib/conversations";
 import { cn } from "@/lib/utils";
+import { canAccessOperationalPage, getWorkspacePermissions } from "@/lib/workspace-permissions";
 import type { Conversation, ConversationListQuery, ConversationStatus, UpdateConversationInput } from "@/types/conversation";
 
 function parseQuery(params: URLSearchParams): ConversationListQuery {
@@ -84,17 +86,28 @@ function ConversationListSkeleton() {
   return <div className="space-y-2 p-3">{Array.from({ length: 7 }).map((_, index) => <div key={index} className="flex gap-3 rounded-xl border bg-card p-4"><Skeleton className="size-11 shrink-0 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-1/3" /></div></div>)}</div>;
 }
 
-function ConversationListItem({ conversation, onSelect }: { conversation: Conversation; onSelect: () => void }) {
+function ConversationListItem({ conversation, canClaim, claimBusy, onClaim, onSelect }: { conversation: Conversation; canClaim?: boolean; claimBusy?: boolean; onClaim?: () => void; onSelect: () => void }) {
   return (
-    <button type="button" onClick={onSelect} className="group flex min-h-28 w-full cursor-pointer gap-3 rounded-xl border bg-card p-4 text-left transition-[border-color,box-shadow,background-color] hover:border-primary/25 hover:bg-secondary/20 hover:shadow-[0_8px_24px_rgba(20,35,27,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <article className="group flex min-h-28 w-full gap-3 rounded-xl border bg-card p-4 text-left transition-[border-color,box-shadow,background-color] hover:border-primary/25 hover:bg-secondary/20 hover:shadow-[0_8px_24px_rgba(20,35,27,0.06)]">
       <span className={cn("grid size-11 shrink-0 place-items-center rounded-full text-xs font-bold", conversation.unreadCount > 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-primary")}>{initials(conversation.lead.fullName)}</span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-start justify-between gap-2"><span className={cn("flex min-w-0 items-center gap-1 truncate text-sm", conversation.unreadCount > 0 ? "font-bold" : "font-semibold")}>{conversation.pinned && <Pin className="size-3 shrink-0 fill-current text-primary" />}<span className="truncate">{conversation.lead.fullName}</span></span><span className="shrink-0 text-[10px] font-medium text-muted-foreground">{formatConversationTime(conversation.lastMessageAt ?? conversation.updatedAt)}</span></span>
+        <button type="button" onClick={onSelect} className="flex w-full items-start justify-between gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className={cn("flex min-w-0 items-center gap-1 truncate text-sm", conversation.unreadCount > 0 ? "font-bold" : "font-semibold")}>{conversation.pinned && <Pin className="size-3 shrink-0 fill-current text-primary" />}<span className="truncate">{conversation.lead.fullName}</span></span><span className="shrink-0 text-[10px] font-medium text-muted-foreground">{formatConversationTime(conversation.lastMessageAt ?? conversation.updatedAt)}</span></button>
         <span className="mt-1 block truncate text-[11px] font-medium text-muted-foreground">{conversation.lead.phone}</span>
         <span className="mt-1 block truncate text-xs text-muted-foreground">{conversation.lastMessagePreview ?? conversation.subject ?? "No messages yet"}</span>
         <span className="mt-3 flex flex-wrap items-center gap-2"><ConversationStatusBadge status={conversation.status} compact /><ConversationChannelBadge channel={conversation.channel} compact /><span className="min-w-0 flex-1 truncate text-[10px] font-medium text-muted-foreground">{conversation.displayId} · {assigneeName(conversation)}</span>{conversation.unreadCount > 0 && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">{conversation.unreadCount}</span>}</span>
+        {!conversation.assignedStaffId && canClaim && (
+          <button
+            type="button"
+            aria-label={`Take conversation ${conversation.displayId}`}
+            onClick={onClaim}
+            disabled={claimBusy}
+            className={cn("mt-3 inline-flex min-h-8 items-center rounded-lg bg-secondary px-2.5 text-xs font-bold text-primary transition hover:bg-secondary/80", claimBusy && "pointer-events-none opacity-60")}
+          >
+            {claimBusy ? "Taking..." : "Take conversation"}
+          </button>
+        )}
       </span>
-    </button>
+    </article>
   );
 }
 
@@ -103,23 +116,41 @@ function InboxList({
   onParams,
   onCreate,
   onSelect,
+  activeBusinessId,
+  currentMembershipId,
+  canCreate,
+  canClaim,
+  staffView,
 }: {
   query: ConversationListQuery;
   onParams: (updates: Record<string, string | number | undefined>) => void;
   onCreate: () => void;
   onSelect: (id: string) => void;
+  activeBusinessId?: string | null;
+  currentMembershipId?: string;
+  canCreate: boolean;
+  canClaim: boolean;
+  staffView: boolean;
 }) {
   const conversations = useConversations(query);
   const stats = useConversationStats();
+  const claim = useClaimConversation(activeBusinessId);
   const dateFrom = parseDateValue(query.dateFrom);
   const dateTo = parseDateValue(query.dateTo);
+  const claimError = (error: unknown) => {
+    const description = error instanceof ApiError && error.code === "WORK_ALREADY_ASSIGNED"
+      ? "This conversation is already assigned to another team member."
+      : getApiErrorMessage(error);
+    systemNotify.error("Could not take conversation", { description });
+    void conversations.refetch();
+  };
 
   return (
     <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6">
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div><div className="flex items-center gap-2"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Communication center</p><RealtimeStatusIndicator /></div><h1 className="mt-1 text-2xl font-bold">Inbox</h1><p className="mt-1 text-sm text-muted-foreground">Review stored customer conversations and team follow-up.</p></div>
-          <AppButton onClick={onCreate}><MessageSquarePlus className="size-4" />New conversation</AppButton>
+          {canCreate && <AppButton onClick={onCreate}><MessageSquarePlus className="size-4" />New conversation</AppButton>}
         </header>
 
         <section className="mt-6 rounded-2xl border bg-card">
@@ -136,6 +167,31 @@ function InboxList({
             <AppButton size="icon" variant="outline" aria-label="Refresh inbox" onClick={() => Promise.all([conversations.refetch(), stats.refetch()])}><RefreshCw className="size-4" /></AppButton>
           </div>
 
+          {staffView && (
+            <div className="flex gap-1 overflow-x-auto border-b px-4 py-2">
+              {[
+                { label: "Available", value: undefined },
+                { label: "Assigned to me", value: currentMembershipId },
+                { label: "Unassigned", value: "unassigned" },
+                { label: "Needs review", value: "unassigned", status: "HUMAN_HANDLING" },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => onParams({ assignedStaffId: item.value, status: item.status as ConversationStatus | undefined, page: 1 })}
+                  disabled={item.label === "Assigned to me" && !currentMembershipId}
+                  className={cn(
+                    "min-h-9 shrink-0 rounded-lg px-3 text-xs font-bold text-muted-foreground transition hover:bg-secondary/60 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+                    query.assignedStaffId === item.value && query.status === item.status && "bg-secondary text-primary",
+                    !query.assignedStaffId && !query.status && item.value === undefined && !item.status && "bg-secondary text-primary",
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex gap-1 overflow-x-auto border-b px-4 pt-2">
             {[
               { status: undefined, label: "All", count: stats.data?.total ?? 0 },
@@ -151,8 +207,17 @@ function InboxList({
             : conversations.isError
               ? <AppErrorState className="m-4 min-h-64 border-0" title="Could not load inbox" description={getApiErrorMessage(conversations.error)} onRetry={() => conversations.refetch()} />
               : conversations.data.data.length === 0
-                ? <AppEmptyState className="m-4 min-h-72 border-0" icon={Inbox} title="No conversations yet" description="Start a manual conversation with an existing lead." actionLabel="New conversation" onAction={onCreate} />
-                : <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">{conversations.data.data.map((conversation) => <ConversationListItem key={conversation.id} conversation={conversation} onSelect={() => onSelect(conversation.id)} />)}</div>}
+                ? <AppEmptyState className="m-4 min-h-72 border-0" icon={Inbox} title={staffView ? "No available conversations" : "No conversations yet"} description={staffView ? "Assigned and unassigned conversations available to you will appear here." : "Start a manual conversation with an existing lead."} actionLabel={canCreate ? "New conversation" : undefined} onAction={onCreate} />
+                : <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">{conversations.data.data.map((conversation) => (
+                  <ConversationListItem
+                    key={conversation.id}
+                    conversation={conversation}
+                    canClaim={canClaim}
+                    claimBusy={claim.isPending && claim.variables === conversation.id}
+                    onClaim={() => claim.mutate(conversation.id, { onSuccess: () => systemNotify.success("Conversation assigned to you"), onError: claimError })}
+                    onSelect={() => onSelect(conversation.id)}
+                  />
+                ))}</div>}
 
           {conversations.data && conversations.data.pagination.totalPages > 1 && <div className="flex items-center justify-between border-t p-4 text-xs text-muted-foreground"><span>Page {conversations.data.pagination.page} of {conversations.data.pagination.totalPages}</span><div className="flex gap-1"><AppButton size="icon" variant="ghost" disabled={query.page <= 1} aria-label="Previous page" onClick={() => onParams({ page: query.page - 1 })}><ChevronLeft className="size-4" /></AppButton><AppButton size="icon" variant="ghost" disabled={query.page >= conversations.data.pagination.totalPages} aria-label="Next page" onClick={() => onParams({ page: query.page + 1 })}><ChevronRight className="size-4" /></AppButton></div></div>}
         </section>
@@ -165,10 +230,12 @@ export function ConversationsInbox() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = parseQuery(searchParams);
-  const selectedId = searchParams.get("conversationId") ?? searchParams.get("conversation") ?? "";
-  const conversations = useConversations(query);
-  const detail = useConversation(selectedId);
   const profile = useCurrentUser();
+  const permissions = getWorkspacePermissions(profile.data);
+  const canViewConversations = canAccessOperationalPage(profile.data, "conversations");
+  const selectedId = canViewConversations ? searchParams.get("conversationId") ?? searchParams.get("conversation") ?? "" : "";
+  const conversations = useConversations(query, Boolean(profile.data && canViewConversations));
+  const detail = useConversation(selectedId);
   const businessSetup = useBusinessSetupStatus(profile.data?.activeBusiness?.id);
   const whatsapp = useWhatsAppStatus(profile.data?.activeBusiness?.id);
   const currentDetail = detail.data?.pages[0];
@@ -186,7 +253,10 @@ export function ConversationsInbox() {
   const [draft, setDraft] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const selectedConversation = currentDetail?.conversation;
-  const canManage = profile.data?.role !== "STAFF";
+  const canManage = permissions.canReassignConversationsToOthers || permissions.canViewAllOperationalConversations;
+  const canCreateConversation = permissions.canViewAllOperationalConversations || profile.data?.membership?.role === "BUSINESS_OWNER" || profile.data?.membership?.role === "MANAGER";
+  const canClaimConversation = permissions.canClaimUnassignedConversations;
+  const staffView = profile.data?.membership?.role === "STAFF" && permissions.canViewOperationalQueues;
   const isOwner = profile.data?.membership?.role === "BUSINESS_OWNER";
   const messages = useMemo(() => detail.data ? [...detail.data.pages].reverse().flatMap((page) => page.messages) : [], [detail.data]);
   const selectedIndex = conversations.data?.data.findIndex((item) => item.id === selectedId) ?? -1;
@@ -282,8 +352,16 @@ export function ConversationsInbox() {
       : []),
   ] : [];
 
+  if (profile.isPending) {
+    return <main className="grid h-[calc(100dvh-4rem)] place-items-center bg-background"><div className="w-full max-w-2xl space-y-4 px-6"><Skeleton className="h-16 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-[420px] w-full" /></div></main>;
+  }
+
+  if (!canViewConversations) {
+    return <main className="grid h-[calc(100dvh-4rem)] place-items-center bg-background p-6"><AppErrorState className="w-full max-w-2xl" title="You do not have permission to access this area." description="Switch workspace or ask an owner or manager to update your access." /></main>;
+  }
+
   if (!selectedId) {
-    return <><InboxList query={query} onParams={setParams} onCreate={() => setCreateOpen(true)} onSelect={(id) => setParams({ conversationId: id })} /><CreateConversationDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={(id) => setParams({ conversationId: id })} /></>;
+    return <><InboxList query={query} activeBusinessId={profile.data?.activeBusiness?.id} currentMembershipId={profile.data?.membership?.id} canCreate={canCreateConversation} canClaim={canClaimConversation} staffView={staffView} onParams={setParams} onCreate={() => setCreateOpen(true)} onSelect={(id) => setParams({ conversationId: id })} /><CreateConversationDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={(id) => setParams({ conversationId: id })} /></>;
   }
 
   if (detail.isPending) {

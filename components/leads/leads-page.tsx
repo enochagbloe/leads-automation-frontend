@@ -43,10 +43,11 @@ import { LeadSearch } from "@/components/search/lead-search";
 import { LoadingCard } from "@/components/states/loading-states";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { useDeleteLead, useLeads, useLeadStats } from "@/hooks/use-leads";
-import { getApiErrorMessage } from "@/lib/api-client";
+import { useClaimLead, useDeleteLead, useLeads, useLeadStats } from "@/hooks/use-leads";
+import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import { formatLeadDate, LEAD_SOURCES, LEAD_SOURCE_LABELS, LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/leads";
 import { cn } from "@/lib/utils";
+import { canAccessOperationalPage, getWorkspacePermissions } from "@/lib/workspace-permissions";
 import type { Lead, LeadListQuery, LeadSortBy, LeadStatus, SortOrder } from "@/types/lead";
 
 const DEFAULT_QUERY: LeadListQuery = { page: 1, limit: 20, sortBy: "createdAt", sortOrder: "desc" };
@@ -94,13 +95,21 @@ export function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = parseQuery(searchParams);
-  const leads = useLeads(query);
-  const stats = useLeadStats();
   const profile = useCurrentUser();
+  const permissions = getWorkspacePermissions(profile.data);
+  const activeBusinessId = profile.data?.activeBusiness?.id;
+  const canViewLeads = canAccessOperationalPage(profile.data, "leads");
+  const leads = useLeads(query, Boolean(profile.data && canViewLeads));
+  const stats = useLeadStats(Boolean(profile.data && canViewLeads));
   const removeLead = useDeleteLead();
+  const claimLead = useClaimLead(activeBusinessId);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const selectedLeadId = searchParams.get("lead");
-  const canDelete = profile.data?.role !== "STAFF";
+  const currentMembershipId = profile.data?.membership?.id;
+  const staffView = profile.data?.membership?.role === "STAFF" && permissions.canViewOperationalQueues;
+  const canClaimLead = permissions.canClaimUnassignedLeads;
+  const canDelete = permissions.canViewAllOperationalLeads && permissions.canReassignLeadsToOthers;
+  const canCreateLead = permissions.canViewAllOperationalLeads || profile.data?.membership?.role === "BUSINESS_OWNER" || profile.data?.membership?.role === "MANAGER";
   const dateFrom = parseDateValue(query.dateFrom);
   const dateTo = parseDateValue(query.dateTo);
 
@@ -122,6 +131,26 @@ export function LeadsPage() {
   };
   const openLead = (id: string) => setParams({ lead: id });
   const closeLead = () => setParams({ lead: undefined });
+  const claimError = (error: unknown) => {
+    const description = error instanceof ApiError && error.code === "WORK_ALREADY_ASSIGNED"
+      ? "This lead is already assigned to another team member."
+      : getApiErrorMessage(error);
+    systemNotify.error("Could not assign lead", { description });
+    void leads.refetch();
+  };
+
+  if (profile.isPending) return <main className="w-full space-y-5 p-4 sm:p-6 lg:p-8"><LoadingCard className="min-h-96" /></main>;
+
+  if (!canViewLeads) {
+    return (
+      <main className="grid min-h-[calc(100dvh-4rem)] place-items-center p-6">
+        <AppErrorState
+          title="You do not have permission to access this area."
+          description="Switch workspace or ask an owner or manager to update your access."
+        />
+      </main>
+    );
+  }
 
   return (
     <main className="w-full space-y-5 p-4 sm:p-6 lg:p-8">
@@ -132,10 +161,34 @@ export function LeadsPage() {
           <p className="mt-1.5 text-sm text-muted-foreground">Track opportunities and keep every follow-up moving.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AppButton variant="outline" onClick={() => handlePlaceholder("Lead import")}><Upload className="size-4" />Import leads</AppButton>
-          <AppButton asChild><Link href="/leads/new"><UserPlus className="size-4" />New lead</Link></AppButton>
+          {canCreateLead && <AppButton variant="outline" onClick={() => handlePlaceholder("Lead import")}><Upload className="size-4" />Import leads</AppButton>}
+          {canCreateLead && <AppButton asChild><Link href="/leads/new"><UserPlus className="size-4" />New lead</Link></AppButton>}
         </div>
       </header>
+
+      {staffView && (
+        <section className="flex flex-wrap gap-2 rounded-2xl border bg-card p-2" aria-label="Operational lead queue filters">
+          {[
+            { label: "All available", value: undefined },
+            { label: "Assigned to me", value: currentMembershipId },
+            { label: "Unassigned", value: "unassigned" },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setParams({ assignedStaffId: item.value, page: 1 })}
+              disabled={item.label === "Assigned to me" && !currentMembershipId}
+              className={cn(
+                "min-h-10 rounded-xl px-3 text-sm font-semibold text-muted-foreground transition hover:bg-secondary/60 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+                query.assignedStaffId === item.value && "bg-secondary text-primary",
+                !query.assignedStaffId && item.value === undefined && "bg-secondary text-primary",
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </section>
+      )}
 
       {stats.isPending ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">{Array.from({ length: 7 }).map((_, index) => <LoadingCard key={index} className="min-h-24 p-4" />)}</div>
@@ -257,7 +310,14 @@ export function LeadsPage() {
         ) : leads.isError ? (
           <AppErrorState className="m-4" title="Could not load leads" description={getApiErrorMessage(leads.error)} onRetry={() => leads.refetch()} />
         ) : leads.data.data.length === 0 ? (
-          <AppEmptyState className="m-4 border-0" icon={UsersRound} title={hasFilters ? "No leads match these filters" : "No leads yet"} description={hasFilters ? "Try clearing or changing your filters." : "Create your first lead to begin building the business CRM."} actionLabel={hasFilters ? "Clear filters" : "Create lead"} onAction={() => hasFilters ? resetFilters() : router.push("/leads/new")} />
+          <AppEmptyState
+            className="m-4 border-0"
+            icon={UsersRound}
+            title={hasFilters ? "No leads match these filters" : staffView ? "No available leads" : "No leads yet"}
+            description={hasFilters ? "Try clearing or changing your filters." : staffView ? "Assigned and unassigned leads available to you will appear here." : "Create your first lead to begin building the business CRM."}
+            actionLabel={hasFilters ? "Clear filters" : canCreateLead ? "Create lead" : undefined}
+            onAction={() => hasFilters ? resetFilters() : router.push("/leads/new")}
+          />
         ) : (
           <>
             <div className="grid gap-4 p-4 md:grid-cols-2">
@@ -306,6 +366,16 @@ export function LeadsPage() {
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
+                        {!lead.assignedStaffId && canClaimLead && (
+                          <AppButton
+                            size="sm"
+                            variant="secondary"
+                            loading={claimLead.isPending && claimLead.variables === lead.id}
+                            onClick={() => claimLead.mutate(lead.id, { onSuccess: () => systemNotify.success("Lead assigned to you"), onError: claimError })}
+                          >
+                            Assign to me
+                          </AppButton>
+                        )}
                         <AppButton size="sm" variant="ghost" onClick={() => openLead(lead.id)}>View</AppButton>
                         {canDelete && (
                           <ConfirmDialog

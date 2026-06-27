@@ -105,4 +105,7 @@ export const appointmentService = {
   assign: (appointmentId: string, input: AssignAppointmentInput) => env.useMockApi
     ? mockAppointmentService.assign(appointmentId, input)
     : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/assign`, { method: "PATCH", body: JSON.stringify(input) }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
+  claim: (appointmentId: string) => env.useMockApi
+    ? mockAppointmentService.claim(appointmentId)
+    : apiRequest<ApiAppointmentLike>(`/business/appointments/${appointmentId}/claim`, { method: "PATCH" }).then((appointment) => normalizeAppointment(appointment) as AppointmentDetail),
 };
