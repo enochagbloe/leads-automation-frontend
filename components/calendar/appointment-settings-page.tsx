@@ -41,8 +41,9 @@ export function AppointmentSettingsPage() {
   const update = useUpdateAppointmentSettings(businessId);
   const canEdit = auth.data?.membership?.role === "BUSINESS_OWNER" || auth.data?.membership?.role === "MANAGER";
 
-  if (auth.isPending || settings.isPending) return <AppointmentSettingsLoading />;
+  if (auth.isPending) return <AppointmentSettingsLoading />;
   if (!businessId) return <main className="p-6"><AppErrorState title="No active business" description="Select a business to manage appointment settings." /></main>;
+  if (settings.isPending) return <AppointmentSettingsLoading />;
 
   const mode = settings.data?.appointmentConfirmationMode ?? "MANUAL_CONFIRMATION_REQUIRED";
   const changeMode = (appointmentConfirmationMode: AppointmentConfirmationMode) => {

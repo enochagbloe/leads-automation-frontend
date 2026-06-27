@@ -36,6 +36,7 @@ function normalizeActions(value: unknown): NotificationAction[] {
         label: entry.label,
         action: entry.action,
         variant: entry.variant,
+        href: entry.href,
       });
       return actions;
     }, []);

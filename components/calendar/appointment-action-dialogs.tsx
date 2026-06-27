@@ -9,8 +9,6 @@ import { AppIsoDatePicker } from "@/components/app-date-picker";
 import { AppTimePicker } from "@/components/app-time-picker";
 import { Dialog, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 import type { AppointmentAction, CalendarAppointment } from "@/types/appointment";
-
-const timezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Accra";
 type DialogAction = Extract<AppointmentAction, "CONFIRM" | "RESCHEDULE" | "CANCEL" | "COMPLETE" | "NO_SHOW" | "MISSED">;
 
 export function AppointmentActionDialog({
@@ -108,7 +106,7 @@ function AppointmentActionDialogContent({
         setError("Please provide a reason before rescheduling this appointment.");
         return;
       }
-      onReschedule({ newDate: date, newStartTime: time, timezone: timezone(), rescheduleReason: reason.trim(), notifyCustomer: false });
+      onReschedule({ newDate: date, newStartTime: time, timezone: appointment.timezone, rescheduleReason: reason.trim(), notifyCustomer: false });
       return;
     }
     if (action === "CANCEL") {
