@@ -53,12 +53,12 @@ export function AppSelect({
   "aria-describedby": ariaDescribedBy,
 }: AppSelectProps) {
   const selectedOption = options.find((option) => option.value === value);
+  const isControlled = value !== undefined || onValueChange !== undefined;
 
   return (
     <Select.Root
       name={name}
-      value={value || undefined}
-      defaultValue={defaultValue}
+      {...(isControlled ? { value: value ?? "" } : { defaultValue })}
       onValueChange={onValueChange}
       disabled={disabled}
       required={required}

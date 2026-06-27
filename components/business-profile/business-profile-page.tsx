@@ -13,7 +13,7 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { Controller, useForm, useWatch, type UseFormReturn } from "react-hook-form";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppCard } from "@/components/app-card";
 import { AppErrorState } from "@/components/app-error-state";
@@ -157,11 +157,11 @@ export function BusinessProfilePage() {
     try {
       const saved = await update.mutateAsync(payload);
       form.reset(profileValues(saved));
-      toast.success("Changes saved", { description: "Your business profile and setup progress are up to date." });
+      systemNotify.success("Changes saved", { description: "Your business profile and setup progress are up to date." });
     } catch (error) {
       applyApiFieldErrors(error, form.setError);
       const permission = error instanceof ApiError && error.code === "FORBIDDEN";
-      toast.error(permission ? "You do not have permission to update business profile settings." : "Could not save changes", { description: permission ? undefined : getApiErrorMessage(error) });
+      systemNotify.error(permission ? "You do not have permission to update business profile settings." : "Could not save changes", { description: permission ? undefined : getApiErrorMessage(error) });
     }
   });
 

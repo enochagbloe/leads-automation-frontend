@@ -2,11 +2,12 @@ import { format } from "date-fns";
 import { CalendarEmptyState } from "@/components/calendar/calendar-empty-state";
 import { AppointmentCard } from "@/components/calendar/appointment-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { CalendarAppointment } from "@/types/appointment";
+import { appointmentDateKey } from "@/lib/appointment-dates";
+import type { AppointmentAction, CalendarAppointment } from "@/types/appointment";
 
 function groupedByDay(appointments: CalendarAppointment[]) {
   return appointments.reduce<Record<string, CalendarAppointment[]>>((groups, appointment) => {
-    const key = appointment.startTime.slice(0, 10);
+    const key = appointmentDateKey(appointment.startTime, appointment.timezone);
     groups[key] = [...(groups[key] ?? []), appointment];
     return groups;
   }, {});
@@ -16,14 +17,18 @@ export function CalendarAgenda({
   appointments,
   loading,
   canCreate,
+  canAssignStaff,
   newlyCreatedAppointmentId,
   onCreate,
+  onAppointmentAction,
 }: {
   appointments: CalendarAppointment[];
   loading: boolean;
   canCreate: boolean;
+  canAssignStaff?: boolean;
   newlyCreatedAppointmentId?: string | null;
   onCreate: () => void;
+  onAppointmentAction?: (appointment: CalendarAppointment, action: AppointmentAction) => void;
 }) {
   if (loading) {
     return (
@@ -48,7 +53,7 @@ export function CalendarAgenda({
           <div className="space-y-3">
             {items.map((appointment) => (
               <div key={appointment.id} className={appointment.id === newlyCreatedAppointmentId ? "animate-[calendar-card-in_260ms_cubic-bezier(0.16,1,0.3,1)]" : undefined}>
-                <AppointmentCard appointment={appointment} highlighted={appointment.id === newlyCreatedAppointmentId} />
+                <AppointmentCard appointment={appointment} highlighted={appointment.id === newlyCreatedAppointmentId} canAssignStaff={canAssignStaff} onAction={onAppointmentAction} />
               </div>
             ))}
           </div>

@@ -6,14 +6,18 @@ export type AppointmentStatus =
   | "NEEDS_HUMAN_CONFIRMATION"
   | "RESCHEDULE_REQUESTED"
   | "RESCHEDULED"
+  | "NEEDS_OUTCOME_CONFIRMATION"
   | "CANCELLED"
   | "COMPLETED"
-  | "NO_SHOW";
+  | "NO_SHOW"
+  | "MISSED";
 
 export type AppointmentSource = "MANUAL" | "CONVERSATION" | "AI_ASSISTED" | "AI_CREATED" | "CUSTOMER_REQUESTED";
 export type AppointmentLocationType = "BUSINESS_LOCATION" | "CUSTOMER_LOCATION" | "ONLINE" | "PHONE_CALL" | "TO_BE_CONFIRMED";
 export type AppointmentLocationStatus = "CONFIRMED" | "NEEDS_CONFIRMATION" | "NOT_REQUIRED";
 export type AppointmentView = "day" | "week" | "month";
+export type AppointmentConfirmationMode = "MANUAL_CONFIRMATION_REQUIRED" | "AUTO_CONFIRM_WHEN_STAFF_ASSIGNED" | "AUTO_CONFIRM_SAFE_BOOKINGS";
+export type AppointmentAction = "CONFIRM" | "RESCHEDULE" | "CANCEL" | "COMPLETE" | "NO_SHOW" | "MISSED" | "ASSIGN_STAFF" | "REVIEW" | "VIEW_DETAILS";
 
 export interface AppointmentPerson {
   id: string;
@@ -24,9 +28,12 @@ export interface AppointmentPerson {
 
 export interface AppointmentStaff {
   id: string;
+  name?: string;
+  email?: string;
+  avatarUrl?: string | null;
   role?: BusinessRole;
   status?: string;
-  user: { id?: string; firstName: string; lastName: string; email?: string };
+  user?: { id?: string; firstName: string; lastName: string; email?: string };
 }
 
 export interface CalendarAppointment {
@@ -47,6 +54,14 @@ export interface CalendarAppointment {
   lead: AppointmentPerson | null;
   service: { id: string; name: string; durationMinutes: number | null } | null;
   assignedStaff: AppointmentStaff | null;
+  availableActions?: AppointmentAction[];
+  humanConfirmationRequired?: boolean;
+  humanConfirmationReason?: string | null;
+  rescheduleCount?: number;
+  outcomeRequiredAt?: string | null;
+  outcomeConfirmedAt?: string | null;
+  appointmentConfirmationMode?: AppointmentConfirmationMode;
+  autoConfirmed?: boolean;
 }
 
 export interface AppointmentDetail extends CalendarAppointment {
@@ -62,6 +77,9 @@ export interface AppointmentDetail extends CalendarAppointment {
   humanConfirmationReason: string | null;
   cancellationReason: string | null;
   rescheduleReason: string | null;
+  completedNote?: string | null;
+  noShowReason?: string | null;
+  missedReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,6 +91,7 @@ export type AppointmentActivityType =
   | "APPOINTMENT_CANCELLED"
   | "APPOINTMENT_COMPLETED"
   | "APPOINTMENT_NO_SHOW"
+  | "APPOINTMENT_MISSED"
   | "APPOINTMENT_ASSIGNED"
   | "APPOINTMENT_STATUS_CHANGED";
 
@@ -106,6 +125,15 @@ export interface AppointmentCalendarResponse {
   dateFrom: string;
   dateTo: string;
   appointments: CalendarAppointment[];
+}
+
+export interface AppointmentSettings {
+  appointmentConfirmationMode: AppointmentConfirmationMode;
+  updatedAt?: string;
+}
+
+export interface UpdateAppointmentSettingsInput {
+  appointmentConfirmationMode: AppointmentConfirmationMode;
 }
 
 export interface AppointmentListQuery {
@@ -171,14 +199,36 @@ export interface CreateAppointmentInput {
 }
 
 export interface RescheduleAppointmentInput {
-  date: string;
-  time: string;
+  date?: string;
+  time?: string;
+  newDate?: string;
+  newStartTime?: string;
   timezone: string;
-  reason: string;
+  reason?: string;
+  rescheduleReason?: string;
+  notifyCustomer?: boolean;
 }
 
 export interface CancelAppointmentInput {
-  reason: string;
+  reason?: string;
+  cancellationReason?: string;
+  notifyCustomer?: boolean;
+}
+
+export interface ConfirmAppointmentInput {
+  note?: string | null;
+}
+
+export interface CompleteAppointmentInput {
+  completedNote?: string | null;
+}
+
+export interface NoShowAppointmentInput {
+  noShowReason?: string | null;
+}
+
+export interface MissedAppointmentInput {
+  missedReason?: string | null;
 }
 
 export interface AssignAppointmentInput {

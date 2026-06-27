@@ -17,7 +17,7 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppCard } from "@/components/app-card";
 import { AppErrorState } from "@/components/app-error-state";
@@ -223,7 +223,7 @@ export function AvailabilityPage() {
     try {
       const saved = await update.mutateAsync(payload(nextValues));
       form.reset(formValues(saved));
-      toast.success(saved.summary.isComplete ? "Availability saved" : "Availability saved. Some days still need complete hours.");
+      systemNotify.success(saved.summary.isComplete ? "Availability saved" : "Availability saved. Some days still need complete hours.");
     } catch (error) {
       applyApiFieldErrors(error, form.setError);
       const message = error instanceof ApiError && error.code === "FORBIDDEN"
@@ -233,7 +233,7 @@ export function AvailabilityPage() {
           : error instanceof ApiError && error.code === "INVALID_TIME_RANGE"
             ? "Please check your opening, closing, and break times."
             : getApiErrorMessage(error);
-      toast.error("Could not save availability", { description: message });
+      systemNotify.error("Could not save availability", { description: message });
     }
   });
 

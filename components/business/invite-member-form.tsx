@@ -5,7 +5,7 @@ import { Check, Clock3, Mail, ShieldCheck, UserPlus, Users } from "lucide-react"
 import Link from "next/link";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { z } from "zod";
 import { AppButton } from "@/components/app-button";
 import { AppCard } from "@/components/app-card";
@@ -63,7 +63,7 @@ export function InviteMemberForm() {
         persistInvitations(profile.data?.activeBusiness?.id, next);
         return next;
       });
-      toast.success("Invitation sent");
+      systemNotify.success("Invitation sent");
       form.reset();
     },
     onError: (error) => applyApiFieldErrors(error, form.setError),

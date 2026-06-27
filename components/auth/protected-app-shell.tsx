@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { UserAccountMenu } from "@/components/account/user-account-menu";
 import { AppButton } from "@/components/app-button";
 import { AppErrorState } from "@/components/app-error-state";
+import { ActionableNotificationHost } from "@/components/notifications/actionable-notification-host";
 import { AppGlobalSearch } from "@/components/search/app-global-search";
 import { RealtimeProvider } from "@/components/providers/realtime-provider";
 import { AppSidebar, type SidebarNavItem } from "@/components/sidebar/app-sidebar";
@@ -14,6 +15,7 @@ import { SidebarProvider, useSidebar } from "@/components/sidebar/sidebar-provid
 import { FullScreenLoading, LogoutLoadingState } from "@/components/states/loading-states";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
 import { useBusinesses, useSelectBusiness } from "@/hooks/use-businesses";
+import { useNotificationCounts } from "@/hooks/use-notifications";
 import { useCurrentSubscription } from "@/hooks/use-subscription";
 import { ApiError } from "@/lib/api-client";
 import { resetBusinessContext } from "@/lib/business-query-cache";
@@ -34,6 +36,8 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const businesses = useBusinesses();
   const selectBusiness = useSelectBusiness();
   const subscription = useCurrentSubscription();
+  const activeBusinessId = profile.data?.activeBusiness?.id;
+  const notificationCounts = useNotificationCounts(activeBusinessId);
   const businessCreation = subscription.data ? canCreateBusiness(subscription.data) : null;
   const sessionEnded = profile.error instanceof ApiError && profile.error.status === 401;
 
@@ -127,7 +131,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
               accounts={businessProfiles}
               activeAccountId={profile.data.activeBusiness?.id}
               status="Online"
-              notificationCount={0}
+              notificationCount={notificationCounts.data?.unread ?? 0}
               currentPlan={subscription.data?.plan.code ?? profile.data.plan?.code}
               onSelectAccount={(business) => selectBusiness(business.id)}
               onAddAccount={openCreateBusiness}
@@ -143,6 +147,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         {children}
+        <ActionableNotificationHost key={profile.data.activeBusiness?.id ?? "no-active-business"} activeBusinessId={profile.data.activeBusiness?.id} />
       </div>
     </div>
     </RealtimeProvider>

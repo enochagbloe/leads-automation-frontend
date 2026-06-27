@@ -165,7 +165,7 @@ export function UserAccountMenu({
         id: "notifications",
         label: "Notifications",
         icon: Bell,
-        badge: notificationCount > 0 ? String(notificationCount) : "4",
+        badge: notificationCount > 0 ? String(notificationCount) : undefined,
       },
     ],
     [

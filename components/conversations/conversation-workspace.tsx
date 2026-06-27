@@ -30,7 +30,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppEmptyState } from "@/components/app-empty-state";
 import { AppSelect, type AppSelectOption } from "@/components/app-select";
@@ -343,7 +343,7 @@ function SideConversationPanel({ conversation }: { conversation: Conversation })
     if (!draft.trim()) return;
     setMessages((current) => [...current, { id: Date.now(), mine: true, content: draft.trim() }]);
     setDraft("");
-    toast.info("Internal chat is a local placeholder for now.");
+    systemNotify.info("Internal chat is a local placeholder for now.");
   };
   return (
     <div className="flex h-full flex-col">
@@ -529,7 +529,7 @@ export function ConversationWorkspace({
 
   const suggestArticle = (article: Article) => {
     onDraftChange(`${article.title}\n${article.url === "#" ? "Article suggestion will be connected later." : article.url}`);
-    toast.info("Article added to the reply draft", { description: "Suggestion delivery will be connected later." });
+    systemNotify.info("Article added to the reply draft", { description: "Suggestion delivery will be connected later." });
     setContext(null);
   };
 

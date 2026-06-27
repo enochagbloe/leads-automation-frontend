@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppIsoDatePicker, parseDateValue } from "@/components/app-date-picker";
 import { AppEmptyState } from "@/components/app-empty-state";
@@ -222,7 +222,7 @@ export function ConversationsInbox() {
             : error instanceof ApiError && error.code === "CONVERSATION_CLOSED"
               ? "This conversation is closed."
               : "Message could not be sent. Please try again.";
-        toast.error(title, { description: getApiErrorMessage(error) });
+        systemNotify.error(title, { description: getApiErrorMessage(error) });
       },
     });
   };
@@ -232,7 +232,7 @@ export function ConversationsInbox() {
     retryMessage.mutate(
       { id: selectedConversation.id, leadId: selectedConversation.leadId, messageId },
       {
-        onSuccess: () => toast.success("Message sent"),
+        onSuccess: () => systemNotify.success("Message sent"),
         onError: (error) => {
           const title = error instanceof ApiError && error.code === "WHATSAPP_NOT_CONNECTED"
             ? "WhatsApp is not connected for this business yet."
@@ -243,7 +243,7 @@ export function ConversationsInbox() {
             : error instanceof ApiError && error.code === "FORBIDDEN"
               ? "You do not have permission to retry this message."
               : "Message retry failed.";
-          toast.error(title, { description: getApiErrorMessage(error) });
+          systemNotify.error(title, { description: getApiErrorMessage(error) });
         },
       },
     );
@@ -252,15 +252,15 @@ export function ConversationsInbox() {
   const status = (value: ConversationStatus) => {
     if (!selectedConversation) return;
     updateStatus.mutate({ id: selectedConversation.id, status: value }, {
-      onSuccess: () => toast.success(value === "CLOSED" ? "Conversation closed" : "Conversation status updated"),
-      onError: (error) => toast.error(getApiErrorMessage(error)),
+      onSuccess: () => systemNotify.success(value === "CLOSED" ? "Conversation closed" : "Conversation status updated"),
+      onError: (error) => systemNotify.error(getApiErrorMessage(error)),
     });
   };
 
   const end = () => {
     if (!selectedConversation) return;
     endConversation.mutate({ id: selectedConversation.id }, {
-      onSuccess: () => toast.success("Conversation ended."),
+      onSuccess: () => systemNotify.success("Conversation ended."),
       onError: (error) => {
         const title = error instanceof ApiError && error.code === "CONVERSATION_ALREADY_CLOSED"
           ? "This conversation is already closed."
@@ -269,7 +269,7 @@ export function ConversationsInbox() {
             : error instanceof ApiError && error.code === "BUSINESS_ACCESS_DENIED"
               ? "You do not have access to this business."
               : "Conversation could not be ended.";
-        toast.error(title, { description: getApiErrorMessage(error) });
+        systemNotify.error(title, { description: getApiErrorMessage(error) });
       },
     });
   };
@@ -334,10 +334,10 @@ export function ConversationsInbox() {
       onRetryMessage={retry}
       onLoadOlder={() => detail.fetchNextPage()}
       onStatus={status}
-      onUpdate={(input: UpdateConversationInput) => updateConversation.mutate({ id: selectedConversation.id, input }, { onSuccess: () => toast.success("Conversation workspace updated"), onError: (error) => toast.error(getApiErrorMessage(error)) })}
-      onAssign={(assignedStaffId) => assign.mutate({ id: selectedConversation.id, assignedStaffId }, { onSuccess: () => toast.success("Assignment updated"), onError: (error) => toast.error(getApiErrorMessage(error)) })}
-      onNotes={(notes) => updateLead.mutate({ id: selectedConversation.leadId, input: { notes } }, { onSuccess: () => { toast.success("Lead notes updated"); void detail.refetch(); }, onError: (error) => toast.error(getApiErrorMessage(error)) })}
-      onDelete={() => remove.mutate(selectedConversation.id, { onSuccess: () => { toast.success("Conversation deleted"); setParams({ conversationId: undefined }); }, onError: (error) => toast.error(getApiErrorMessage(error)) })}
+      onUpdate={(input: UpdateConversationInput) => updateConversation.mutate({ id: selectedConversation.id, input }, { onSuccess: () => systemNotify.success("Conversation workspace updated"), onError: (error) => systemNotify.error(getApiErrorMessage(error)) })}
+      onAssign={(assignedStaffId) => assign.mutate({ id: selectedConversation.id, assignedStaffId }, { onSuccess: () => systemNotify.success("Assignment updated"), onError: (error) => systemNotify.error(getApiErrorMessage(error)) })}
+      onNotes={(notes) => updateLead.mutate({ id: selectedConversation.leadId, input: { notes } }, { onSuccess: () => { systemNotify.success("Lead notes updated"); void detail.refetch(); }, onError: (error) => systemNotify.error(getApiErrorMessage(error)) })}
+      onDelete={() => remove.mutate(selectedConversation.id, { onSuccess: () => { systemNotify.success("Conversation deleted"); setParams({ conversationId: undefined }); }, onError: (error) => systemNotify.error(getApiErrorMessage(error)) })}
     />
   );
 }

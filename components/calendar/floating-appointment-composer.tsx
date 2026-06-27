@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { CalendarPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { z } from "zod";
 import { AppButton } from "@/components/app-button";
 import { AppFormField } from "@/components/app-form-field";
@@ -20,6 +20,7 @@ import { useBusinessLeads, useBusinessMembers, useCheckAppointmentAvailability, 
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import { applyApiFieldErrors } from "@/lib/form-errors";
 import type { AppointmentAvailabilityResponse, AppointmentLocationType, CalendarAppointment } from "@/types/appointment";
+import { ACTIONABLE_NOTIFICATION_CREATED_EVENT, type ActionableNotification } from "@/types/notification";
 
 const appointmentSchema = z.object({
   title: z.string().trim().min(2, "Add an appointment title.").max(120, "Title must be 120 characters or less."),
@@ -72,11 +73,32 @@ function appointmentErrorMessage(error: unknown) {
     LEAD_NOT_FOUND: "This customer or lead could not be found.",
     CONVERSATION_NOT_FOUND: "This conversation could not be found.",
     STAFF_MEMBER_NOT_FOUND: "This staff member could not be found.",
+    APPOINTMENT_STAFF_UNAVAILABLE: "The assigned staff member already has an appointment at this time.",
+    INVALID_ASSIGNED_STAFF: "The selected staff member is not available for this business.",
+    PLAN_UPGRADE_REQUIRED: error.message,
     INVALID_TIMEZONE: "The selected timezone is invalid.",
     INVALID_APPOINTMENT_STATUS: "This appointment status cannot be used here.",
     FORBIDDEN: "You do not have permission to manage this appointment.",
   };
   return messages[error.code] ?? error.message;
+}
+
+function showAppointmentCreatedNotification(businessId: string, appointment: CalendarAppointment) {
+  const notification: ActionableNotification = {
+    id: `local-appointment-created-${appointment.id}`,
+    businessId,
+    recipientMembershipId: "",
+    type: "APPOINTMENT_CONFIRMED",
+    priority: "NORMAL",
+    title: "Appointment created",
+    message: `${appointment.title} has been added to your calendar.`,
+    entityType: "APPOINTMENT",
+    entityId: appointment.id,
+    actions: [],
+    status: "UNREAD",
+    createdAt: new Date().toISOString(),
+  };
+  window.dispatchEvent(new CustomEvent(ACTIONABLE_NOTIFICATION_CREATED_EVENT, { detail: notification }));
 }
 
 export function FloatingAppointmentComposer({
@@ -192,7 +214,7 @@ export function FloatingAppointmentComposer({
       });
       setAvailabilityState({ key: availabilityKey, result: checked });
       if (!checked.available) {
-        toast.error("Slot unavailable", { description: checked.message ?? "This time slot is not available. Choose another time." });
+        systemNotify.error("Slot unavailable", { description: checked.message ?? "This time slot is not available. Choose another time." });
         return;
       }
 
@@ -213,14 +235,14 @@ export function FloatingAppointmentComposer({
         location: input.location?.trim() || null,
         source: "MANUAL",
       });
-      toast.success("Appointment created");
+      showAppointmentCreatedNotification(businessId, appointment);
       form.reset(defaultValues());
       setAvailabilityState(null);
       onOpenChange(false);
       onCreated(appointment);
     } catch (error) {
       applyApiFieldErrors(error, form.setError);
-      toast.error("Could not create appointment", { description: appointmentErrorMessage(error) });
+      systemNotify.error("Could not create appointment", { description: appointmentErrorMessage(error) });
     }
   });
 

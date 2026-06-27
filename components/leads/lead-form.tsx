@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppFormField } from "@/components/app-form-field";
 import { AppInput } from "@/components/app-input";
@@ -86,7 +86,7 @@ export function LeadForm({ lead }: { lead?: Lead }) {
     try {
       if (!lead) {
         const savedLead = await createLead.mutateAsync(toCreateInput(normalizedValues));
-        toast.success("Lead created");
+        systemNotify.success("Lead created");
         router.push(`/leads?lead=${savedLead.id}`);
         return;
       }
@@ -104,14 +104,14 @@ export function LeadForm({ lead }: { lead?: Lead }) {
         });
       }
 
-      toast.success("Lead updated");
+      systemNotify.success("Lead updated");
       router.push(`/leads?lead=${lead.id}`);
     } catch (error) {
       if (error instanceof ApiError && error.code === "DUPLICATE_LEAD") {
         form.setError("phone", { type: "server", message: "A lead with this phone number already exists in this business." });
       } else {
         applyApiFieldErrors(error, form.setError);
-        toast.error("Could not save lead", { description: getApiErrorMessage(error) });
+        systemNotify.error("Could not save lead", { description: getApiErrorMessage(error) });
       }
     }
   });

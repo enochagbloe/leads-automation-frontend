@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { MessageSquarePlus, X } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppFormField } from "@/components/app-form-field";
 import { AppInput } from "@/components/app-input";
@@ -25,7 +25,7 @@ export function CreateConversationDialog({ open, onOpenChange, onCreated }: { op
     { leadId: values.leadId, subject: values.subject.trim() || null, channel: values.channel, priority: values.priority },
     {
       onSuccess: (conversation) => {
-        toast.success("Conversation created");
+        systemNotify.success("Conversation created");
         form.reset();
         onOpenChange(false);
         onCreated(conversation.id);
@@ -33,7 +33,7 @@ export function CreateConversationDialog({ open, onOpenChange, onCreated }: { op
       onError: (error) => {
         if (error instanceof ApiError && error.code === "CONVERSATION_ALREADY_EXISTS") {
           const conversationId = (error.details as unknown as Record<string, unknown> | undefined)?.conversationId;
-          toast.error("An active conversation already exists for this lead and channel.");
+          systemNotify.error("An active conversation already exists for this lead and channel.");
           if (typeof conversationId === "string") {
             onOpenChange(false);
             onCreated(conversationId);
@@ -41,7 +41,7 @@ export function CreateConversationDialog({ open, onOpenChange, onCreated }: { op
           return;
         }
         applyApiFieldErrors(error, form.setError);
-        toast.error("Could not create conversation", { description: getApiErrorMessage(error) });
+        systemNotify.error("Could not create conversation", { description: getApiErrorMessage(error) });
       },
     },
   ));

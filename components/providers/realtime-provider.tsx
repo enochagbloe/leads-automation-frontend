@@ -3,12 +3,15 @@
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { systemNotify } from "@/lib/system-notifications";
 import { refreshAccessToken } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { queryKeys } from "@/lib/query-keys";
 import { tokenStore } from "@/lib/token-store";
 import type { Conversation, ConversationDetailResponse, ConversationListResponse, MessageDeliveryStatus } from "@/types/conversation";
+import { ACTIONABLE_NOTIFICATION_CREATED_EVENT } from "@/types/notification";
 import type { RealtimeConnectionState, RealtimeEvent } from "@/types/realtime";
+import { normalizeActionableNotification } from "@/services/notification-service";
 
 const RealtimeContext = createContext<RealtimeConnectionState>("disconnected");
 const RECONNECT_DELAYS = [1_000, 2_000, 5_000, 10_000, 15_000];
@@ -137,14 +140,43 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
-  if (["business.appointment.created", "business.appointment.updated", "business.appointment.rescheduled", "business.appointment.cancelled", "business.appointment.completed", "business.appointment.no_show", "business.appointment.assigned", "business.appointments.calendar.updated"].includes(type)) {
+  if (type === "business.notification.created") {
+    const notification = normalizeActionableNotification(payload.notification ?? payload);
+    if (notification && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(ACTIONABLE_NOTIFICATION_CREATED_EVENT, { detail: notification }));
+    }
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+      client.invalidateQueries({ queryKey: queryKeys.notifications.business(event.businessId) }),
+      client.invalidateQueries({ queryKey: queryKeys.notifications.counts(event.businessId) }),
+    ]);
+    return;
+  }
+
+  if (["business.appointment.created", "business.appointment.updated", "business.appointment.confirmation_required", "business.appointment.needs_confirmation", "business.appointment.confirmed", "business.appointment.rescheduled", "business.appointment.cancelled", "business.appointment.outcome_required", "business.appointment.completed", "business.appointment.no_show", "business.appointment.missed", "business.appointment.reschedule_limit_reached", "business.appointment.assigned", "business.appointments.calendar.updated"].includes(type)) {
     const appointmentId = typeof payload.appointmentId === "string" ? payload.appointmentId : undefined;
+    if (type === "business.appointment.confirmation_required") {
+      systemNotify.info("New appointment needs confirmation.");
+    }
+    if (type === "business.appointment.needs_confirmation") {
+      systemNotify.info("Appointment needs review.");
+    }
+    if (type === "business.appointment.outcome_required") {
+      systemNotify.info("Appointment outcome needed.");
+    }
+    if (type === "business.appointment.assigned") {
+      systemNotify.info("New appointment assigned.");
+    }
+    if (type === "business.appointment.confirmed") {
+      systemNotify.success("Appointment assigned and confirmed.");
+    }
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.notifications.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
-      ...(appointmentId ? [client.invalidateQueries({ queryKey: ["business-appointments", "detail", appointmentId] })] : []),
+      ...(appointmentId ? [client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all })] : []),
       ...(leadId ? [client.invalidateQueries({ queryKey: queryKeys.leads.detail(leadId) })] : []),
       ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) })] : []),
     ]);
@@ -180,6 +212,7 @@ export function RealtimeProvider({ activeBusinessId, enabled = true, children }:
       client.invalidateQueries({ queryKey: queryKeys.leads.all }),
       client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.notifications.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
     ]);
