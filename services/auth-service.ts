@@ -22,9 +22,13 @@ const permissionMap: Partial<Record<keyof WorkspacePermissions, string>> = {
   canManageAiSettings: "ai:manage",
 };
 
-function normalizePermissions(permissions: AuthProfile["permissions"] | Partial<WorkspacePermissions> | undefined) {
+function normalizePermissions(
+  permissions: AuthProfile["permissions"] | Partial<WorkspacePermissions> | undefined,
+  fallbackWorkspacePermissions?: Partial<WorkspacePermissions>,
+) {
   if (Array.isArray(permissions)) return { permissionList: permissions, workspacePermissions: undefined };
-  const workspacePermissions = permissions ?? {};
+  const workspacePermissions = permissions ?? fallbackWorkspacePermissions;
+  if (!workspacePermissions) return { permissionList: [], workspacePermissions: undefined };
   const permissionList = Object.entries(workspacePermissions)
     .filter(([, enabled]) => enabled === true)
     .map(([key]) => permissionMap[key as keyof WorkspacePermissions])
@@ -34,7 +38,7 @@ function normalizePermissions(permissions: AuthProfile["permissions"] | Partial<
 
 function normalizeAuthProfile<T extends AuthProfile>(profile: T): T {
   const root = profile as T & { accountType?: AuthProfile["account"]["accountType"]; canCreateBusiness?: boolean; permissions?: Partial<WorkspacePermissions> | string[] };
-  const { permissionList, workspacePermissions } = normalizePermissions(root.permissions);
+  const { permissionList, workspacePermissions } = normalizePermissions(root.permissions, profile.workspacePermissions);
   const accountType = root.account.accountType ?? root.accountType ?? (root.canCreateBusiness === false ? "STAFF_ONLY" : "OWNER_CAPABLE");
   const canCreateBusiness = root.account.canCreateBusiness ?? root.canCreateBusiness ?? accountType !== "STAFF_ONLY";
 

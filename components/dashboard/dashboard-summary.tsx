@@ -19,6 +19,16 @@ export function DashboardSummary() {
   const { account, accountUsage, activeBusiness, businessUsage, features, limits, membership, plan, subscription, permissions } = profile.data;
   if (!activeBusiness || !membership || !plan || !subscription) return <AppErrorState title="No active business" description="Select or join a business to continue." />;
   const workspacePermissions = getWorkspacePermissions(profile.data);
+  if (!workspacePermissions.canViewDashboard) {
+    return (
+      <main className="grid min-h-[calc(100dvh-4rem)] place-items-center p-6">
+        <AppErrorState
+          title="You do not have permission to access this area."
+          description="Switch workspace or ask an owner or manager to update your access."
+        />
+      </main>
+    );
+  }
   const showBillingContext = canManageBilling(profile.data);
   const canManageSetup = canManageBusinessSettings(profile.data);
 
