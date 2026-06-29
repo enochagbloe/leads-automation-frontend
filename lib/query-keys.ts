@@ -56,6 +56,12 @@ export const queryKeys = {
     list: (businessId: string, query: unknown) => ["notifications", "list", businessId, query] as const,
     counts: (businessId: string) => ["notifications", "counts", businessId] as const,
   },
+  customerIssues: {
+    all: ["customer-issues"] as const,
+    business: (businessId: string) => ["customer-issues", businessId] as const,
+    list: (businessId: string, query: unknown) => ["customer-issues", businessId, "list", query] as const,
+    detail: (businessId: string, issueId: string) => ["customer-issues", businessId, "detail", issueId] as const,
+  },
   businessLeads: {
     all: ["business-leads"] as const,
     list: (businessId: string, search: string) => ["business-leads", businessId, search] as const,

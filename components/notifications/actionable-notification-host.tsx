@@ -190,6 +190,11 @@ export function ActionableNotificationHost({ activeBusinessId }: { activeBusines
       removeFromStack(notification.id);
       return;
     }
+    if (action.action === "VIEW_CUSTOMER_ISSUE" || notification.entityType === "CUSTOMER_ISSUE") {
+      if (notification.entityId) router.push(`/customer-issues?issue=${notification.entityId}`);
+      removeFromStack(notification.id);
+      return;
+    }
     if (action.action === "OPEN_URL") {
       if (action.href) router.push(action.href);
       removeFromStack(notification.id);

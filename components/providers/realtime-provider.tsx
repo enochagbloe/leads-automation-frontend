@@ -153,6 +153,19 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if (["business.customer_issue.created", "business.customer_issue.routed", "business.customer_issue.status_updated"].includes(type)) {
+    const issueId = typeof payload.issueId === "string" ? payload.issueId : typeof payload.customerIssueId === "string" ? payload.customerIssueId : undefined;
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.customerIssues.business(event.businessId) }),
+      client.invalidateQueries({ queryKey: queryKeys.notifications.business(event.businessId) }),
+      client.invalidateQueries({ queryKey: queryKeys.notifications.counts(event.businessId) }),
+      ...(issueId ? [client.invalidateQueries({ queryKey: queryKeys.customerIssues.detail(event.businessId, issueId) })] : []),
+      ...(leadId ? [client.invalidateQueries({ queryKey: queryKeys.leads.detail(leadId) })] : []),
+      ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) })] : []),
+    ]);
+    return;
+  }
+
   if (["business.appointment.created", "business.appointment.updated", "business.appointment.confirmation_required", "business.appointment.needs_confirmation", "business.appointment.confirmed", "business.appointment.rescheduled", "business.appointment.cancelled", "business.appointment.outcome_required", "business.appointment.completed", "business.appointment.no_show", "business.appointment.missed", "business.appointment.reschedule_limit_reached", "business.appointment.assigned", "business.appointments.calendar.updated"].includes(type)) {
     const appointmentId = typeof payload.appointmentId === "string" ? payload.appointmentId : undefined;
     if (type === "business.appointment.confirmation_required") {

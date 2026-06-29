@@ -1,6 +1,9 @@
 "use client";
-
-import { ContactRound, CreditCard, LayoutDashboard, UserRound, Users } from "lucide-react";
+// the gloabal serach look like it takes from specific modules if evrytime 
+// the module is update or new module is create and added to the system the global search is not updated
+// the global search should from every endpoint on the system thst's why it is called gloabl search 
+// right now this implementation feels hard coded, try using endpoints but if the backend need to create a seach algorithm for the gloabla search then i will do that
+import { AlertTriangle, ContactRound, CreditCard, LayoutDashboard, UserRound, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ComponentType } from "react";
 import { GlobalSearch } from "@/components/search/global-search";
@@ -9,6 +12,7 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { useLeads } from "@/hooks/use-leads";
 import { LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/lib/leads";
 import { cn } from "@/lib/utils";
+import { canAccessCustomerIssues } from "@/lib/workspace-permissions";
 
 type SearchItem = {
   id: string;
@@ -42,10 +46,12 @@ export function AppGlobalSearch() {
   const leads = useLeads({ page: 1, limit: 100, sortBy: "updatedAt", sortOrder: "desc" }, activated);
 
   const items = useMemo<SearchItem[]>(() => {
+    const canViewCustomerIssues = profile.data?.plan?.code !== "BASIC" && canAccessCustomerIssues(profile.data);
     const pageItems: SearchItem[] = [
       { id: "dashboard", kind: "page", group: "Pages", title: "Dashboard", subtitle: "Business workspace overview", meta: "Page", href: "/dashboard", searchText: ["overview", "workspace", "home"], status: [], source: [], tags: [], assigned: [], type: ["page"], icon: LayoutDashboard },
       { id: "leads", kind: "page", group: "Pages", title: "Leads", subtitle: "Manage customer opportunities", meta: "CRM page", href: "/leads", searchText: ["crm", "customers", "contacts"], status: [], source: [], tags: [], assigned: [], type: ["page", "leads"], icon: ContactRound },
       { id: "new-lead", kind: "page", group: "Pages", title: "Create lead", subtitle: "Add a new customer opportunity", meta: "CRM action", href: "/leads/new", searchText: ["new", "add", "customer"], status: [], source: [], tags: [], assigned: [], type: ["page", "action"], icon: UserRound },
+      ...(canViewCustomerIssues ? [{ id: "customer-issues", kind: "page" as const, group: "Pages" as const, title: "Customer Issues", subtitle: "Review AI-detected complaints and service issues", meta: "Operations page", href: "/customer-issues", searchText: ["issues", "complaints", "customer", "ai", "routing"], status: [], source: [], tags: [], assigned: [], type: ["page", "operations"], icon: AlertTriangle }] : []),
       { id: "billing", kind: "page", group: "Pages", title: "Billing & plan", subtitle: "Subscription usage and plan details", meta: "Settings page", href: "/settings/billing", searchText: ["subscription", "plan", "usage"], status: [], source: [], tags: [], assigned: [], type: ["page", "settings"], icon: CreditCard },
       ...(profile.data?.permissions.includes("members:manage") ? [{ id: "members", kind: "page" as const, group: "Pages" as const, title: "Team members", subtitle: "Invite and manage workspace members", meta: "Settings page", href: "/settings/members", searchText: ["staff", "invite", "manager"], status: [], source: [], tags: [], assigned: [], type: ["page", "settings"], icon: Users }] : []),
     ];
@@ -67,7 +73,7 @@ export function AppGlobalSearch() {
       icon: ContactRound,
     }));
     return [...pageItems, ...leadItems];
-  }, [leads.data?.data, profile.data?.permissions]);
+  }, [leads.data?.data, profile.data]);
 
   return (
     <GlobalSearch
