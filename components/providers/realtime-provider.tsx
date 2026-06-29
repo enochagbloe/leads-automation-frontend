@@ -82,7 +82,13 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
-  if (["message.created", "conversation.created", "conversation.closed", "conversation.reopened", "conversation.assigned"].includes(type)) {
+  if (["conversation.assigned", "conversation.claimed", "conversation.reopened", "conversation.blocked", "conversation.unblocked"].includes(type) && conversationId && payload.changes && typeof payload.changes === "object") {
+    patchConversation(client, conversationId, payload.changes as Partial<Conversation>);
+    void invalidateRealtimeState(client, conversationId, leadId);
+    return;
+  }
+
+  if (["message.created", "conversation.created", "conversation.closed", "conversation.reopened", "conversation.assigned", "conversation.claimed", "conversation.blocked", "conversation.unblocked"].includes(type)) {
     void invalidateRealtimeState(client, conversationId, leadId);
     return;
   }

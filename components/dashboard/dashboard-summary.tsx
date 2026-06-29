@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, CalendarDays, Check, Inbox, Minus, UsersRound } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarDays, Check, Inbox, Minus, UsersRound } from "lucide-react";
 import { AppCard } from "@/components/app-card";
 import { AppErrorState } from "@/components/app-error-state";
 import { DashboardBusinessSetup } from "@/components/business-setup/dashboard-business-setup";
@@ -31,6 +31,7 @@ export function DashboardSummary() {
   }
   const showBillingContext = canManageBilling(profile.data);
   const canManageSetup = canManageBusinessSettings(profile.data);
+  const conversationQuotaReached = limits.maxConversationsPerMonth !== null && accountUsage.conversationsUsed >= limits.maxConversationsPerMonth;
 
   const featureRows = [
     ["Analytics", features.allowAnalytics],
@@ -40,6 +41,20 @@ export function DashboardSummary() {
 
   return <main className="mx-auto max-w-6xl space-y-8 p-5 sm:p-8">
     <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">{account.name} · {accountUsage.businessesCount} {accountUsage.businessesCount === 1 ? "business" : "businesses"}</p><h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Workspace overview</h1><p className="mt-2 text-sm text-muted-foreground">Viewing active-business activity for {activeBusiness.name}.</p></div>{showBillingContext && <div className="flex items-center gap-2"><PlanBadge plan={plan.code} /><SubscriptionStatusBadge status={subscription.status} /></div>}</header>
+    {conversationQuotaReached && (
+      <AppCard className="border-warning/25 bg-warning/10 shadow-none">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-warning/15 text-warning"><AlertTriangle className="size-5" /></span>
+            <div>
+              <h2 className="font-bold text-warning">Conversation quota reached</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">You may have locked customer messages because your shared workspace conversation limit has been reached.</p>
+            </div>
+          </div>
+          {showBillingContext && <a href="/settings/billing" className="inline-flex min-h-10 items-center justify-center rounded-lg border bg-card px-4 text-sm font-bold text-foreground hover:bg-muted">View Billing</a>}
+        </div>
+      </AppCard>
+    )}
     <DashboardBusinessSetup businessId={activeBusiness.id} canManage={canManageSetup} />
     <WhatsAppDashboardWarning />
     {!showBillingContext && (

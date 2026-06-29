@@ -15,6 +15,7 @@ import {
   FileText,
   Filter,
   Link2,
+  LockKeyhole,
   MessageCircleMore,
   MessageSquareText,
   MoreHorizontal,
@@ -29,7 +30,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppEmptyState } from "@/components/app-empty-state";
@@ -226,7 +227,7 @@ function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending,
   }, [emojiOpen]);
 
   if (closed) {
-    return <div className="border-t bg-card px-4 py-3"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3"><div><p className="text-sm font-semibold">This conversation is closed</p><p className="text-xs leading-5 text-muted-foreground">{closedAt ? `Closed ${formatConversationDateTime(closedAt)}. ` : ""}If the customer replies again, BizReply will automatically reopen it.</p></div></div></div>;
+    return <div className="border-t bg-card px-4 py-3"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3"><div><p className="text-sm font-semibold">This conversation is closed</p><p className="text-xs leading-5 text-muted-foreground">{closedAt ? `Closed ${formatConversationDateTime(closedAt)}. ` : ""}It will reopen automatically if the customer sends another message or an approved automation sends a follow-up.</p></div></div></div>;
   }
 
   const whatsAppBlocked = channel === "WHATSAPP" && !whatsappCanSend;
@@ -260,6 +261,47 @@ function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending,
         />
         {emojiOpen && <div ref={emojiRef} className="absolute bottom-12 left-10 z-20 flex w-56 flex-wrap gap-1 rounded-xl border bg-popover p-2 shadow-[0_14px_40px_rgba(20,35,27,0.16)]" aria-label="Emoji picker">{["🙂", "👍", "🙏", "✅", "🎉", "📅", "📍", "💬", "❤️", "👋", "😊", "🤝"].map((emoji) => <button key={emoji} type="button" className="grid size-9 place-items-center rounded-lg text-lg transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { onDraftChange(`${draft}${emoji}`); setEmojiOpen(false); }}>{emoji}</button>)}</div>}
         <p className="mt-1.5 px-1 text-[10px] text-muted-foreground">{channel === "WHATSAPP" ? "Replies are sent through the connected WhatsApp provider." : "Stored in BizReply only."}</p>
+      </div>
+    </div>
+  );
+}
+
+function blockedReasonLabel(reason?: string | null) {
+  if (reason === "PAYMENT_FAILED") return "Payment failed";
+  if (reason === "SUBSCRIPTION_EXPIRED") return "Subscription expired";
+  if (reason === "PLAN_LIMIT_REACHED") return "Plan limit reached";
+  return "Access locked";
+}
+
+function LockedConversationState({ conversation, canManageBilling }: { conversation: Conversation; canManageBilling: boolean }) {
+  const receivedAt = conversation.lastMessageAt ?? conversation.updatedAt;
+  return (
+    <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-6">
+      <div className="w-full max-w-2xl rounded-3xl border border-warning/25 bg-card p-6 text-center shadow-sm">
+        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-muted text-muted-foreground"><LockKeyhole className="size-6" /></span>
+        <div className="mt-5 flex justify-center"><ConversationStatusBadge status="PLAN_LIMIT_BLOCKED" /></div>
+        <h2 className="mt-4 text-xl font-bold">This customer message is locked</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          This customer message is locked because your account has reached its conversation limit or payment is inactive. Restore payment, upgrade your plan, or wait for quota reset to unlock it.
+        </p>
+        <dl className="mt-6 grid gap-3 rounded-2xl bg-muted/45 p-4 text-left text-sm sm:grid-cols-2">
+          <div><dt className="text-xs font-bold text-muted-foreground">Customer</dt><dd className="mt-1 font-semibold">{conversation.lead.fullName}</dd></div>
+          <div><dt className="text-xs font-bold text-muted-foreground">Received</dt><dd className="mt-1 font-semibold">{formatConversationDateTime(receivedAt)}</dd></div>
+          <div><dt className="text-xs font-bold text-muted-foreground">Reason</dt><dd className="mt-1 font-semibold">{blockedReasonLabel(conversation.accessBlockedReason)}</dd></div>
+          <div><dt className="text-xs font-bold text-muted-foreground">Reference</dt><dd className="mt-1 font-semibold">{conversation.displayId}</dd></div>
+        </dl>
+        {canManageBilling ? <AppButton asChild className="mt-6"><a href="/settings/billing">View Billing</a></AppButton> : <p className="mt-6 rounded-xl bg-secondary px-4 py-3 text-sm font-semibold text-secondary-foreground">Ask an owner or manager to restore billing or upgrade the plan.</p>}
+      </div>
+    </div>
+  );
+}
+
+function ConversationReplyNotice({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
+  return (
+    <div className="border-t bg-card px-4 py-3">
+      <div className="mx-auto flex max-w-4xl flex-col gap-3 rounded-xl bg-muted px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><p className="text-sm font-semibold">{title}</p><p className="text-xs leading-5 text-muted-foreground">{description}</p></div>
+        {action}
       </div>
     </div>
   );
@@ -358,12 +400,14 @@ function SideConversationPanel({ conversation }: { conversation: Conversation })
 }
 
 function LeadProfilePanel({ conversation, leadDetail, assigneeOptions, canManage, statusBusy, assignBusy, onStatus, onAssign }: { conversation: Conversation; leadDetail?: LeadDetailResponse; assigneeOptions: AppSelectOption[]; canManage: boolean; statusBusy: boolean; assignBusy: boolean; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void }) {
+  const canUpdateStatus = conversation.status !== "CLOSED" && conversation.status !== "PLAN_LIMIT_BLOCKED" && conversation.permissions?.canUpdateStatus !== false;
+  const canAssign = canManage && conversation.status !== "CLOSED" && conversation.status !== "PLAN_LIMIT_BLOCKED" && conversation.permissions?.canAssign !== false;
   const lead = leadDetail?.lead;
   return (
     <div className="h-full overflow-y-auto">
       <div className="border-b p-5"><span className="grid size-14 place-items-center rounded-full bg-secondary text-sm font-bold text-primary">{initials(conversation.lead.fullName)}</span><h3 className="mt-3 text-lg font-bold">{conversation.lead.fullName}</h3><p className="mt-1 text-sm text-muted-foreground">{conversation.lead.email ?? conversation.lead.phone}</p></div>
       <div className="space-y-6 p-5">
-        <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Conversation</h4><div className="mt-3 space-y-3"><div><label htmlFor="drawer-status" className="mb-1 block text-xs font-semibold">Status</label>{conversation.status === "CLOSED" ? <ConversationStatusBadge status="CLOSED" /> : <AppSelect id="drawer-status" value={conversation.status} options={ACTIVE_CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} />}</div>{canManage && <div><label htmlFor="drawer-assignee" className="mb-1 block text-xs font-semibold">Assigned staff</label><AppSelect id="drawer-assignee" value={conversation.assignedStaffId ?? "__unassigned"} options={assigneeOptions} disabled={assignBusy} onValueChange={(value) => onAssign(value === "__unassigned" ? null : value)} /></div>}</div></section>
+        <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Conversation</h4><div className="mt-3 space-y-3"><div><label htmlFor="drawer-status" className="mb-1 block text-xs font-semibold">Status</label>{canUpdateStatus ? <AppSelect id="drawer-status" value={conversation.status} options={ACTIVE_CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} /> : <ConversationStatusBadge status={conversation.status} />}</div>{canAssign && <div><label htmlFor="drawer-assignee" className="mb-1 block text-xs font-semibold">Assigned staff</label><AppSelect id="drawer-assignee" value={conversation.assignedStaffId ?? "__unassigned"} options={assigneeOptions} disabled={assignBusy} onValueChange={(value) => onAssign(value === "__unassigned" ? null : value)} /></div>}</div></section>
         <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Lead profile</h4><dl className="mt-3 space-y-3 text-sm"><div><dt className="text-xs text-muted-foreground">Phone</dt><dd className="mt-1 font-medium">{conversation.lead.phone}</dd></div><div><dt className="text-xs text-muted-foreground">Email</dt><dd className="mt-1 font-medium">{conversation.lead.email ?? "No email provided"}</dd></div>{lead && <><div><dt className="text-xs text-muted-foreground">Lead status</dt><dd className={cn("mt-1 inline-flex rounded-md px-2 py-1 text-xs font-bold", leadStatusTone(lead.status))}>{LEAD_STATUS_LABELS[lead.status]}</dd></div><div><dt className="text-xs text-muted-foreground">Source</dt><dd className="mt-1 font-medium">{LEAD_SOURCE_LABELS[lead.source]}</dd></div></>}</dl></section>
         <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Tags</h4><div className="mt-3 flex flex-wrap gap-1.5">{lead?.tags.length ? lead.tags.map((tag) => <span key={tag} className="rounded-lg bg-secondary px-2 py-1 text-xs font-semibold text-secondary-foreground">{tag}</span>) : <span className="text-xs text-muted-foreground">No tags</span>}</div></section>
       </div>
@@ -517,6 +561,14 @@ export function ConversationWorkspace({
   const [renderedContext, setRenderedContext] = useState<ContextPanel>("knowledge");
   const [editingSubject, setEditingSubject] = useState(false);
   const [subject, setSubject] = useState(conversation.subject ?? "");
+  const locked = conversation.status === "PLAN_LIMIT_BLOCKED" || Boolean(conversation.accessBlocked);
+  const closed = conversation.status === "CLOSED";
+  const canViewMessages = conversation.permissions?.canViewMessages !== false;
+  const canReply = !locked && !closed && conversation.permissions?.canReply !== false;
+  const canClose = !locked && !closed && conversation.permissions?.canClose !== false;
+  const canAssign = canManage && !locked && !closed && conversation.permissions?.canAssign !== false;
+  const canUpdateStatus = !locked && !closed && conversation.permissions?.canUpdateStatus !== false;
+  const canEditConversation = canManage && !locked && conversation.permissions?.canAssign !== false;
 
   const toggleContext = (panel: ContextPanel) => {
     if (context === panel) {
@@ -544,19 +596,19 @@ export function ConversationWorkspace({
               <span className="shrink-0 text-xs font-bold text-primary">{conversation.displayId}</span>
               {editingSubject
                 ? <form className="flex min-w-0 flex-1 items-center gap-1" onSubmit={(event) => { event.preventDefault(); onUpdate({ subject: subject.trim() || null }); setEditingSubject(false); }}><label className="sr-only" htmlFor="conversation-subject">Conversation subject</label><input id="conversation-subject" autoFocus value={subject} onChange={(event) => setSubject(event.target.value)} className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring" /><AppButton type="submit" size="sm" className="h-8 min-h-8" loading={updateBusy}>Save</AppButton><AppButton type="button" size="sm" variant="ghost" className="h-8 min-h-8" onClick={() => { setSubject(conversation.subject ?? ""); setEditingSubject(false); }}>Cancel</AppButton></form>
-                : <><h1 className="truncate text-sm font-bold sm:text-base">{conversation.subject ?? conversation.lead.fullName}</h1>{canManage && <AppButton size="icon" variant="ghost" className="size-8 min-h-8 shrink-0" aria-label="Edit conversation subject" onClick={() => setEditingSubject(true)}><Pencil className="size-3.5" /></AppButton>}</>}
+                : <><h1 className="truncate text-sm font-bold sm:text-base">{conversation.subject ?? conversation.lead.fullName}</h1>{canEditConversation && <AppButton size="icon" variant="ghost" className="size-8 min-h-8 shrink-0" aria-label="Edit conversation subject" onClick={() => setEditingSubject(true)}><Pencil className="size-3.5" /></AppButton>}</>}
             </div>
             <p className="mt-0.5 flex items-center gap-2 truncate text-[11px] text-muted-foreground"><span className="truncate">{conversation.lead.fullName} · {CONVERSATION_CHANNEL_LABELS[conversation.channel]} channel</span><span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold", conversationPriorityTone(conversation.priority))}>{CONVERSATION_PRIORITY_LABELS[conversation.priority]}</span></p>
           </div>
           <RealtimeStatusIndicator className="hidden sm:inline-flex" />
-          <AppButton size="icon" variant={conversation.pinned ? "secondary" : "ghost"} className="shrink-0" loading={updateBusy} aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"} aria-pressed={conversation.pinned} onClick={() => onUpdate({ pinned: !conversation.pinned })}>{conversation.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}</AppButton>
-          {canManage && <div className="hidden w-32 xl:block"><AppSelect aria-label="Conversation priority" value={conversation.priority} options={CONVERSATION_PRIORITIES.map((priority) => ({ value: priority, label: CONVERSATION_PRIORITY_LABELS[priority] }))} disabled={updateBusy} onValueChange={(priority) => onUpdate({ priority: priority as Conversation["priority"] })} /></div>}
-          {conversation.status === "CLOSED"
-            ? <ConversationStatusBadge status="CLOSED" />
+          {!locked && <AppButton size="icon" variant={conversation.pinned ? "secondary" : "ghost"} className="shrink-0" loading={updateBusy} aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"} aria-pressed={conversation.pinned} onClick={() => onUpdate({ pinned: !conversation.pinned })}>{conversation.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}</AppButton>}
+          {canEditConversation && <div className="hidden w-32 xl:block"><AppSelect aria-label="Conversation priority" value={conversation.priority} options={CONVERSATION_PRIORITIES.map((priority) => ({ value: priority, label: CONVERSATION_PRIORITY_LABELS[priority] }))} disabled={updateBusy} onValueChange={(priority) => onUpdate({ priority: priority as Conversation["priority"] })} /></div>}
+          {!canUpdateStatus
+            ? <ConversationStatusBadge status={conversation.status} />
             : <div className="hidden w-44 lg:block"><AppSelect aria-label="Conversation status" value={conversation.status} options={ACTIVE_CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} /></div>}
           <AppButton size="icon" variant="ghost" aria-label="Open lead profile" className="md:hidden" onClick={() => toggleContext("profile")}><CircleUserRound className="size-4" /></AppButton>
-          {canManage && <ConfirmDialog trigger={<AppButton size="icon" variant="ghost" aria-label="Delete conversation" title="Delete conversation"><MoreHorizontal className="size-4" /></AppButton>} title="Delete this conversation?" description="The conversation will disappear from this business inbox." confirmLabel="Delete conversation" loading={deleting} onConfirm={onDelete} />}
-          {conversation.status !== "CLOSED" && <ConfirmDialog trigger={<AppButton size="sm" className="hidden sm:inline-flex">End Chat</AppButton>} title="End this conversation?" description="The conversation will be closed. If the customer replies later, BizReply will automatically reopen it." confirmLabel="End Chat" loading={ending} onConfirm={onEnd} />}
+          {canManage && !locked && <ConfirmDialog trigger={<AppButton size="icon" variant="ghost" aria-label="Delete conversation" title="Delete conversation"><MoreHorizontal className="size-4" /></AppButton>} title="Delete this conversation?" description="The conversation will disappear from this business inbox." confirmLabel="Delete conversation" loading={deleting} onConfirm={onDelete} />}
+          {canClose && <ConfirmDialog trigger={<AppButton size="sm" className="hidden sm:inline-flex">End Chat</AppButton>} title="End this conversation?" description="The conversation will be closed. If the customer replies later, BizReply will automatically reopen it." confirmLabel="End Chat" loading={ending} onConfirm={onEnd} />}
         </header>
 
         <ConversationTabs active={tab} onChange={setTab} activityCount={activities.length} />
@@ -567,14 +619,16 @@ export function ConversationWorkspace({
 
         <div className="flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
-            {tab === "conversation" && <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} /><MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} onEnd={onEnd} sending={sending} ending={ending} closed={conversation.status === "CLOSED"} closedAt={conversation.closedAt} channel={conversation.channel} senderName={senderName} whatsappCanSend={whatsappCanSend} whatsappStatus={whatsappStatus} isOwner={isOwner} /></>}
+            {tab === "conversation" && (locked && !canViewMessages
+              ? <LockedConversationState conversation={conversation} canManageBilling={isOwner} />
+              : <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} />{locked ? <ConversationReplyNotice title="Replies are locked" description="Restore payment, upgrade your plan, or wait for quota reset before replying to this customer." action={isOwner ? <AppButton asChild size="sm"><a href="/settings/billing">View Billing</a></AppButton> : undefined} /> : !canReply && !closed ? <ConversationReplyNotice title="Replies are unavailable" description="You do not have permission to reply in this conversation." /> : <MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} onEnd={onEnd} sending={sending} ending={ending} closed={closed} closedAt={conversation.closedAt} channel={conversation.channel} senderName={senderName} whatsappCanSend={whatsappCanSend} whatsappStatus={whatsappStatus} isOwner={isOwner} />}</>)}
             {tab === "tasks" && <AppEmptyState className="m-6 min-h-72 border-0 bg-transparent" icon={FileText} title="Tasks are coming later" description="The conversation workspace is prepared for a future task module." />}
             {tab === "activity" && <ActivityPanel activities={activities} />}
             {tab === "notes" && <NotesPanel notes={leadDetail?.lead.notes} saving={notesBusy} onSave={onNotes} />}
           </div>
           <div className={cn("grid h-full min-h-0 shrink-0 overflow-hidden transition-[grid-template-columns] duration-300 ease-out xl:grid", context ? "xl:grid-cols-[340px]" : "xl:grid-cols-[0px]")}>
             <div className="h-full min-h-0 min-w-0 overflow-hidden xl:w-[340px]">
-              <ConversationContextDrawer active={renderedContext} open={Boolean(context)} onClose={() => setContext(null)} conversation={conversation} leadDetail={leadDetail} activities={activities} assigneeOptions={assigneeOptions} canManage={canManage} statusBusy={statusBusy} assignBusy={assignBusy} notesBusy={notesBusy} onStatus={onStatus} onAssign={onAssign} onNotes={onNotes} onSuggest={suggestArticle} />
+              <ConversationContextDrawer active={renderedContext} open={Boolean(context)} onClose={() => setContext(null)} conversation={conversation} leadDetail={leadDetail} activities={activities} assigneeOptions={assigneeOptions} canManage={canAssign} statusBusy={statusBusy} assignBusy={assignBusy} notesBusy={notesBusy} onStatus={onStatus} onAssign={onAssign} onNotes={onNotes} onSuggest={suggestArticle} />
             </div>
           </div>
           <ConversationRightRail active={context} onSelect={toggleContext} />
