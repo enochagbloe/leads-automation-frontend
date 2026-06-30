@@ -17,6 +17,7 @@ export type AppointmentLocationType = "BUSINESS_LOCATION" | "CUSTOMER_LOCATION" 
 export type AppointmentLocationStatus = "CONFIRMED" | "NEEDS_CONFIRMATION" | "NOT_REQUIRED";
 export type AppointmentView = "day" | "week" | "month";
 export type AppointmentConfirmationMode = "MANUAL_CONFIRMATION_REQUIRED" | "AUTO_CONFIRM_WHEN_STAFF_ASSIGNED" | "AUTO_CONFIRM_SAFE_BOOKINGS";
+export type AppointmentConfirmationSource = "MANUAL" | "AI_REQUEST" | "AI_PREMIUM_AUTO_CONFIRM" | "SYSTEM";
 export type AppointmentAction = "CONFIRM" | "RESCHEDULE" | "CANCEL" | "COMPLETE" | "NO_SHOW" | "MISSED" | "ASSIGN_STAFF" | "CLAIM" | "REVIEW" | "VIEW_DETAILS";
 
 export interface AppointmentPerson {
@@ -62,6 +63,11 @@ export interface CalendarAppointment {
   outcomeConfirmedAt?: string | null;
   appointmentConfirmationMode?: AppointmentConfirmationMode;
   autoConfirmed?: boolean;
+  confirmationSource?: AppointmentConfirmationSource | null;
+  autoConfirmedAt?: string | null;
+  autoConfirmDecisionReason?: string | null;
+  autoConfirmFailedReason?: string | null;
+  autoConfirmConfidence?: number | null;
 }
 
 export interface AppointmentDetail extends CalendarAppointment {
@@ -93,7 +99,11 @@ export type AppointmentActivityType =
   | "APPOINTMENT_NO_SHOW"
   | "APPOINTMENT_MISSED"
   | "APPOINTMENT_ASSIGNED"
-  | "APPOINTMENT_STATUS_CHANGED";
+  | "APPOINTMENT_STATUS_CHANGED"
+  | "APPOINTMENT_AUTO_CONFIRM_EVALUATED"
+  | "APPOINTMENT_AUTO_CONFIRMED"
+  | "APPOINTMENT_AUTO_CONFIRM_SKIPPED"
+  | "APPOINTMENT_PENDING_CONFIRMATION";
 
 export interface AppointmentActivity {
   id: string;
@@ -134,6 +144,15 @@ export interface AppointmentSettings {
 
 export interface UpdateAppointmentSettingsInput {
   appointmentConfirmationMode: AppointmentConfirmationMode;
+}
+
+export interface AppointmentAutoConfirmSettings {
+  aiAutoConfirmAppointmentsEnabled: boolean;
+  updatedAt?: string;
+}
+
+export interface UpdateAppointmentAutoConfirmSettingsInput {
+  aiAutoConfirmAppointmentsEnabled: boolean;
 }
 
 export interface AppointmentListQuery {

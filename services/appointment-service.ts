@@ -4,6 +4,7 @@ import { mockAppointmentService } from "@/services/mock-appointment-service";
 import type {
   AssignAppointmentInput,
   AppointmentAvailabilityResponse,
+  AppointmentAutoConfirmSettings,
   AppointmentCalendarQuery,
   AppointmentCalendarResponse,
   AppointmentDetail,
@@ -21,6 +22,7 @@ import type {
   MissedAppointmentInput,
   NoShowAppointmentInput,
   RescheduleAppointmentInput,
+  UpdateAppointmentAutoConfirmSettingsInput,
   UpdateAppointmentSettingsInput,
 } from "@/types/appointment";
 
@@ -81,6 +83,12 @@ export const appointmentService = {
   updateSettings: (input: UpdateAppointmentSettingsInput) => env.useMockApi
     ? mockAppointmentService.updateSettings(input)
     : apiRequest<AppointmentSettings>("/business/appointments/settings", { method: "PATCH", body: JSON.stringify(input) }),
+  autoConfirmSettings: () => env.useMockApi
+    ? mockAppointmentService.autoConfirmSettings()
+    : apiRequest<AppointmentAutoConfirmSettings>("/business/ai/auto-confirm-settings"),
+  updateAutoConfirmSettings: (input: UpdateAppointmentAutoConfirmSettingsInput) => env.useMockApi
+    ? mockAppointmentService.updateAutoConfirmSettings(input)
+    : apiRequest<AppointmentAutoConfirmSettings>("/business/ai/auto-confirm-settings", { method: "PATCH", body: JSON.stringify(input) }),
   create: (input: CreateAppointmentInput) => env.useMockApi
     ? mockAppointmentService.create(input)
     : apiRequest<ApiAppointmentLike>("/business/appointments", { method: "POST", body: JSON.stringify(input) }).then(normalizeAppointment),

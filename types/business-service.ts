@@ -20,6 +20,11 @@ export interface BusinessService {
   isBookable: boolean;
   isActive: boolean;
   isArchived: boolean;
+  autoConfirmEligible?: boolean;
+  requiresManualApproval?: boolean;
+  requiresDepositBeforeConfirmation?: boolean;
+  requiresLocationBeforeConfirmation?: boolean;
+  requiresStaffAssignment?: boolean;
   readinessStatus: ServiceReadinessStatus;
   missingFields: string[];
   displayOrder: number;
@@ -74,6 +79,11 @@ export interface BusinessServiceInput {
   paymentRequiredBeforeBooking?: boolean;
   isBookable?: boolean;
   isActive?: boolean;
+  autoConfirmEligible?: boolean;
+  requiresManualApproval?: boolean;
+  requiresDepositBeforeConfirmation?: boolean;
+  requiresLocationBeforeConfirmation?: boolean;
+  requiresStaffAssignment?: boolean;
 }
 
 export type UpdateBusinessServiceInput = Partial<BusinessServiceInput>;

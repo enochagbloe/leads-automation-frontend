@@ -14,6 +14,11 @@ export const businessServiceSchema = z.object({
   paymentRequiredBeforeBooking: z.boolean(),
   isBookable: z.boolean(),
   isActive: z.boolean(),
+  autoConfirmEligible: z.boolean(),
+  requiresManualApproval: z.boolean(),
+  requiresDepositBeforeConfirmation: z.boolean(),
+  requiresLocationBeforeConfirmation: z.boolean(),
+  requiresStaffAssignment: z.boolean(),
 }).refine((values) => !values.paymentRequiredBeforeBooking || values.requiresPayment, {
   message: "Enable requires payment first",
   path: ["paymentRequiredBeforeBooking"],

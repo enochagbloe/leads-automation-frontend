@@ -62,7 +62,7 @@ const READINESS: Array<{ value: string; label: string }> = [
 const STATUS = [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }, { value: "archived", label: "Archived" }, { value: "all", label: "All services" }];
 const DURATIONS = [{ value: "__unset", label: "Not set" }, { value: "15", label: "15 min" }, { value: "30", label: "30 min" }, { value: "45", label: "45 min" }, { value: "60", label: "1 hour" }, { value: "90", label: "1 hour 30 min" }, { value: "120", label: "2 hours" }];
 const CURRENCIES = ["GHS", "USD", "EUR", "GBP", "NGN", "KES", "ZAR"].map((value) => ({ value, label: value }));
-const DEFAULT_VALUES: BusinessServiceValues = { name: "", category: "", description: "", priceType: "NOT_SET", basePrice: "", currency: "GHS", priceDescription: "", durationMinutes: "", bufferMinutes: "0", requiresPayment: false, paymentRequiredBeforeBooking: false, isBookable: false, isActive: true };
+const DEFAULT_VALUES: BusinessServiceValues = { name: "", category: "", description: "", priceType: "NOT_SET", basePrice: "", currency: "GHS", priceDescription: "", durationMinutes: "", bufferMinutes: "0", requiresPayment: false, paymentRequiredBeforeBooking: false, isBookable: false, isActive: true, autoConfirmEligible: false, requiresManualApproval: false, requiresDepositBeforeConfirmation: false, requiresLocationBeforeConfirmation: false, requiresStaffAssignment: false };
 
 function useDebouncedValue(value: string, delay = 300) {
   const [debounced, setDebounced] = useState(value);
@@ -95,13 +95,13 @@ function missingLabel(field: string) {
 }
 
 function valuesFromService(service: BusinessService): BusinessServiceValues {
-  return { name: service.name, category: service.category ?? "", description: service.description ?? "", priceType: service.priceType, basePrice: service.basePrice ?? "", currency: service.currency, priceDescription: service.priceDescription ?? "", durationMinutes: service.durationMinutes ? String(service.durationMinutes) : "", bufferMinutes: String(service.bufferMinutes), requiresPayment: service.requiresPayment, paymentRequiredBeforeBooking: service.paymentRequiredBeforeBooking, isBookable: service.isBookable, isActive: service.isActive };
+  return { name: service.name, category: service.category ?? "", description: service.description ?? "", priceType: service.priceType, basePrice: service.basePrice ?? "", currency: service.currency, priceDescription: service.priceDescription ?? "", durationMinutes: service.durationMinutes ? String(service.durationMinutes) : "", bufferMinutes: String(service.bufferMinutes), requiresPayment: service.requiresPayment, paymentRequiredBeforeBooking: service.paymentRequiredBeforeBooking, isBookable: service.isBookable, isActive: service.isActive, autoConfirmEligible: service.autoConfirmEligible ?? false, requiresManualApproval: service.requiresManualApproval ?? false, requiresDepositBeforeConfirmation: service.requiresDepositBeforeConfirmation ?? false, requiresLocationBeforeConfirmation: service.requiresLocationBeforeConfirmation ?? false, requiresStaffAssignment: service.requiresStaffAssignment ?? false };
 }
 
 function toInput(values: BusinessServiceValues): BusinessServiceInput {
   const usesBasePrice = ["FIXED", "STARTING_FROM", "RANGE"].includes(values.priceType);
   const usesPriceDescription = ["QUOTE_ONLY", "RANGE", "NOT_SET"].includes(values.priceType);
-  return { name: values.name.trim(), category: values.category.trim() || null, description: values.description.trim() || null, priceType: values.priceType, basePrice: usesBasePrice ? values.basePrice || null : null, currency: values.currency.toUpperCase(), priceDescription: usesPriceDescription ? values.priceDescription.trim() || null : null, durationMinutes: values.durationMinutes && values.durationMinutes !== "__unset" ? Number(values.durationMinutes) : null, bufferMinutes: Number(values.bufferMinutes), requiresPayment: values.requiresPayment, paymentRequiredBeforeBooking: values.paymentRequiredBeforeBooking, isBookable: values.isBookable, isActive: values.isActive };
+  return { name: values.name.trim(), category: values.category.trim() || null, description: values.description.trim() || null, priceType: values.priceType, basePrice: usesBasePrice ? values.basePrice || null : null, currency: values.currency.toUpperCase(), priceDescription: usesPriceDescription ? values.priceDescription.trim() || null : null, durationMinutes: values.durationMinutes && values.durationMinutes !== "__unset" ? Number(values.durationMinutes) : null, bufferMinutes: Number(values.bufferMinutes), requiresPayment: values.requiresPayment, paymentRequiredBeforeBooking: values.paymentRequiredBeforeBooking, isBookable: values.isBookable, isActive: values.isActive, autoConfirmEligible: values.autoConfirmEligible, requiresManualApproval: values.requiresManualApproval, requiresDepositBeforeConfirmation: values.requiresDepositBeforeConfirmation, requiresLocationBeforeConfirmation: values.requiresLocationBeforeConfirmation, requiresStaffAssignment: values.requiresStaffAssignment };
 }
 
 function CheckField({ checked, onChange, label, description }: { checked: boolean; onChange: (checked: boolean) => void; label: string; description: string }) {
@@ -114,11 +114,19 @@ function ServiceEditor({ open, onOpenChange, onSaved, service, businessId, defau
   const form = useForm<BusinessServiceValues>({ resolver: zodResolver(businessServiceSchema), defaultValues: DEFAULT_VALUES });
   const priceType = useWatch({ control: form.control, name: "priceType" });
   const requiresPayment = useWatch({ control: form.control, name: "requiresPayment" });
+  const autoConfirmEligible = useWatch({ control: form.control, name: "autoConfirmEligible" });
+  const requiresManualApproval = useWatch({ control: form.control, name: "requiresManualApproval" });
+  const durationMinutes = useWatch({ control: form.control, name: "durationMinutes" });
+  const description = useWatch({ control: form.control, name: "description" });
+  const basePrice = useWatch({ control: form.control, name: "basePrice" });
+  const priceDescription = useWatch({ control: form.control, name: "priceDescription" });
+
   useEffect(() => {
     if (!open) return;
     const values = service ? valuesFromService(service) : { ...DEFAULT_VALUES, currency: defaultCurrency || "GHS" };
     form.reset({ ...values, durationMinutes: values.durationMinutes || "__unset" });
   }, [defaultCurrency, form, open, service]);
+
   const submit = form.handleSubmit(async (values) => {
     try {
       const saved = service ? await update.mutateAsync({ id: service.id, input: toInput(values) }) : await create.mutateAsync(toInput(values));
@@ -131,8 +139,116 @@ function ServiceEditor({ open, onOpenChange, onSaved, service, businessId, defau
       systemNotify.error(error instanceof ApiError && error.code === "FORBIDDEN" ? "You do not have permission to manage services." : "Could not save service", { description: getApiErrorMessage(error) });
     }
   });
+
   const busy = create.isPending || update.isPending;
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogPortal><DialogOverlay /><DialogContent className="inset-y-0 right-0 flex h-dvh w-full max-w-xl flex-col overflow-hidden border bg-background shadow-2xl sm:right-3 sm:top-3 sm:h-[calc(100dvh-1.5rem)] sm:rounded-2xl"><div className="flex items-start justify-between gap-4 border-b bg-card px-5 py-4"><div><DialogTitle className="text-lg font-bold">{service ? "Edit service" : "Add service"}</DialogTitle><DialogDescription className="mt-1 text-sm text-muted-foreground">Add what you know now. Missing details can be completed later.</DialogDescription></div><button type="button" onClick={() => onOpenChange(false)} className="grid size-10 place-items-center rounded-lg hover:bg-muted" aria-label="Close service editor"><X className="size-4" /></button></div><form onSubmit={submit} className="min-h-0 flex-1 overflow-y-auto p-5"><div className="grid gap-5 sm:grid-cols-2"><div className="sm:col-span-2"><AppFormField id="service-name" label="Service name" required error={form.formState.errors.name?.message}><AppInput id="service-name" placeholder="e.g. Property Viewing" {...form.register("name")} /></AppFormField></div><AppFormField id="service-category" label="Category" error={form.formState.errors.category?.message}><AppInput id="service-category" placeholder="e.g. Real Estate" {...form.register("category")} /></AppFormField><Controller name="priceType" control={form.control} render={({ field }) => <AppFormField id="priceType" label="Price type" error={form.formState.errors.priceType?.message}><AppSelect id="priceType" value={field.value} onValueChange={field.onChange} options={PRICE_TYPES} /></AppFormField>} /><div className="sm:col-span-2"><AppFormField id="service-description" label="Description" hint="A clear description helps BizReply answer customer questions accurately." error={form.formState.errors.description?.message}><textarea id="service-description" rows={4} className="w-full resize-y rounded-lg border border-input bg-card px-3 py-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20" placeholder="Describe what this service includes." {...form.register("description")} /></AppFormField></div>{["FIXED", "STARTING_FROM", "RANGE"].includes(priceType) && <AppFormField id="basePrice" label="Base price" error={form.formState.errors.basePrice?.message}><AppInput id="basePrice" inputMode="decimal" placeholder="100.00" {...form.register("basePrice")} /></AppFormField>}<Controller name="currency" control={form.control} render={({ field }) => <AppFormField id="currency" label="Currency" error={form.formState.errors.currency?.message}><AppSelect id="currency" value={field.value} onValueChange={field.onChange} options={CURRENCIES} /></AppFormField>} />{["QUOTE_ONLY", "RANGE", "NOT_SET"].includes(priceType) && <div className="sm:col-span-2"><AppFormField id="priceDescription" label="Price description" error={form.formState.errors.priceDescription?.message}><AppInput id="priceDescription" placeholder="Price depends on location, scope, or customer request." {...form.register("priceDescription")} /></AppFormField></div>}<Controller name="durationMinutes" control={form.control} render={({ field }) => <AppFormField id="durationMinutes" label="Duration"><AppSelect id="durationMinutes" value={field.value} onValueChange={field.onChange} options={DURATIONS} placeholder="Not set" /></AppFormField>} /><AppFormField id="bufferMinutes" label="Buffer time (minutes)" error={form.formState.errors.bufferMinutes?.message}><AppInput id="bufferMinutes" inputMode="numeric" {...form.register("bufferMinutes")} /></AppFormField></div><div className="mt-6 grid gap-3"><Controller name="requiresPayment" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={(checked) => { field.onChange(checked); if (!checked) form.setValue("paymentRequiredBeforeBooking", false); }} label="Requires payment" description="This service has a payment requirement." />} /><Controller name="paymentRequiredBeforeBooking" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={(checked) => { field.onChange(checked); if (checked && !requiresPayment) form.setValue("requiresPayment", true); }} label="Payment required before booking" description="Customers must pay before a booking is confirmed." />} /><Controller name="isBookable" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Bookable service" description="Customers can book this service as an appointment." />} /><Controller name="isActive" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Active service" description="Inactive services stay saved but are hidden from normal flows." />} /></div><div className="sticky bottom-0 mt-6 flex justify-end gap-3 border-t bg-background py-4"><AppButton type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</AppButton><AppButton type="submit" loading={busy} loadingText="Saving service">{service ? "Save changes" : "Add service"}</AppButton></div></form></DialogContent></DialogPortal></Dialog>;
+  const autoConfirmWarnings = [
+    ...(autoConfirmEligible && (!durationMinutes || durationMinutes === "__unset") ? ["This service has no duration. Add a duration so AI can check appointment conflicts."] : []),
+    ...(autoConfirmEligible && !description?.trim() ? ["This service has no clear description. Add what is included so AI can answer customers accurately."] : []),
+    ...(autoConfirmEligible && priceType !== "FREE" && !basePrice && !priceDescription?.trim() ? ["This service has no price. Auto-confirmation may be unsafe for price-sensitive requests."] : []),
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogContent className="inset-y-0 right-0 flex h-dvh w-full max-w-xl flex-col overflow-hidden border bg-background shadow-2xl sm:right-3 sm:top-3 sm:h-[calc(100dvh-1.5rem)] sm:rounded-2xl">
+          <div className="flex items-start justify-between gap-4 border-b bg-card px-5 py-4">
+            <div>
+              <DialogTitle className="text-lg font-bold">{service ? "Edit service" : "Add service"}</DialogTitle>
+              <DialogDescription className="mt-1 text-sm text-muted-foreground">Add what you know now. Missing details can be completed later.</DialogDescription>
+            </div>
+            <button type="button" onClick={() => onOpenChange(false)} className="grid size-10 place-items-center rounded-lg hover:bg-muted" aria-label="Close service editor"><X className="size-4" /></button>
+          </div>
+          <form onSubmit={submit} className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <AppFormField id="service-name" label="Service name" required error={form.formState.errors.name?.message}>
+                  <AppInput id="service-name" placeholder="e.g. Property Viewing" {...form.register("name")} />
+                </AppFormField>
+              </div>
+              <AppFormField id="service-category" label="Category" error={form.formState.errors.category?.message}>
+                <AppInput id="service-category" placeholder="e.g. Real Estate" {...form.register("category")} />
+              </AppFormField>
+              <Controller name="priceType" control={form.control} render={({ field }) => (
+                <AppFormField id="priceType" label="Price type" error={form.formState.errors.priceType?.message}>
+                  <AppSelect id="priceType" value={field.value} onValueChange={field.onChange} options={PRICE_TYPES} />
+                </AppFormField>
+              )} />
+              <div className="sm:col-span-2">
+                <AppFormField id="service-description" label="Description" hint="A clear description helps BizReply answer customer questions accurately." error={form.formState.errors.description?.message}>
+                  <textarea id="service-description" rows={4} className="w-full resize-y rounded-lg border border-input bg-card px-3 py-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20" placeholder="Describe what this service includes." {...form.register("description")} />
+                </AppFormField>
+              </div>
+              {["FIXED", "STARTING_FROM", "RANGE"].includes(priceType) && (
+                <AppFormField id="basePrice" label="Base price" error={form.formState.errors.basePrice?.message}>
+                  <AppInput id="basePrice" inputMode="decimal" placeholder="100.00" {...form.register("basePrice")} />
+                </AppFormField>
+              )}
+              <Controller name="currency" control={form.control} render={({ field }) => (
+                <AppFormField id="currency" label="Currency" error={form.formState.errors.currency?.message}>
+                  <AppSelect id="currency" value={field.value} onValueChange={field.onChange} options={CURRENCIES} />
+                </AppFormField>
+              )} />
+              {["QUOTE_ONLY", "RANGE", "NOT_SET"].includes(priceType) && (
+                <div className="sm:col-span-2">
+                  <AppFormField id="priceDescription" label="Price description" error={form.formState.errors.priceDescription?.message}>
+                    <AppInput id="priceDescription" placeholder="Price depends on location, scope, or customer request." {...form.register("priceDescription")} />
+                  </AppFormField>
+                </div>
+              )}
+              <Controller name="durationMinutes" control={form.control} render={({ field }) => (
+                <AppFormField id="durationMinutes" label="Duration">
+                  <AppSelect id="durationMinutes" value={field.value} onValueChange={field.onChange} options={DURATIONS} placeholder="Not set" />
+                </AppFormField>
+              )} />
+              <AppFormField id="bufferMinutes" label="Buffer time (minutes)" error={form.formState.errors.bufferMinutes?.message}>
+                <AppInput id="bufferMinutes" inputMode="numeric" {...form.register("bufferMinutes")} />
+              </AppFormField>
+            </div>
+
+            <div className="mt-6 grid gap-3">
+              <Controller name="requiresPayment" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={(checked) => { field.onChange(checked); if (!checked) form.setValue("paymentRequiredBeforeBooking", false); }} label="Requires payment" description="This service has a payment requirement." />} />
+              <Controller name="paymentRequiredBeforeBooking" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={(checked) => { field.onChange(checked); if (checked && !requiresPayment) form.setValue("requiresPayment", true); }} label="Payment required before booking" description="Customers must pay before a booking is confirmed." />} />
+              <Controller name="isBookable" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Bookable service" description="Customers can book this service as an appointment." />} />
+              <Controller name="isActive" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Active service" description="Inactive services stay saved but are hidden from normal flows." />} />
+            </div>
+
+            <section className="mt-6 rounded-2xl border bg-muted/30 p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><Sparkles className="size-4" /></span>
+                <div>
+                  <h3 className="text-sm font-bold">AI Auto-Confirmation</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Use these rules to tell BizReply when this service is safe for Premium AI auto-confirmation.</p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3">
+                <Controller name="autoConfirmEligible" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Allow AI to auto-confirm this service" description="Only enable this for simple, predictable services with clear pricing, duration, and availability." />} />
+                <Controller name="requiresManualApproval" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Always require manual approval" description="Use this for custom, high-value, sensitive, or unclear services." />} />
+                <Controller name="requiresDepositBeforeConfirmation" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Requires deposit/payment before confirmation" description="If enabled, AI will not auto-confirm until payment verification exists. In V1, this should usually keep the appointment pending." />} />
+                <Controller name="requiresLocationBeforeConfirmation" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Requires customer location before confirmation" description="Useful for site visits, inspections, delivery, home service, or field work." />} />
+                <Controller name="requiresStaffAssignment" control={form.control} render={({ field }) => <CheckField checked={field.value} onChange={field.onChange} label="Requires staff assignment before confirmation" description="AI can only auto-confirm if an eligible active staff member is assigned and available." />} />
+              </div>
+              {requiresManualApproval && <p className="mt-4 rounded-xl border border-warning/20 bg-warning/10 px-3 py-2 text-xs font-semibold leading-5 text-warning">Manual approval is on, so AI auto-confirmation will be blocked for this service.</p>}
+              {autoConfirmWarnings.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {autoConfirmWarnings.map((warning) => <p key={warning} className="rounded-xl border border-warning/20 bg-warning/10 px-3 py-2 text-xs font-semibold leading-5 text-warning">{warning}</p>)}
+                </div>
+              )}
+              <div className="mt-4 grid gap-3 text-xs leading-5 text-muted-foreground sm:grid-cols-2">
+                <p><span className="font-bold text-foreground">Good for auto-confirm:</span> consultation calls, basic haircuts, standard inspections, and simple fixed-duration appointments.</p>
+                <p><span className="font-bold text-foreground">Require manual approval:</span> custom construction, wedding packages, urgent repairs, discount negotiation, high-value quotes, or unclear requests.</p>
+              </div>
+            </section>
+
+            <div className="sticky bottom-0 mt-6 flex justify-end gap-3 border-t bg-background py-4">
+              <AppButton type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</AppButton>
+              <AppButton type="submit" loading={busy} loadingText="Saving service">{service ? "Save changes" : "Add service"}</AppButton>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogPortal>
+    </Dialog>
+  );
 }
 
 function SummaryCard({ summary }: { summary: ServicesSummary }) {

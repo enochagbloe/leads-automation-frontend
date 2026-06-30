@@ -19,6 +19,7 @@ import type {
   MissedAppointmentInput,
   NoShowAppointmentInput,
   RescheduleAppointmentInput,
+  UpdateAppointmentAutoConfirmSettingsInput,
   UpdateAppointmentSettingsInput,
 } from "@/types/appointment";
 
@@ -46,6 +47,12 @@ export const useAppointmentSettings = (businessId: string | null | undefined) =>
   enabled: Boolean(businessId),
 });
 
+export const useAppointmentAutoConfirmSettings = (businessId: string | null | undefined) => useQuery({
+  queryKey: queryKeys.businessAppointments.autoConfirmSettings(businessId ?? ""),
+  queryFn: () => appointmentService.autoConfirmSettings(),
+  enabled: Boolean(businessId),
+});
+
 export const useCheckAppointmentAvailability = () => useMutation({
   mutationFn: (input: CheckAppointmentAvailabilityInput) => appointmentService.checkAvailability(input),
 });
@@ -57,6 +64,23 @@ export function useUpdateAppointmentSettings(businessId: string | null | undefin
     onSuccess: async () => {
       await Promise.all([
         client.invalidateQueries({ queryKey: queryKeys.businessAppointments.settings(businessId ?? "") }),
+        client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+        client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
+        client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+        client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
+        client.invalidateQueries({ queryKey: queryKeys.auth.currentUser }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateAppointmentAutoConfirmSettings(businessId: string | null | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateAppointmentAutoConfirmSettingsInput) => appointmentService.updateAutoConfirmSettings(input),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.businessAppointments.autoConfirmSettings(businessId ?? "") }),
         client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
         client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
         client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
