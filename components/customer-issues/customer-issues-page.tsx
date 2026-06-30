@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowRight, CheckCircle2, CircleAlert, Clock3, ExternalLink, Inbox, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, CircleAlert, Clock3, ExternalLink, Inbox, MessageSquareText, MoreVertical, ShieldAlert, Tag, UserCheck, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -13,6 +13,7 @@ import { AppSelect } from "@/components/app-select";
 import { LoadingCard } from "@/components/states/loading-states";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useCustomerIssue, useCustomerIssues, useUpdateCustomerIssueStatus } from "@/hooks/use-customer-issues";
+import { useLead } from "@/hooks/use-leads";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import {
   CUSTOMER_ISSUE_CATEGORIES,
@@ -29,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { canAccessCustomerIssues, canManageBilling, canUpdateCustomerIssueStatus } from "@/lib/workspace-permissions";
 import type { CustomerIssue, CustomerIssueCategory, CustomerIssueListQuery, CustomerIssueSeverity, CustomerIssueStatus } from "@/types/customer-issue";
+import type { Lead } from "@/types/lead";
 
 type IssueTab = NonNullable<CustomerIssueListQuery["tab"]>;
 
@@ -66,14 +68,22 @@ function SeverityPill({ severity }: { severity: CustomerIssueSeverity }) {
   return <Pill className={customerIssueSeverityTone(severity)}>{CUSTOMER_ISSUE_SEVERITY_LABELS[severity]}</Pill>;
 }
 
-function customerName(issue: CustomerIssue) {
-  return issue.lead?.name || issue.lead?.phone || "Unknown customer";
+function customerName(issue: CustomerIssue, fallbackLead?: Lead | null) {
+  return issue.lead?.name || fallbackLead?.fullName || issue.lead?.phone || fallbackLead?.phone || "Customer details unavailable";
 }
 
 function responsibleLabel(issue: CustomerIssue) {
   if (issue.responsibleMember?.name) return `Assigned to ${issue.responsibleMember.name}`;
   if (issue.suggestedResponsibleMembershipId) return "Suggested responsible staff";
   return "Unassigned";
+}
+
+function categoryLabel(issue: CustomerIssue) {
+  return CUSTOMER_ISSUE_CATEGORY_LABELS[issue.category] ?? issue.category ?? "Other";
+}
+
+function typeLabel(issue: CustomerIssue) {
+  return CUSTOMER_ISSUE_TYPE_LABELS[issue.type] ?? issue.type ?? "Issue";
 }
 
 function nextActions(status: CustomerIssueStatus, canUpdate: boolean) {
@@ -143,7 +153,7 @@ function IssueCard({
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={issue.status} />
             <SeverityPill severity={issue.severity} />
-            <Pill className="bg-muted text-muted-foreground">{CUSTOMER_ISSUE_TYPE_LABELS[issue.type]}</Pill>
+            <Pill className="bg-muted text-muted-foreground">{typeLabel(issue)}</Pill>
           </div>
           <h2 className="mt-3 text-base font-bold leading-6">{issue.summary}</h2>
           <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{issue.customerMessageExcerpt || issue.routingReason || "AI-created customer issue record."}</p>
@@ -159,7 +169,7 @@ function IssueCard({
       </div>
       <dl className="mt-5 grid gap-3 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
         <div><dt className="font-bold text-foreground">Customer</dt><dd className="mt-1 truncate">{customerName(issue)}</dd></div>
-        <div><dt className="font-bold text-foreground">Category</dt><dd className="mt-1">{CUSTOMER_ISSUE_CATEGORY_LABELS[issue.category]}</dd></div>
+        <div><dt className="font-bold text-foreground">Category</dt><dd className="mt-1">{categoryLabel(issue)}</dd></div>
         <div><dt className="font-bold text-foreground">Responsible</dt><dd className="mt-1 truncate">{responsibleLabel(issue)}</dd></div>
         <div><dt className="font-bold text-foreground">Created</dt><dd className="mt-1">{formatCustomerIssueTime(issue.createdAt)}</dd></div>
       </dl>
@@ -184,68 +194,141 @@ function IssueDetailPanel({
 }) {
   const detail = useCustomerIssue(businessId, issueId);
   const issue = detail.data;
+  const leadFallback = useLead(issue?.leadId && (!issue.lead?.name || !issue.lead?.phone) ? issue.leadId : "");
+  const fallbackLead = leadFallback.data?.lead ?? null;
+  const [activeDetailTab, setActiveDetailTab] = useState<"activity" | "customer" | "routing" | "actions">("activity");
+
   return (
-    <aside className={cn("fixed inset-y-0 right-0 z-40 w-full max-w-xl translate-x-full border-l bg-background shadow-2xl transition-transform duration-200 sm:top-16", issueId && "translate-x-0")} aria-label="Customer issue detail">
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between gap-4 border-b p-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Customer issue</p>
-            <h2 className="mt-1 text-lg font-bold">Issue details</h2>
-          </div>
+    <aside className={cn("fixed inset-y-0 right-0 z-[90] h-dvh w-full max-w-xl translate-x-full overflow-hidden border bg-background shadow-2xl transition-transform duration-200 sm:right-3 sm:top-3 sm:h-[calc(100dvh-1.5rem)] sm:rounded-2xl", issueId && "translate-x-0")} aria-label="Customer issue detail">
+      <div className="flex h-full flex-col rounded-[inherit]">
+        <div className="flex h-14 items-center justify-between gap-3 border-b bg-card px-3">
           <AppButton size="icon" variant="ghost" onClick={onClose} aria-label="Close issue detail"><X className="size-5" /></AppButton>
+          <div className="flex items-center gap-1">
+            <AppButton size="icon" variant="ghost" disabled aria-label="Issue activity"><Clock3 className="size-4" /></AppButton>
+            <AppButton size="icon" variant="ghost" disabled aria-label="More issue options"><MoreVertical className="size-4" /></AppButton>
+          </div>
         </div>
         {detail.isPending ? (
           <div className="space-y-4 p-4"><LoadingCard /><LoadingCard /></div>
         ) : detail.isError ? (
           <div className="p-4"><AppErrorState title="Could not load issue" description={issueErrorMessage(detail.error)} onRetry={() => void detail.refetch()} /></div>
         ) : issue ? (
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="flex flex-wrap gap-2">
-              <StatusPill status={issue.status} />
-              <SeverityPill severity={issue.severity} />
-              <Pill className="bg-muted text-muted-foreground">{CUSTOMER_ISSUE_CATEGORY_LABELS[issue.category]}</Pill>
-            </div>
-            <h3 className="mt-4 text-xl font-bold leading-7">{issue.summary}</h3>
-            {issue.customerMessageExcerpt && (
-              <blockquote className="mt-4 rounded-2xl border bg-card p-4 text-sm leading-6 text-muted-foreground">
-                “{issue.customerMessageExcerpt}”
-              </blockquote>
-            )}
-            <div className="mt-5 grid gap-3 text-sm">
-              <DetailRow label="Customer" value={customerName(issue)} icon={UserRound} />
-              <DetailRow label="Responsible staff" value={responsibleLabel(issue)} icon={CheckCircle2} />
-              <DetailRow label="Client owner" value={issue.clientOwner?.name ?? "Not provided"} icon={UserRound} />
-              <DetailRow label="Routing reason" value={issue.routingReason ?? "Not provided"} icon={AlertTriangle} />
-              <DetailRow label="Created" value={formatCustomerIssueTime(issue.createdAt)} icon={Clock3} />
-              <DetailRow label="Updated" value={formatCustomerIssueTime(issue.updatedAt)} icon={Clock3} />
-              {issue.resolvedAt && <DetailRow label="Resolved" value={formatCustomerIssueTime(issue.resolvedAt)} icon={CheckCircle2} />}
-            </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {issue.conversationId && (
-                <AppButton asChild variant="outline">
-                  <Link href={`/conversations?conversationId=${issue.conversationId}`}>Open conversation <ExternalLink className="size-4" /></Link>
-                </AppButton>
-              )}
-              {issue.leadId && (
-                <AppButton asChild variant="outline">
-                  <Link href={`/leads?lead=${issue.leadId}`}>Open lead <ExternalLink className="size-4" /></Link>
-                </AppButton>
-              )}
-            </div>
-            <div className="mt-6 border-t pt-4">
-              <h4 className="text-sm font-bold">Status actions</h4>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {nextActions(issue.status, canUpdate).length ? nextActions(issue.status, canUpdate).map((action) => (
-                  <AppButton key={action.status} size="sm" loading={updating} variant={action.status === "RESOLVED" ? "default" : "outline"} onClick={() => onStatus(issue.id, action.status)}>
-                    {action.label}
-                  </AppButton>
-                )) : <p className="text-sm text-muted-foreground">No status actions are available for this issue.</p>}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <section className="px-5 pb-5 pt-5">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Customer issue</p>
+              <h3 className="mt-3 text-2xl font-bold leading-8 tracking-tight">{issue.summary}</h3>
+              <div className="mt-5 space-y-3 text-sm">
+                <PanelMetaRow icon={Clock3} label="Created time" value={formatCustomerIssueTime(issue.createdAt)} />
+                <PanelMetaRow icon={CheckCircle2} label="Status" value={<StatusPill status={issue.status} />} />
+                <PanelMetaRow icon={ShieldAlert} label="Severity" value={<SeverityPill severity={issue.severity} />} />
+                <PanelMetaRow icon={Tag} label="Category" value={<Pill className="bg-muted text-muted-foreground">{categoryLabel(issue)}</Pill>} />
+                <PanelMetaRow icon={UserCheck} label="Responsible" value={responsibleLabel(issue)} />
+                <PanelMetaRow icon={UserRound} label="Customer" value={customerName(issue, fallbackLead)} />
               </div>
-            </div>
+              <div className="mt-6 rounded-2xl bg-muted/55 p-4">
+                <h4 className="text-sm font-bold">Customer message</h4>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {issue.customerMessageExcerpt || issue.routingReason || "BizReply created this issue from customer context and internal routing signals."}
+                </p>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {issue.conversationId && (
+                  <AppButton asChild variant="outline" size="sm">
+                    <Link href={`/conversations?conversationId=${issue.conversationId}`}>Open conversation <ExternalLink className="size-4" /></Link>
+                  </AppButton>
+                )}
+                {issue.leadId && (
+                  <AppButton asChild variant="outline" size="sm">
+                    <Link href={`/leads?lead=${issue.leadId}`}>Open lead <ExternalLink className="size-4" /></Link>
+                  </AppButton>
+                )}
+              </div>
+            </section>
+
+            <nav className="sticky top-0 z-10 flex border-y bg-background/95 px-5 backdrop-blur" aria-label="Issue detail tabs">
+              {[
+                ["activity", "Activity"],
+                ["customer", "Customer"],
+                ["routing", "Routing"],
+                ["actions", "Actions"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveDetailTab(key as typeof activeDetailTab)}
+                  className={cn("min-h-12 border-b-2 border-transparent px-3 text-sm font-semibold text-muted-foreground transition hover:text-foreground", activeDetailTab === key && "border-primary text-primary")}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+
+            <section className="px-5 py-5">
+              {activeDetailTab === "activity" && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Today</p>
+                  <ol className="mt-4 space-y-4">
+                    <TimelineItem icon={MessageSquareText} title="Issue detected from customer message" time={formatCustomerIssueTime(issue.createdAt)} description={issue.customerMessageExcerpt || "A customer interaction was flagged for internal review."} />
+                    <TimelineItem icon={UserCheck} title={responsibleLabel(issue)} time={formatCustomerIssueTime(issue.updatedAt)} description={issue.routingReason || "Responsible ownership can be adjusted by the team."} />
+                    {issue.resolvedAt && <TimelineItem icon={CheckCircle2} title="Issue resolved" time={formatCustomerIssueTime(issue.resolvedAt)} description="This issue has been marked resolved by the team." />}
+                  </ol>
+                </div>
+              )}
+              {activeDetailTab === "customer" && (
+                <div className="grid gap-3">
+                  <DetailRow label="Customer" value={customerName(issue, fallbackLead)} icon={UserRound} />
+                  <DetailRow label="Client owner" value={issue.clientOwner?.name ?? "Not provided"} icon={UserRound} />
+                  <DetailRow label="Lead" value={issue.lead?.phone ?? fallbackLead?.phone ?? fallbackLead?.email ?? issue.leadId ?? "Not provided"} icon={UserRound} />
+                </div>
+              )}
+              {activeDetailTab === "routing" && (
+                <div className="grid gap-3">
+                  <DetailRow label="Issue type" value={typeLabel(issue)} icon={AlertTriangle} />
+                  <DetailRow label="Routing reason" value={issue.routingReason ?? "Not provided"} icon={AlertTriangle} />
+                  <DetailRow label="Updated" value={formatCustomerIssueTime(issue.updatedAt)} icon={Clock3} />
+                </div>
+              )}
+              {activeDetailTab === "actions" && (
+                <div>
+                  <h4 className="text-sm font-bold">Status actions</h4>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">Move this issue forward without leaving the page.</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {nextActions(issue.status, canUpdate).length ? nextActions(issue.status, canUpdate).map((action) => (
+                      <AppButton key={action.status} size="sm" loading={updating} variant={action.status === "RESOLVED" ? "default" : "outline"} onClick={() => onStatus(issue.id, action.status)}>
+                        {action.label}
+                      </AppButton>
+                    )) : <p className="text-sm text-muted-foreground">No status actions are available for this issue.</p>}
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
         ) : null}
       </div>
     </aside>
+  );
+}
+
+function PanelMetaRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon: typeof Clock3 }) {
+  return (
+    <div className="grid grid-cols-[1rem_minmax(7rem,0.42fr)_minmax(0,1fr)] items-center gap-3">
+      <Icon className="size-4 text-muted-foreground" />
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="min-w-0 text-sm font-medium text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function TimelineItem({ title, time, description, icon: Icon }: { title: string; time: string; description: string; icon: typeof Clock3 }) {
+  return (
+    <li className="flex gap-3">
+      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-primary"><Icon className="size-4" /></span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{time}</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+      </div>
+    </li>
   );
 }
 
@@ -400,7 +483,12 @@ export function CustomerIssuesPage() {
         </div>
       )}
 
-      {selectedIssueId && <div className="fixed inset-0 z-30 bg-foreground/10 backdrop-blur-[1px]" onClick={() => setParams({ issue: undefined })} />}
+      {selectedIssueId && (
+        <div
+          className="fixed left-0 top-0 z-[80] h-dvh w-screen bg-foreground/15 backdrop-blur-sm"
+          onClick={() => setParams({ issue: undefined })}
+        />
+      )}
       <IssueDetailPanel
         businessId={activeBusinessId}
         issueId={selectedIssueId}
