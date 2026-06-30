@@ -12,7 +12,7 @@ export type ActionableNotificationType =
 
 export type NotificationPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export type NotificationStatus = "UNREAD" | "READ" | "ACTIONED" | "DISMISSED";
-export type NotificationEntityType = "APPOINTMENT" | "CONVERSATION" | "LEAD" | "BUSINESS";
+export type NotificationEntityType = "APPOINTMENT" | "CONVERSATION" | "LEAD" | "BUSINESS" | "CUSTOMER_ISSUE";
 
 export type NotificationActionType =
   | "CONFIRM_APPOINTMENT"
@@ -23,6 +23,7 @@ export type NotificationActionType =
   | "MARK_NO_SHOW"
   | "MARK_MISSED"
   | "VIEW_CONVERSATION"
+  | "VIEW_CUSTOMER_ISSUE"
   | "TAKE_OVER_CONVERSATION"
   | "OPEN_URL"
   | "DISMISS";

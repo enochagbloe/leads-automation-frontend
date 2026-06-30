@@ -184,6 +184,10 @@ export interface WorkspacePermissions {
   canReassignAppointmentsToOthers: boolean;
   canViewNotifications: boolean;
   canManageOwnNotifications: boolean;
+  canViewCustomerIssues: boolean;
+  canViewAllCustomerIssues: boolean;
+  canViewAssignedCustomerIssues: boolean;
+  canUpdateCustomerIssueStatus: boolean;
   canManageTeam: boolean;
   canInviteStaff: boolean;
   canRemoveStaff: boolean;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarDays, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
+import { AlertTriangle, Building2, CalendarDays, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,7 +22,7 @@ import { resetBusinessContext } from "@/lib/business-query-cache";
 import { BUSINESS_ACCESS_DENIED_EVENT } from "@/lib/business-store";
 import { canCreateBusiness } from "@/lib/subscription";
 import { cn } from "@/lib/utils";
-import { canAccessOperationalPage, canManageBilling as userCanManageBilling, canManageBusinessSettings as userCanManageBusinessSettings, canManageTeam as userCanManageTeam, getWorkspacePermissions } from "@/lib/workspace-permissions";
+import { canAccessCustomerIssues, canAccessOperationalPage, canManageBilling as userCanManageBilling, canManageBusinessSettings as userCanManageBusinessSettings, canManageTeam as userCanManageTeam, getWorkspacePermissions } from "@/lib/workspace-permissions";
 import type { MembershipStatus } from "@/types/auth";
 
 export function ProtectedAppShell({ children }: { children: React.ReactNode }) {
@@ -137,11 +137,13 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const canViewLeads = canAccessOperationalPage(profile.data, "leads");
   const canViewConversations = canAccessOperationalPage(profile.data, "conversations");
   const canViewAppointments = canAccessOperationalPage(profile.data, "appointments");
+  const canViewCustomerIssues = profile.data.plan?.code !== "BASIC" && canAccessCustomerIssues(profile.data);
   const navItems: SidebarNavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main", visible: permissions.canViewDashboard },
     { label: "Leads", href: "/leads", icon: ContactRound, section: "main", visible: canViewLeads },
     { label: "Inbox", href: "/conversations", icon: MessageSquareText, section: "main", visible: canViewConversations },
     { label: "Appointments", href: "/appointments/calendar", icon: CalendarDays, section: "main", visible: canViewAppointments },
+    { label: "Customer Issues", href: "/customer-issues", icon: AlertTriangle, section: "main", visible: canViewCustomerIssues },
     { label: "Business profile", href: "/settings/business/profile", icon: Building2, section: "workspace", visible: canManageBusinessSettings },
     { label: "Team members", href: "/settings/members", icon: Users, section: "workspace", visible: canManageTeam },
     { label: "WhatsApp connection", href: "/settings/business/whatsapp", icon: Smartphone, section: "workspace", visible: canManageBusinessSettings },

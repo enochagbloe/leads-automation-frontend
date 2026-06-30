@@ -20,6 +20,10 @@ export const defaultWorkspacePermissions: WorkspacePermissions = {
   canReassignAppointmentsToOthers: false,
   canViewNotifications: false,
   canManageOwnNotifications: false,
+  canViewCustomerIssues: false,
+  canViewAllCustomerIssues: false,
+  canViewAssignedCustomerIssues: false,
+  canUpdateCustomerIssueStatus: false,
   canManageTeam: false,
   canInviteStaff: false,
   canRemoveStaff: false,
@@ -38,6 +42,10 @@ const stringPermissionMap: Partial<Record<keyof WorkspacePermissions, string[]>>
   canViewAppointments: ["appointments:view"],
   canViewNotifications: ["notifications:view"],
   canManageOwnNotifications: ["notifications:manage-own"],
+  canViewCustomerIssues: ["customer-issues:view"],
+  canViewAllCustomerIssues: ["customer-issues:view-all"],
+  canViewAssignedCustomerIssues: ["customer-issues:view-assigned"],
+  canUpdateCustomerIssueStatus: ["customer-issues:update-status"],
   canManageTeam: ["members:manage"],
   canInviteStaff: ["members:manage"],
   canRemoveStaff: ["members:manage"],
@@ -71,6 +79,10 @@ function roleFallbackPermissions(profile: AuthProfile): WorkspacePermissions {
       canReassignAppointmentsToOthers: true,
       canViewNotifications: true,
       canManageOwnNotifications: true,
+      canViewCustomerIssues: true,
+      canViewAllCustomerIssues: true,
+      canViewAssignedCustomerIssues: true,
+      canUpdateCustomerIssueStatus: true,
       canManageTeam: true,
       canInviteStaff: true,
       canRemoveStaff: true,
@@ -104,6 +116,10 @@ function roleFallbackPermissions(profile: AuthProfile): WorkspacePermissions {
       canReassignAppointmentsToOthers: true,
       canViewNotifications: true,
       canManageOwnNotifications: true,
+      canViewCustomerIssues: true,
+      canViewAllCustomerIssues: true,
+      canViewAssignedCustomerIssues: true,
+      canUpdateCustomerIssueStatus: true,
       canManageTeam: true,
       canInviteStaff: true,
       canRemoveStaff: false,
@@ -128,6 +144,8 @@ function roleFallbackPermissions(profile: AuthProfile): WorkspacePermissions {
       canAssignAppointmentsToSelf: true,
       canViewNotifications: true,
       canManageOwnNotifications: true,
+      canViewAssignedCustomerIssues: true,
+      canUpdateCustomerIssueStatus: true,
     };
   }
 
@@ -170,4 +188,13 @@ export function canManageBusinessSettings(profile: AuthProfile | null | undefine
 export function canManageTeam(profile: AuthProfile | null | undefined) {
   const permissions = getWorkspacePermissions(profile);
   return permissions.canManageTeam || permissions.canInviteStaff || permissions.canRemoveStaff;
+}
+
+export function canAccessCustomerIssues(profile: AuthProfile | null | undefined) {
+  const permissions = getWorkspacePermissions(profile);
+  return permissions.canViewCustomerIssues || permissions.canViewAllCustomerIssues || permissions.canViewAssignedCustomerIssues;
+}
+
+export function canUpdateCustomerIssueStatus(profile: AuthProfile | null | undefined) {
+  return getWorkspacePermissions(profile).canUpdateCustomerIssueStatus;
 }
