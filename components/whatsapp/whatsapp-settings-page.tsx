@@ -39,6 +39,13 @@ const CONNECTING_STEPS = [
   "Almost done...",
 ];
 
+const DISCONNECTING_STEPS = [
+  "Disconnecting your number...",
+  "Preserving your conversation history...",
+  "Turning off WhatsApp delivery...",
+  "Almost done...",
+];
+
 const STATUS_LABELS: Record<WhatsAppConnectionStatus, string> = {
   NOT_CONNECTED: "Not connected",
   CONNECTING: "Connection pending",
@@ -77,23 +84,28 @@ function WhatsAppMark({ connected, busy }: { connected?: boolean; busy?: boolean
   );
 }
 
-function ConnectionLoadingState({ active }: { active: boolean }) {
+function ConnectionLoadingState({ active, mode = "connecting" }: { active: boolean; mode?: "connecting" | "disconnecting" }) {
   const [step, setStep] = useState(0);
+  const steps = mode === "disconnecting" ? DISCONNECTING_STEPS : CONNECTING_STEPS;
 
   useEffect(() => {
     if (!active) return;
     const interval = window.setInterval(() => {
-      setStep((value) => Math.min(value + 1, CONNECTING_STEPS.length - 1));
+      setStep((value) => Math.min(value + 1, steps.length - 1));
     }, 1200);
     return () => window.clearInterval(interval);
-  }, [active]);
+  }, [active, steps.length]);
 
   return (
     <div className="mx-auto grid min-h-[420px] max-w-md place-items-center text-center">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Connecting</p>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{CONNECTING_STEPS[active ? step : 0]}</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">Please keep this page open. We are preparing your WhatsApp workspace.</p>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">{mode === "disconnecting" ? "Disconnecting" : "Connecting"}</p>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{steps[active ? step : 0]}</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          {mode === "disconnecting"
+            ? "Please keep this page open. Your leads, conversations, and messages will stay available."
+            : "Please keep this page open. We are preparing your WhatsApp workspace."}
+        </p>
         <div className="mx-auto mt-7 h-1.5 w-48 overflow-hidden rounded-full bg-muted">
           <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
         </div>
@@ -102,7 +114,21 @@ function ConnectionLoadingState({ active }: { active: boolean }) {
   );
 }
 
-function ConnectedState({ status, canManage, onChangeNumber, changing }: { status: WhatsAppStatus; canManage: boolean; onChangeNumber: () => void; changing: boolean }) {
+function ConnectedState({
+  status,
+  canManage,
+  onChangeNumber,
+  onDisconnect,
+  changing,
+  disconnecting,
+}: {
+  status: WhatsAppStatus;
+  canManage: boolean;
+  onChangeNumber: () => void;
+  onDisconnect: () => void;
+  changing: boolean;
+  disconnecting: boolean;
+}) {
   return (
     <div className="mx-auto max-w-xl text-center">
       <WhatsAppMark connected />
@@ -111,8 +137,9 @@ function ConnectedState({ status, canManage, onChangeNumber, changing }: { statu
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">Customer messages can now land inside BizReply for this business.</p>
       <p className="mt-7 text-sm text-muted-foreground">Connected number: <span className="font-bold text-foreground">{status.displayPhoneNumber ?? "Number connected"}</span></p>
       {canManage && (
-        <div className="mt-6 flex justify-center">
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
           <AppButton variant="outline" loading={changing} loadingText="Preparing" onClick={onChangeNumber}><ArrowRightLeft className="size-4" />Change number</AppButton>
+          <AppButton variant="ghost" loading={disconnecting} loadingText="Disconnecting" onClick={onDisconnect}>Disconnect number</AppButton>
         </div>
       )}
     </div>
@@ -131,6 +158,7 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
   const localPhone = normalizeLocalPhone(phone);
   const fullPhone = `${countryCode}${localPhone}`;
   const connecting = start.isPending || change.isPending;
+  const disconnecting = deactivate.isPending;
   const connected = status.status === "CONNECTED";
   const showLoadingState = connecting || status.status === "CONNECTING";
 
@@ -171,8 +199,23 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
     }
   };
 
+  const disconnectNumber = () => {
+    setErrorMessage(null);
+    deactivate.mutate("Disconnected from settings.", {
+      onSuccess: () => void onRefresh(),
+      onError: (error) => {
+        setErrorMessage(compactError(error));
+        setRefreshCountdown(4);
+      },
+    });
+  };
+
+  if (disconnecting) {
+    return <ConnectionLoadingState active={disconnecting} mode="disconnecting" />;
+  }
+
   if (connected) {
-    return <ConnectedState status={status} canManage={canManage} onChangeNumber={changeNumber} changing={change.isPending} />;
+    return <ConnectedState status={status} canManage={canManage} onChangeNumber={changeNumber} onDisconnect={disconnectNumber} changing={change.isPending} disconnecting={disconnecting} />;
   }
 
   if (showLoadingState) {
@@ -233,9 +276,6 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
 
       {canManage && ["DEACTIVATED", "ERROR"].includes(status.status) && (
         <p className="mt-6 text-xs text-muted-foreground">Current status: {STATUS_LABELS[status.status]}</p>
-      )}
-      {canManage && status.status === "CONNECTED" && (
-        <button type="button" className="mt-6 text-xs font-semibold text-muted-foreground underline underline-offset-4 hover:text-foreground" disabled={deactivate.isPending} onClick={() => deactivate.mutate("Disconnected from settings.", { onSuccess: () => void onRefresh() })}>Disconnect number</button>
       )}
     </div>
   );
