@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Inbox,
+  LockKeyhole,
   MessageCircleMore,
   MessageSquarePlus,
   Pin,
@@ -82,20 +83,39 @@ function assigneeName(conversation: Conversation) {
   return conversation.assignedStaff ? `${conversation.assignedStaff.user.firstName} ${conversation.assignedStaff.user.lastName}` : "Unassigned";
 }
 
+function conversationActionError(error: unknown) {
+  if (!(error instanceof ApiError)) return getApiErrorMessage(error);
+  const messages: Record<string, string> = {
+    PLAN_LIMIT_REACHED: "This customer message is locked because the conversation limit has been reached.",
+    CONVERSATION_ACCESS_BLOCKED: "This conversation is locked by plan or billing status.",
+    PAYMENT_REQUIRED: "Restore payment to unlock this conversation.",
+    SUBSCRIPTION_INACTIVE: "Reactivate the subscription to unlock this conversation.",
+    CONVERSATION_CLOSED: "This conversation is closed. It will reopen automatically when new message activity happens.",
+    REOPEN_REQUIRES_MESSAGE_ACTIVITY: "This conversation can only reopen when a new message is received.",
+    FORBIDDEN: "You do not have permission to perform this action.",
+  };
+  return messages[error.code] ?? error.message;
+}
+
 function ConversationListSkeleton() {
   return <div className="space-y-2 p-3">{Array.from({ length: 7 }).map((_, index) => <div key={index} className="flex gap-3 rounded-xl border bg-card p-4"><Skeleton className="size-11 shrink-0 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-1/3" /></div></div>)}</div>;
 }
 
 function ConversationListItem({ conversation, canClaim, claimBusy, onClaim, onSelect }: { conversation: Conversation; canClaim?: boolean; claimBusy?: boolean; onClaim?: () => void; onSelect: () => void }) {
+  const locked = conversation.status === "PLAN_LIMIT_BLOCKED" || conversation.accessBlocked;
+  const closed = conversation.status === "CLOSED";
+  const canOpen = !locked || conversation.permissions?.canViewMessages !== false;
+  const canClaimThis = !locked && !closed && !conversation.assignedStaffId && canClaim && conversation.permissions?.canClaim !== false;
   return (
-    <article className="group flex min-h-28 w-full gap-3 rounded-xl border bg-card p-4 text-left transition-[border-color,box-shadow,background-color] hover:border-primary/25 hover:bg-secondary/20 hover:shadow-[0_8px_24px_rgba(20,35,27,0.06)]">
-      <span className={cn("grid size-11 shrink-0 place-items-center rounded-full text-xs font-bold", conversation.unreadCount > 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-primary")}>{initials(conversation.lead.fullName)}</span>
+    <article className={cn("group flex min-h-28 w-full gap-3 rounded-xl border bg-card p-4 text-left transition-[border-color,box-shadow,background-color] hover:border-primary/25 hover:bg-secondary/20 hover:shadow-[0_8px_24px_rgba(20,35,27,0.06)]", locked && "border-dashed bg-muted/35 hover:bg-muted/45")}>
+      <span className={cn("grid size-11 shrink-0 place-items-center rounded-full text-xs font-bold", conversation.unreadCount > 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-primary", locked && "bg-muted text-muted-foreground")}>{locked ? <LockKeyhole className="size-4" /> : initials(conversation.lead.fullName)}</span>
       <span className="min-w-0 flex-1">
-        <button type="button" onClick={onSelect} className="flex w-full items-start justify-between gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className={cn("flex min-w-0 items-center gap-1 truncate text-sm", conversation.unreadCount > 0 ? "font-bold" : "font-semibold")}>{conversation.pinned && <Pin className="size-3 shrink-0 fill-current text-primary" />}<span className="truncate">{conversation.lead.fullName}</span></span><span className="shrink-0 text-[10px] font-medium text-muted-foreground">{formatConversationTime(conversation.lastMessageAt ?? conversation.updatedAt)}</span></button>
+        <button type="button" onClick={canOpen ? onSelect : undefined} disabled={!canOpen} className="flex w-full items-start justify-between gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed"><span className={cn("flex min-w-0 items-center gap-1 truncate text-sm", conversation.unreadCount > 0 ? "font-bold" : "font-semibold")}>{conversation.pinned && <Pin className="size-3 shrink-0 fill-current text-primary" />}<span className="truncate">{conversation.lead.fullName}</span></span><span className="shrink-0 text-[10px] font-medium text-muted-foreground">{formatConversationTime(conversation.lastMessageAt ?? conversation.updatedAt)}</span></button>
         <span className="mt-1 block truncate text-[11px] font-medium text-muted-foreground">{conversation.lead.phone}</span>
-        <span className="mt-1 block truncate text-xs text-muted-foreground">{conversation.lastMessagePreview ?? conversation.subject ?? "No messages yet"}</span>
+        <span className="mt-1 block truncate text-xs text-muted-foreground">{locked && conversation.permissions?.canViewMessages === false ? "Message body locked by plan or billing status" : conversation.lastMessagePreview ?? conversation.subject ?? "No messages yet"}</span>
         <span className="mt-3 flex flex-wrap items-center gap-2"><ConversationStatusBadge status={conversation.status} compact /><ConversationChannelBadge channel={conversation.channel} compact /><span className="min-w-0 flex-1 truncate text-[10px] font-medium text-muted-foreground">{conversation.displayId} · {assigneeName(conversation)}</span>{conversation.unreadCount > 0 && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">{conversation.unreadCount}</span>}</span>
-        {!conversation.assignedStaffId && canClaim && (
+        {!canOpen && <p className="mt-3 text-xs font-semibold text-muted-foreground">Locked preview. Restore billing or wait for quota reset to open.</p>}
+        {canClaimThis && (
           <button
             type="button"
             aria-label={`Take conversation ${conversation.displayId}`}
@@ -152,6 +172,17 @@ function InboxList({
           <div><div className="flex items-center gap-2"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Communication center</p><RealtimeStatusIndicator /></div><h1 className="mt-1 text-2xl font-bold">Inbox</h1><p className="mt-1 text-sm text-muted-foreground">Review stored customer conversations and team follow-up.</p></div>
           {canCreate && <AppButton onClick={onCreate}><MessageSquarePlus className="size-4" />New conversation</AppButton>}
         </header>
+        {((stats.data?.locked ?? 0) > 0 || conversations.data?.data.some((conversation) => conversation.status === "PLAN_LIMIT_BLOCKED" || conversation.accessBlocked)) && (
+          <div className="mt-5 rounded-2xl border border-warning/25 bg-warning/10 p-4 text-sm text-warning">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-bold">Locked customer messages need attention</p>
+                <p className="mt-1 text-xs leading-5">You have locked customer messages because your conversation limit has been reached or billing is inactive.</p>
+              </div>
+              <AppButton asChild size="sm" variant="outline"><a href="/settings/billing">View Billing</a></AppButton>
+            </div>
+          </div>
+        )}
 
         <section className="mt-6 rounded-2xl border bg-card">
           <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center">
@@ -173,7 +204,7 @@ function InboxList({
                 { label: "Available", value: undefined },
                 { label: "Assigned to me", value: currentMembershipId },
                 { label: "Unassigned", value: "unassigned" },
-                { label: "Needs review", value: "unassigned", status: "HUMAN_HANDLING" },
+                { label: "Needs review", value: "unassigned", status: "NEEDS_HUMAN_REVIEW" },
               ].map((item) => (
                 <button
                   key={item.label}
@@ -198,7 +229,9 @@ function InboxList({
               { status: "OPEN" as const, label: "Open", count: stats.data?.open ?? 0 },
               { status: "HUMAN_HANDLING" as const, label: "Human handling", count: stats.data?.humanHandling ?? 0 },
               { status: "AI_HANDLING" as const, label: "AI handling", count: stats.data?.aiHandling ?? 0 },
+              { status: "NEEDS_HUMAN_REVIEW" as const, label: "Needs review", count: stats.data?.needsHumanReview ?? 0 },
               { status: "CLOSED" as const, label: "Closed", count: stats.data?.closed ?? 0 },
+              { status: "PLAN_LIMIT_BLOCKED" as const, label: "Locked", count: stats.data?.locked ?? 0 },
             ].map((item) => <button key={item.label} type="button" onClick={() => onParams({ status: item.status, page: 1 })} className={cn("relative min-h-11 shrink-0 px-3 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", query.status === item.status && "text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary")}>{item.label} <span className="ml-1 tabular-nums opacity-65">{item.count}</span></button>)}
           </div>
 
@@ -291,6 +324,8 @@ export function ConversationsInbox() {
             ? "You do not have permission to send messages in this conversation."
             : error instanceof ApiError && error.code === "CONVERSATION_CLOSED"
               ? "This conversation is closed."
+              : error instanceof ApiError && ["PLAN_LIMIT_REACHED", "CONVERSATION_ACCESS_BLOCKED", "PAYMENT_REQUIRED", "SUBSCRIPTION_INACTIVE"].includes(error.code)
+                ? conversationActionError(error)
               : "Message could not be sent. Please try again.";
         systemNotify.error(title, { description: getApiErrorMessage(error) });
       },
@@ -321,9 +356,17 @@ export function ConversationsInbox() {
 
   const status = (value: ConversationStatus) => {
     if (!selectedConversation) return;
+    if (selectedConversation.status === "CLOSED" && value !== "CLOSED") {
+      systemNotify.info("This conversation reopens automatically", { description: "Closed conversations reopen only when a customer sends a new message or an approved automation sends a follow-up." });
+      return;
+    }
+    if (selectedConversation.status === "PLAN_LIMIT_BLOCKED" || selectedConversation.accessBlocked) {
+      systemNotify.error("Conversation is locked", { description: "Restore billing, upgrade your plan, or wait for quota reset before changing this conversation." });
+      return;
+    }
     updateStatus.mutate({ id: selectedConversation.id, status: value }, {
       onSuccess: () => systemNotify.success(value === "CLOSED" ? "Conversation closed" : "Conversation status updated"),
-      onError: (error) => systemNotify.error(getApiErrorMessage(error)),
+      onError: (error) => systemNotify.error(conversationActionError(error)),
     });
   };
 
@@ -370,7 +413,9 @@ export function ConversationsInbox() {
 
   if (detail.isError) {
     const forbidden = detail.error instanceof ApiError && detail.error.code === "FORBIDDEN";
-    return <main className="grid h-[calc(100dvh-4rem)] place-items-center bg-background p-6"><AppErrorState className="w-full max-w-2xl" title={forbidden ? "You do not have access to this conversation" : detail.error instanceof ApiError && detail.error.code === "CONVERSATION_NOT_FOUND" ? "Conversation not found" : "Could not load conversation"} description={getApiErrorMessage(detail.error)} onRetry={() => detail.refetch()} /></main>;
+    const blocked = detail.error instanceof ApiError && ["PLAN_LIMIT_REACHED", "CONVERSATION_ACCESS_BLOCKED", "PAYMENT_REQUIRED", "SUBSCRIPTION_INACTIVE"].includes(detail.error.code);
+    const closed = detail.error instanceof ApiError && ["CONVERSATION_CLOSED", "REOPEN_REQUIRES_MESSAGE_ACTIVITY"].includes(detail.error.code);
+    return <main className="grid h-[calc(100dvh-4rem)] place-items-center bg-background p-6"><AppErrorState className="w-full max-w-2xl" title={forbidden ? "You do not have access to this conversation" : blocked ? "Conversation is locked" : closed ? "Conversation is closed" : detail.error instanceof ApiError && detail.error.code === "CONVERSATION_NOT_FOUND" ? "Conversation not found" : "Could not load conversation"} description={conversationActionError(detail.error)} onRetry={() => detail.refetch()} /></main>;
   }
 
   if (!selectedConversation) {

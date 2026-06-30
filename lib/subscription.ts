@@ -16,7 +16,7 @@ export const PLAN_CATALOG: Record<PlanCode, Plan> = {
     name: "Plus",
     priceMonthly: 199,
     currency: "GHS",
-    limits: { businesses: 5, staff: 5, services: 20, appointments: 500, conversations: 2_000, aiReplies: 2_000, knowledgeBaseItems: 100 },
+    limits: { businesses: 5, staff: 5, services: 20, appointments: 500, conversations: 3_000, aiReplies: 2_000, knowledgeBaseItems: 100 },
     features: { analytics: "BASIC", brandingRemoval: false, prioritySupport: false },
   },
   PREMIUM: {

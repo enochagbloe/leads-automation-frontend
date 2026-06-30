@@ -132,20 +132,22 @@ export function FloatingAppointmentComposer({
   const availabilityKey = `${values.serviceId ?? ""}:${values.date ?? ""}:${values.time ?? ""}:${values.assignedStaffId ?? ""}:${selectedService?.durationMinutes ?? ""}`;
   const availability = availabilityState?.key === availabilityKey ? availabilityState.result : null;
   const titleField = form.register("title");
+  const isDraftDirty = form.formState.isDirty;
 
   const requestClose = useCallback((nextOpen: boolean) => {
-    if (!nextOpen && form.formState.isDirty && !create.isPending) {
+    onOpenChange(nextOpen);
+  }, [onOpenChange]);
+
+  const discardDraft = useCallback(() => {
+    if (create.isPending) return;
+    if (isDraftDirty) {
       const confirmed = window.confirm("Discard this appointment draft?");
       if (!confirmed) return;
     }
-    onOpenChange(nextOpen);
-  }, [create.isPending, form.formState.isDirty, onOpenChange]);
-
-  useEffect(() => {
-    if (!open) {
-      form.reset(defaultValues());
-    }
-  }, [form, open]);
+    form.reset(defaultValues());
+    setAvailabilityState(null);
+    onOpenChange(false);
+  }, [create.isPending, form, isDraftDirty, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -154,18 +156,9 @@ export function FloatingAppointmentComposer({
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") requestClose(false);
     };
-    const handlePointer = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node) || !panelRef.current || panelRef.current.contains(target)) return;
-      if (target instanceof Element && target.closest("[data-radix-popper-content-wrapper], .app-select-content")) return;
-      requestClose(false);
-    };
-
     document.addEventListener("keydown", handleKey);
-    document.addEventListener("pointerdown", handlePointer);
     return () => {
       document.removeEventListener("keydown", handleKey);
-      document.removeEventListener("pointerdown", handlePointer);
     };
   }, [open, requestClose]);
 
@@ -335,7 +328,7 @@ export function FloatingAppointmentComposer({
             </div>
 
             <div className="sticky bottom-0 mt-5 flex justify-end gap-2 border-t bg-card py-3">
-              <AppButton type="button" size="sm" variant="outline" onClick={() => requestClose(false)}>Cancel</AppButton>
+              <AppButton type="button" size="sm" variant="outline" onClick={discardDraft}>Discard</AppButton>
               <AppButton type="submit" size="sm" loading={create.isPending || availabilityCheck.isPending} loadingText="Creating" disabled={missingDuration || availability?.available === false}>
                 <CalendarPlus className="size-4" />Create appointment
               </AppButton>

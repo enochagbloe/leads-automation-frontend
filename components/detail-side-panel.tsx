@@ -38,8 +38,8 @@ export function DetailSidePanel({
         <DialogContent
           style={panelStyle}
           className={cn(
-            "inset-y-0 right-0 grid h-dvh w-full grid-rows-[auto_minmax(0,1fr)] border-l bg-card text-card-foreground shadow-[-18px_0_54px_rgba(20,35,27,0.12)] will-change-transform",
-            "sm:w-[var(--detail-panel-width)]",
+            "inset-y-0 right-0 grid h-dvh w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden border bg-card text-card-foreground shadow-[-18px_0_54px_rgba(20,35,27,0.16)] will-change-transform",
+            "sm:right-3 sm:top-3 sm:h-[calc(100dvh-1.5rem)] sm:w-[var(--detail-panel-width)] sm:rounded-2xl",
             className,
           )}
         >

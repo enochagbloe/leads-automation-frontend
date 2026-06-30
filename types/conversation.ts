@@ -1,7 +1,7 @@
 import type { LeadActivity, LeadAssignee, LeadStatus } from "@/types/lead";
 
 export type ConversationChannel = "MANUAL" | "WHATSAPP" | "OTHER" | "INSTAGRAM" | "FACEBOOK" | "WEBSITE_CHAT" | "EMAIL";
-export type ConversationStatus = "OPEN" | "AI_HANDLING" | "HUMAN_HANDLING" | "CLOSED";
+export type ConversationStatus = "OPEN" | "AI_HANDLING" | "HUMAN_HANDLING" | "NEEDS_HUMAN_REVIEW" | "CLOSED" | "PLAN_LIMIT_BLOCKED";
 export type ConversationPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export type MessageSenderType = "CUSTOMER" | "STAFF" | "AI" | "SYSTEM";
 export type MessageType = "TEXT" | "SYSTEM" | "IMAGE" | "DOCUMENT" | "AUDIO" | "VIDEO" | "LOCATION";
@@ -36,10 +36,29 @@ export interface Conversation {
   unreadCount: number;
   aiEnabled: boolean;
   humanTakeover: boolean;
+  needsHumanReview?: boolean;
+  humanReviewResolvedAt?: string | null;
+  humanReviewResolvedByMembershipId?: string | null;
+  accessBlocked?: boolean;
+  accessBlockedReason?: "PLAN_LIMIT_REACHED" | "PAYMENT_FAILED" | "SUBSCRIPTION_EXPIRED" | string | null;
+  quotaBlockedAt?: string | null;
+  unblockedAt?: string | null;
+  reopenedAt?: string | null;
+  permissions?: ConversationPermissions | null;
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
   deletedAt: string | null;
+}
+
+export interface ConversationPermissions {
+  canViewMessages?: boolean;
+  canReply?: boolean;
+  canAssign?: boolean;
+  canClaim?: boolean;
+  canClose?: boolean;
+  canToggleAI?: boolean;
+  canUpdateStatus?: boolean;
 }
 
 export interface ConversationMessage {
@@ -87,7 +106,9 @@ export interface ConversationStats {
   open: number;
   aiHandling: number;
   humanHandling: number;
+  needsHumanReview?: number;
   closed: number;
+  locked?: number;
   unread: number;
 }
 
