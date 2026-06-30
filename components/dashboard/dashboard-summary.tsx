@@ -3,14 +3,12 @@
 import { AlertTriangle, BarChart3, CalendarDays, Check, Inbox, Minus, UsersRound } from "lucide-react";
 import { AppCard } from "@/components/app-card";
 import { AppErrorState } from "@/components/app-error-state";
-import { DashboardBusinessSetup } from "@/components/business-setup/dashboard-business-setup";
 import { PlanBadge } from "@/components/subscription/plan-badge";
 import { SubscriptionStatusBadge } from "@/components/subscription/subscription-status-badge";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { LoadingPage } from "@/components/states/loading-states";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { WhatsAppDashboardWarning } from "@/components/whatsapp/whatsapp-dashboard-warning";
-import { canManageBilling, canManageBusinessSettings, getWorkspacePermissions } from "@/lib/workspace-permissions";
+import { canManageBilling, getWorkspacePermissions } from "@/lib/workspace-permissions";
 
 export function DashboardSummary() {
   const profile = useCurrentUser();
@@ -30,7 +28,6 @@ export function DashboardSummary() {
     );
   }
   const showBillingContext = canManageBilling(profile.data);
-  const canManageSetup = canManageBusinessSettings(profile.data);
   const conversationQuotaReached = limits.maxConversationsPerMonth !== null && accountUsage.conversationsUsed >= limits.maxConversationsPerMonth;
 
   const featureRows = [
@@ -55,8 +52,6 @@ export function DashboardSummary() {
         </div>
       </AppCard>
     )}
-    <DashboardBusinessSetup businessId={activeBusiness.id} canManage={canManageSetup} />
-    <WhatsAppDashboardWarning />
     {!showBillingContext && (
       <div className="grid gap-4 md:grid-cols-3">
         <AppCard><div className="flex items-center gap-2"><UsersRound className="size-4 text-primary" /><h2 className="font-bold">Leads queue</h2></div><p className="mt-3 text-sm text-muted-foreground">{workspacePermissions.canClaimUnassignedLeads ? "You can work assigned and unassigned leads." : "You can view leads available to your role."}</p></AppCard>

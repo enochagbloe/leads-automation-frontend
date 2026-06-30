@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { UserAccountMenu } from "@/components/account/user-account-menu";
 import { AppButton } from "@/components/app-button";
 import { AppErrorState } from "@/components/app-error-state";
+import { AppReadinessBanner } from "@/components/business-setup/app-readiness-banner";
 import { ActionableNotificationHost } from "@/components/notifications/actionable-notification-host";
 import { AppGlobalSearch } from "@/components/search/app-global-search";
 import { RealtimeProvider } from "@/components/providers/realtime-provider";
@@ -208,6 +209,11 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
+        <AppReadinessBanner
+          profile={profile.data}
+          canCreateBusiness={accountCanCreateBusiness}
+          canManageBusinessSettings={canManageBusinessSettings}
+        />
         {children}
         {canViewNotifications && <ActionableNotificationHost key={profile.data.activeBusiness?.id ?? "no-active-business"} activeBusinessId={profile.data.activeBusiness?.id} />}
       </div>
