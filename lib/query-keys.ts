@@ -38,6 +38,20 @@ export const queryKeys = {
     all: ["business-knowledge-preview"] as const,
     detail: (businessId: string) => ["business-knowledge-preview", businessId] as const,
   },
+  knowledgeDocuments: {
+    all: ["knowledge-documents"] as const,
+    list: (businessId: string, query: unknown) => ["knowledge-documents", businessId, query] as const,
+    detail: (businessId: string, documentId: string) => ["knowledge-documents", businessId, documentId] as const,
+  },
+  knowledgeArticles: {
+    all: ["knowledge-articles"] as const,
+    list: (businessId: string, query: unknown) => ["knowledge-articles", businessId, query] as const,
+    detail: (businessId: string, articleId: string) => ["knowledge-articles", businessId, articleId] as const,
+  },
+  knowledgeSearch: {
+    all: ["knowledge-search"] as const,
+    results: (businessId: string, conversationId: string | undefined, query: string) => ["knowledge-search", businessId, conversationId ?? "", query] as const,
+  },
   calendarAppointments: {
     all: ["calendar-appointments"] as const,
     business: (businessId: string) => ["calendar-appointments", businessId] as const,
@@ -49,6 +63,7 @@ export const queryKeys = {
     list: (businessId: string, query: unknown) => ["business-appointments", "list", businessId, query] as const,
     detail: (businessId: string, appointmentId: string) => ["business-appointments", "detail", businessId, appointmentId] as const,
     settings: (businessId: string) => ["business-appointments", "settings", businessId] as const,
+    autoConfirmSettings: (businessId: string) => ["auto-confirm-settings", businessId] as const,
   },
   notifications: {
     all: ["notifications"] as const,

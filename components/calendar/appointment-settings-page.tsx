@@ -8,9 +8,9 @@ import { AppointmentConfirmationSettings } from "@/components/calendar/appointme
 import { BusinessSetupTabs } from "@/components/business-setup/business-setup-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { useAppointmentSettings, useUpdateAppointmentSettings } from "@/hooks/use-calendar-appointments";
+import { useAppointmentAutoConfirmSettings, useUpdateAppointmentAutoConfirmSettings } from "@/hooks/use-calendar-appointments";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
-import type { AppointmentConfirmationMode } from "@/types/appointment";
+import { canManageBilling, getWorkspacePermissions } from "@/lib/workspace-permissions";
 
 function settingsError(error: unknown) {
   if (!(error instanceof ApiError)) return getApiErrorMessage(error);
@@ -37,23 +37,26 @@ export function AppointmentSettingsPage() {
   const auth = useCurrentUser();
   const businessId = auth.data?.activeBusiness?.id;
   const plan = auth.data?.plan?.code ?? "BASIC";
-  const settings = useAppointmentSettings(businessId);
-  const update = useUpdateAppointmentSettings(businessId);
-  const canEdit = auth.data?.membership?.role === "BUSINESS_OWNER" || auth.data?.membership?.role === "MANAGER";
+  const settings = useAppointmentAutoConfirmSettings(businessId);
+  const update = useUpdateAppointmentAutoConfirmSettings(businessId);
+  const permissions = getWorkspacePermissions(auth.data);
+  const canEdit = auth.data?.membership?.role === "BUSINESS_OWNER"
+    || (auth.data?.membership?.role === "MANAGER" && (permissions.canManageAiSettings || permissions.canManageBusinessSettings));
+  const billingAllowed = canManageBilling(auth.data);
 
   if (auth.isPending) return <AppointmentSettingsLoading />;
   if (!businessId) return <main className="p-6"><AppErrorState title="No active business" description="Select a business to manage appointment settings." /></main>;
   if (settings.isPending) return <AppointmentSettingsLoading />;
 
-  const mode = settings.data?.appointmentConfirmationMode ?? "MANUAL_CONFIRMATION_REQUIRED";
-  const changeMode = (appointmentConfirmationMode: AppointmentConfirmationMode) => {
+  const enabled = settings.data?.aiAutoConfirmAppointmentsEnabled ?? false;
+  const changeEnabled = (aiAutoConfirmAppointmentsEnabled: boolean) => {
     if (!canEdit) {
       systemNotify.error("You do not have permission to update appointment settings.");
       return;
     }
-    update.mutate({ appointmentConfirmationMode }, {
+    update.mutate({ aiAutoConfirmAppointmentsEnabled }, {
       onSuccess: () => {
-        systemNotify.success(appointmentConfirmationMode === "AUTO_CONFIRM_SAFE_BOOKINGS" ? "Premium auto-confirmation enabled." : "Appointment confirmation setting updated.");
+        systemNotify.success(aiAutoConfirmAppointmentsEnabled ? "AI appointment auto-confirmation enabled." : "AI appointment auto-confirmation disabled.");
       },
       onError: (error) => systemNotify.error("Could not update appointment setting", { description: settingsError(error) }),
     });
@@ -74,11 +77,13 @@ export function AppointmentSettingsPage() {
         <div className="space-y-5">
           <AppointmentConfirmationSettings
             plan={plan}
-            value={mode}
+            enabled={enabled}
             loading={settings.isPending}
             error={settings.isError}
             updating={update.isPending}
-            onChange={changeMode}
+            canManage={canEdit}
+            canManageBilling={billingAllowed}
+            onChange={changeEnabled}
           />
           {settings.isError && (
             <AppErrorState
@@ -96,7 +101,7 @@ export function AppointmentSettingsPage() {
               <div>
                 <h2 className="text-sm font-bold">Current plan</h2>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {plan === "PREMIUM" ? "Premium unlocks safe automatic confirmation." : `${plan.charAt(0)}${plan.slice(1).toLowerCase()} keeps safe auto-confirmation locked.`}
+                  {plan === "PREMIUM" ? "Premium unlocks safe automatic appointment confirmation." : `${plan.charAt(0)}${plan.slice(1).toLowerCase()} keeps AI auto-confirmation locked.`}
                 </p>
               </div>
             </div>

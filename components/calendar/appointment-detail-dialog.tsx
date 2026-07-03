@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { CalendarDays, Clock3, FileText, MapPin, MoreVertical, NotebookPen, UserRound, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, Clock3, FileText, MapPin, MoreVertical, NotebookPen, Sparkles, UserRound, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { AppointmentStatusBadge } from "@/components/calendar/appointment-status-badge";
@@ -58,6 +58,24 @@ function locationLabel(appointment: CalendarAppointment) {
   return appointment.location ?? appointment.locationType.replaceAll("_", " ").toLowerCase();
 }
 
+function confirmationStatus(appointment: CalendarAppointment) {
+  if (appointment.confirmationSource === "AI_PREMIUM_AUTO_CONFIRM") return "Auto-confirmed by AI";
+  if (appointment.autoConfirmFailedReason) return "Auto-confirm skipped";
+  if (appointment.humanConfirmationRequired) return "Pending business confirmation";
+  if (appointment.confirmationSource === "MANUAL") return "Manual confirmation";
+  if (appointment.confirmationSource === "AI_REQUEST") return "AI request";
+  return "Not evaluated";
+}
+
+function sourceLabel(source?: string | null) {
+  return source ? source.replaceAll("_", " ").toLowerCase() : "Not provided";
+}
+
+function confidenceLabel(value?: number | null) {
+  if (typeof value !== "number") return "Not provided";
+  return `${Math.round(value * 100)}%`;
+}
+
 export function AppointmentDetailDialog({
   appointment,
   canAssignStaff,
@@ -109,6 +127,7 @@ export function AppointmentDetailDialog({
                       <PanelMetaRow icon={MapPin} label="Location" value={locationLabel(selected)} />
                       <PanelMetaRow icon={UserRound} label="Assigned staff" value={staffName(selected)} />
                       <PanelMetaRow icon={FileText} label="Status" value={<AppointmentStatusBadge status={selected.status} />} />
+                      <PanelMetaRow icon={Sparkles} label="AI confirmation" value={confirmationStatus(selected)} />
                     </div>
 
                     <div className="mt-6 rounded-2xl bg-muted/55 p-4">
@@ -119,6 +138,22 @@ export function AppointmentDetailDialog({
                       {selected.status === "NEEDS_OUTCOME_CONFIRMATION" && <p className="mt-3 rounded-lg bg-warning/10 px-3 py-2 text-xs font-semibold leading-5 text-warning">This appointment needs an outcome. Mark it as completed, no-show, or missed.</p>}
                       {selected.autoConfirmed && <p className="mt-3 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold leading-5 text-primary">Auto-confirmed because staff was assigned.</p>}
                     </div>
+
+                    <section className="mt-4 rounded-2xl border bg-card p-4">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="size-4 text-primary" />
+                        <h3 className="text-sm font-bold">AI Confirmation</h3>
+                      </div>
+                      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                        <MiniDetail label="Confirmation status" value={confirmationStatus(selected)} />
+                        <MiniDetail label="Confirmation source" value={sourceLabel(selected.confirmationSource)} />
+                        <MiniDetail label="Auto-confirmed time" value={dateLabel(selected.autoConfirmedAt)} />
+                        <MiniDetail label="AI confidence" value={confidenceLabel(selected.autoConfirmConfidence)} />
+                        <MiniDetail label="Decision reason" value={selected.autoConfirmDecisionReason ?? "Not provided"} />
+                        <MiniDetail label="Skipped reason" value={selected.autoConfirmFailedReason ?? "Not provided"} />
+                        <MiniDetail label="Human confirmation required" value={selected.humanConfirmationRequired ? "Yes" : "No"} />
+                      </dl>
+                    </section>
                   </section>
 
                   <nav className="sticky top-0 z-10 flex overflow-x-auto border-y bg-card/95 px-5 backdrop-blur sm:px-6" aria-label="Appointment detail tabs">
@@ -205,6 +240,25 @@ function DetailCell({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MiniDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-muted/45 px-3 py-2">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-semibold">{value}</dd>
+    </div>
+  );
+}
+
+function activityLabel(activity: AppointmentActivity) {
+  const labels: Partial<Record<AppointmentActivity["type"], string>> = {
+    APPOINTMENT_AUTO_CONFIRM_EVALUATED: "AI evaluated this appointment for auto-confirmation",
+    APPOINTMENT_AUTO_CONFIRMED: "AI auto-confirmed this appointment",
+    APPOINTMENT_AUTO_CONFIRM_SKIPPED: "AI skipped auto-confirmation",
+    APPOINTMENT_PENDING_CONFIRMATION: "Appointment requires business confirmation",
+  };
+  return labels[activity.type] ?? activity.type.replaceAll("_", " ").toLowerCase();
+}
+
 function AppointmentActivityTimeline({ activities }: { activities: AppointmentActivity[] }) {
   if (!activities.length) return <AppEmptyState className="min-h-40 border-0" icon={Clock3} title="No activity yet" description="Appointment lifecycle events will appear here." />;
   return (
@@ -213,7 +267,7 @@ function AppointmentActivityTimeline({ activities }: { activities: AppointmentAc
         <li key={activity.id} className="flex gap-3">
           <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-primary"><Clock3 className="size-4" /></span>
           <div className="min-w-0">
-            <p className="text-sm font-semibold">{activity.type.replaceAll("_", " ").toLowerCase()}</p>
+            <p className="text-sm font-semibold">{activityLabel(activity)}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">{dateLabel(activity.createdAt)}</p>
           </div>
         </li>

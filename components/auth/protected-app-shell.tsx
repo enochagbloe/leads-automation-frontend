@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Building2, CalendarDays, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
+import { AlertTriangle, BookOpen, Building2, CalendarDays, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -139,6 +139,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const canViewConversations = canAccessOperationalPage(profile.data, "conversations");
   const canViewAppointments = canAccessOperationalPage(profile.data, "appointments");
   const canViewCustomerIssues = profile.data.plan?.code !== "BASIC" && canAccessCustomerIssues(profile.data);
+  const canViewKnowledgeBase = canManageBusinessSettings || permissions.canManageAiSettings || permissions.canUseAi || canViewConversations;
   const navItems: SidebarNavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main", visible: permissions.canViewDashboard },
     { label: "Leads", href: "/leads", icon: ContactRound, section: "main", visible: canViewLeads },
@@ -146,6 +147,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
     { label: "Appointments", href: "/appointments/calendar", icon: CalendarDays, section: "main", visible: canViewAppointments },
     { label: "Customer Issues", href: "/customer-issues", icon: AlertTriangle, section: "main", visible: canViewCustomerIssues },
     { label: "Business profile", href: "/settings/business/profile", icon: Building2, section: "workspace", visible: canManageBusinessSettings },
+    { label: "Knowledge Base", href: "/knowledge-base", icon: BookOpen, section: "workspace", visible: canViewKnowledgeBase },
     { label: "Team members", href: "/settings/members", icon: Users, section: "workspace", visible: canManageTeam },
     { label: "WhatsApp connection", href: "/settings/business/whatsapp", icon: Smartphone, section: "workspace", visible: canManageBusinessSettings },
     { label: "Billing & plan", href: "/settings/billing", icon: CreditCard, section: "workspace", visible: canManageBilling },

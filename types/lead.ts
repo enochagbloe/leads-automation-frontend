@@ -39,8 +39,8 @@ export interface Lead {
   status: LeadStatus;
   assignedStaffId: string | null;
   assignedStaff: LeadAssignee | null;
-  createdById: string;
-  createdBy: { id: string; firstName: string; lastName: string };
+  createdById: string | null;
+  createdBy: { id: string; firstName: string; lastName: string } | null;
   notes: string | null;
   tags: string[];
   customFields: Record<string, unknown> | null;

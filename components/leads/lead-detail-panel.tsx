@@ -59,6 +59,13 @@ function owner(lead: Lead) {
   return lead.assignedStaff ? `${lead.assignedStaff.user.firstName} ${lead.assignedStaff.user.lastName}` : "Unassigned";
 }
 
+function createdByName(lead: Lead) {
+  if (lead.createdBy) return `${lead.createdBy.firstName} ${lead.createdBy.lastName}`;
+  if (lead.source === "WHATSAPP") return "WhatsApp inbound";
+  if (lead.source === "WEBSITE") return "Website capture";
+  return "System";
+}
+
 function activityDescription(activity: LeadActivity) {
   const actor = activity.actor ? `${activity.actor.firstName} ${activity.actor.lastName}` : "System";
   if (activity.action === "LEAD_STATUS_CHANGED" && typeof activity.metadata?.to === "string") {
@@ -306,7 +313,7 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
                   <DetailCell label="Email" value={detail.data.lead.email ?? "No email provided"} />
                   <DetailCell label="Source" value={LEAD_SOURCE_LABELS[detail.data.lead.source]} />
                   <DetailCell label="Location" value={location(detail.data.lead)} />
-                  <DetailCell label="Created by" value={`${detail.data.lead.createdBy.firstName} ${detail.data.lead.createdBy.lastName}`} />
+                  <DetailCell label="Created by" value={createdByName(detail.data.lead)} />
                   <DetailCell label="Last contacted" value={detail.data.lead.lastContactedAt ? formatLeadDate(detail.data.lead.lastContactedAt) : "Not contacted yet"} />
                 </dl>
                 {detail.data.lead.tags.length > 0 && (

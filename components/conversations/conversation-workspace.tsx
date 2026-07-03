@@ -13,7 +13,6 @@ import {
   CircleUserRound,
   ExternalLink,
   FileText,
-  Filter,
   Link2,
   LockKeyhole,
   MessageCircleMore,
@@ -23,8 +22,6 @@ import {
   Pencil,
   Pin,
   PinOff,
-  Plus,
-  Search,
   Send,
   TriangleAlert,
   UsersRound,
@@ -38,6 +35,7 @@ import { AppSelect, type AppSelectOption } from "@/components/app-select";
 import { IncompleteBusinessNotice } from "@/components/business-setup/incomplete-business-notice";
 import { ConversationComposer, type Macro } from "@/components/conversations/composer/conversation-composer";
 import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
+import { ConversationKnowledgeDrawer } from "@/components/knowledge/conversation-knowledge-drawer";
 import { RealtimeStatusIndicator } from "@/components/conversations/realtime-status-indicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ACTIVE_CONVERSATION_STATUSES, CONVERSATION_CHANNEL_LABELS, CONVERSATION_PRIORITIES, CONVERSATION_PRIORITY_LABELS, CONVERSATION_STATUS_LABELS, conversationPriorityTone, formatConversationDateTime, formatMessageTime } from "@/lib/conversations";
@@ -61,12 +59,6 @@ type Article = {
   visibility: "Public" | "Private";
   frequency: "FAQ" | "Rarely Asked";
 };
-
-const ARTICLES: Article[] = [
-  { id: "1", title: "Preparing for a property viewing", summary: "A practical checklist customers can use before attending a scheduled property viewing.", source: "BizReply Help", url: "#", tag: "Guideline", readTime: "4 min read", visibility: "Public", frequency: "FAQ" },
-  { id: "2", title: "How appointment scheduling works", summary: "What customers should expect after requesting a meeting or site visit.", source: "BizReply Help", url: "#", tag: "Setup", readTime: "3 min read", visibility: "Public", frequency: "FAQ" },
-  { id: "3", title: "Updating contact information", summary: "Steps for correcting a phone number or notification email.", source: "Internal guide", url: "#", tag: "Setup", readTime: "2 min read", visibility: "Private", frequency: "Rarely Asked" },
-];
 
 const RAIL_ITEMS: { id: ContextPanel; label: string; icon: typeof BookOpen }[] = [
   { id: "knowledge", label: "Knowledge Base", icon: BookOpen },
@@ -307,77 +299,6 @@ function ConversationReplyNotice({ title, description, action }: { title: string
   );
 }
 
-function ArticleFilterPopover({ open, onOpenChange, visibility, onVisibilityChange, frequency, onFrequencyChange, tags, onTagsChange }: { open: boolean; onOpenChange: (open: boolean) => void; visibility: string; onVisibilityChange: (value: string) => void; frequency: string; onFrequencyChange: (value: string) => void; tags: string[]; onTagsChange: (tags: string[]) => void }) {
-  if (!open) return null;
-  const availableTags = ["Payment", "Setup", "Website", "Error", "Guideline"];
-  return (
-    <div className="absolute right-12 top-14 z-20 w-[min(300px,calc(100vw-2rem))] rounded-xl border bg-popover p-4 shadow-[0_18px_50px_rgba(20,35,27,0.18)]">
-      <div className="flex items-center justify-between"><p className="text-sm font-bold">Article filters</p><button type="button" className="text-xs font-semibold text-primary" onClick={() => { onVisibilityChange("ALL"); onFrequencyChange("ALL"); onTagsChange([]); }}>Reset</button></div>
-      <label className="mt-4 block text-xs font-semibold">Visibility</label>
-      <AppSelect className="mt-1" value={visibility} onValueChange={onVisibilityChange} options={[{ value: "ALL", label: "Public and private" }, { value: "PUBLIC", label: "Public" }, { value: "PRIVATE", label: "Private" }]} />
-      <label className="mt-4 block text-xs font-semibold">Frequency</label>
-      <AppSelect className="mt-1" value={frequency} onValueChange={onFrequencyChange} options={[{ value: "ALL", label: "All frequencies" }, { value: "FAQ", label: "Frequently asked" }, { value: "RARE", label: "Rarely asked" }]} />
-      <p className="mt-4 text-xs font-semibold">Tags</p>
-      <div className="mt-2 flex flex-wrap gap-1.5">{availableTags.map((tag) => <button type="button" key={tag} onClick={() => onTagsChange(tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag])} className={cn("rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors", tags.includes(tag) ? "border-primary bg-secondary text-primary" : "bg-card text-muted-foreground hover:bg-muted")}>{tag}</button>)}</div>
-      <AppButton className="mt-5 w-full" size="sm" onClick={() => onOpenChange(false)}>Apply filters</AppButton>
-    </div>
-  );
-}
-
-function KnowledgeBaseDrawer({ onSuggest }: { onSuggest: (article: Article) => void }) {
-  const [query, setQuery] = useState("");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [visibility, setVisibility] = useState("ALL");
-  const [frequency, setFrequency] = useState("ALL");
-  const [tags, setTags] = useState<string[]>([]);
-  const articles = ARTICLES.filter((article) => {
-    const matchesQuery = `${article.title} ${article.summary} ${article.tag}`.toLowerCase().includes(query.toLowerCase());
-    const matchesVisibility = visibility === "ALL" || article.visibility === visibility;
-    const matchesFrequency = frequency === "ALL" || article.frequency === frequency;
-    const matchesTags = tags.length === 0 || tags.includes(article.tag);
-    return matchesQuery && matchesVisibility && matchesFrequency && matchesTags;
-  });
-  if (selectedArticle) {
-    return (
-      <div className="flex h-full flex-col">
-        <div className="flex items-center gap-2 border-b p-4"><AppButton size="icon" variant="ghost" aria-label="Back to article list" onClick={() => setSelectedArticle(null)}><ArrowLeft className="size-4" /></AppButton><div><h3 className="font-bold">Article preview</h3><p className="text-xs text-muted-foreground">Review before adding it to your reply.</p></div></div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="grid aspect-[16/9] place-items-center rounded-xl bg-secondary text-primary"><BookOpen className="size-10" /></div>
-          <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-muted-foreground"><span className="rounded-md bg-secondary px-2 py-1 text-secondary-foreground">{selectedArticle.tag}</span><span>{selectedArticle.readTime}</span></div>
-          <h4 className="mt-4 text-xl font-bold">{selectedArticle.title}</h4>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{selectedArticle.summary}</p>
-          <div className="mt-6 grid gap-2"><AppButton onClick={() => onSuggest(selectedArticle)}><Plus className="size-4" />Add to reply draft</AppButton><AppButton variant="outline" disabled title="Article editing is coming later">Edit article <span className="text-[10px]">(soon)</span></AppButton></div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="relative flex h-full flex-col">
-      <div className="border-b p-4">
-        <h3 className="font-bold">Knowledge Base</h3>
-        <p className="mt-1 text-xs text-muted-foreground">Find a helpful article without leaving the conversation.</p>
-        <div className="mt-4 flex gap-2">
-          <label className="relative min-w-0 flex-1"><span className="sr-only">Search articles</span><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 w-full rounded-lg border bg-card pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Search articles" /></label>
-          <AppButton size="icon" variant={filterOpen ? "secondary" : "outline"} aria-label="Filter articles" aria-expanded={filterOpen} onClick={() => setFilterOpen((value) => !value)}><Filter className="size-4" /></AppButton>
-          <AppButton size="icon" variant="outline" aria-label="Create article coming soon" title="Article creation coming soon" disabled><Plus className="size-4" /></AppButton>
-        </div>
-      </div>
-      <ArticleFilterPopover open={filterOpen} onOpenChange={setFilterOpen} visibility={visibility} onVisibilityChange={setVisibility} frequency={frequency} onFrequencyChange={setFrequency} tags={tags} onTagsChange={setTags} />
-      <div className="min-h-0 flex-1 divide-y overflow-y-auto">
-        {articles.map((article) => (
-          <article key={article.id} className="p-4">
-            <button type="button" className="flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setSelectedArticle(article)}><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><BookOpen className="size-4" /></span><span className="min-w-0"><span className="block font-semibold">{article.title}</span><span className="mt-1 block text-[11px] text-muted-foreground">{article.tag} · {article.readTime}</span></span></button>
-            <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">{article.summary}</p>
-            <button type="button" className="mt-3 text-xs font-bold text-primary hover:underline" onClick={() => onSuggest(article)}>Suggest article</button>
-          </article>
-        ))}
-        {articles.length === 0 && <AppEmptyState className="m-4 min-h-52 border-0" icon={BookOpen} title="No articles found" description="Try a different search phrase." />}
-      </div>
-    </div>
-  );
-}
-
 function SideConversationPanel({ conversation }: { conversation: Conversation }) {
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<{ id: number; mine: boolean; content: string }[]>([]);
@@ -433,7 +354,7 @@ function ActivityPanel({ activities }: { activities: LeadActivity[] }) {
   return <div className="h-full overflow-y-auto p-5"><h3 className="font-bold">Recent activity</h3><ol className="mt-5 space-y-5">{activities.length ? activities.map((item) => <li key={item.id} className="relative border-l-2 border-secondary pl-4"><span className="absolute -left-[5px] top-0 size-2 rounded-full bg-primary" /><p className="text-sm font-semibold">{getLeadActivityLabel(item.action)}</p><p className="mt-1 text-xs text-muted-foreground">{item.actor ? `${item.actor.firstName} ${item.actor.lastName} · ` : ""}{formatLeadDate(item.createdAt)}</p></li>) : <li><AppEmptyState className="min-h-52 border-0" icon={Activity} title="No activity yet" description="Lead and conversation events will appear here." /></li>}</ol></div>;
 }
 
-function ConversationContextDrawer({ active, open, onClose, conversation, leadDetail, activities, assigneeOptions, canManage, statusBusy, assignBusy, notesBusy, onStatus, onAssign, onNotes, onSuggest }: { active: ContextPanel; open: boolean; onClose: () => void; conversation: Conversation; leadDetail?: LeadDetailResponse; activities: LeadActivity[]; assigneeOptions: AppSelectOption[]; canManage: boolean; statusBusy: boolean; assignBusy: boolean; notesBusy: boolean; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void; onNotes: (notes: string | null) => void; onSuggest: (article: Article) => void }) {
+function ConversationContextDrawer({ active, open, onClose, conversation, leadDetail, activities, assigneeOptions, canManage, statusBusy, assignBusy, notesBusy, onStatus, onAssign, onNotes }: { active: ContextPanel; open: boolean; onClose: () => void; conversation: Conversation; leadDetail?: LeadDetailResponse; activities: LeadActivity[]; assigneeOptions: AppSelectOption[]; canManage: boolean; statusBusy: boolean; assignBusy: boolean; notesBusy: boolean; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void; onNotes: (notes: string | null) => void }) {
   const title = RAIL_ITEMS.find((item) => item.id === active)?.label ?? "Context";
   return (
     <aside
@@ -445,7 +366,7 @@ function ConversationContextDrawer({ active, open, onClose, conversation, leadDe
     >
       <div className="flex h-14 shrink-0 items-center justify-between border-b px-4 xl:hidden"><p className="font-bold">{title}</p><AppButton size="icon" variant="ghost" aria-label="Close context panel" onClick={onClose}><X className="size-4" /></AppButton></div>
       <div key={active} className="conversation-context-content min-h-0 flex-1">
-        {active === "knowledge" && <KnowledgeBaseDrawer onSuggest={onSuggest} />}
+        {active === "knowledge" && <ConversationKnowledgeDrawer conversationId={conversation.id} canManage={canManage} />}
         {active === "profile" && <LeadProfilePanel conversation={conversation} leadDetail={leadDetail} assigneeOptions={assigneeOptions} canManage={canManage} statusBusy={statusBusy} assignBusy={assignBusy} onStatus={onStatus} onAssign={onAssign} />}
         {active === "internal" && <SideConversationPanel conversation={conversation} />}
         {active === "notes" && <NotesPanel notes={leadDetail?.lead.notes} saving={notesBusy} onSave={onNotes} />}
@@ -579,12 +500,6 @@ export function ConversationWorkspace({
     setContext(panel);
   };
 
-  const suggestArticle = (article: Article) => {
-    onDraftChange(`${article.title}\n${article.url === "#" ? "Article suggestion will be connected later." : article.url}`);
-    systemNotify.info("Article added to the reply draft", { description: "Suggestion delivery will be connected later." });
-    setContext(null);
-  };
-
   return (
     <main className="flex h-[calc(100dvh-4rem)] min-h-[620px] overflow-hidden bg-background">
       <section className="flex min-w-0 flex-1 flex-col">
@@ -628,7 +543,7 @@ export function ConversationWorkspace({
           </div>
           <div className={cn("grid h-full min-h-0 shrink-0 overflow-hidden transition-[grid-template-columns] duration-300 ease-out xl:grid", context ? "xl:grid-cols-[340px]" : "xl:grid-cols-[0px]")}>
             <div className="h-full min-h-0 min-w-0 overflow-hidden xl:w-[340px]">
-              <ConversationContextDrawer active={renderedContext} open={Boolean(context)} onClose={() => setContext(null)} conversation={conversation} leadDetail={leadDetail} activities={activities} assigneeOptions={assigneeOptions} canManage={canAssign} statusBusy={statusBusy} assignBusy={assignBusy} notesBusy={notesBusy} onStatus={onStatus} onAssign={onAssign} onNotes={onNotes} onSuggest={suggestArticle} />
+              <ConversationContextDrawer active={renderedContext} open={Boolean(context)} onClose={() => setContext(null)} conversation={conversation} leadDetail={leadDetail} activities={activities} assigneeOptions={assigneeOptions} canManage={canAssign} statusBusy={statusBusy} assignBusy={assignBusy} notesBusy={notesBusy} onStatus={onStatus} onAssign={onAssign} onNotes={onNotes} />
             </div>
           </div>
           <ConversationRightRail active={context} onSelect={toggleContext} />

@@ -4,6 +4,7 @@ import type {
   AssignAppointmentInput,
   AppointmentActivity,
   AppointmentAvailabilityResponse,
+  AppointmentAutoConfirmSettings,
   AppointmentCalendarQuery,
   AppointmentCalendarResponse,
   AppointmentDetail,
@@ -19,12 +20,18 @@ import type {
   MissedAppointmentInput,
   NoShowAppointmentInput,
   RescheduleAppointmentInput,
+  UpdateAppointmentAutoConfirmSettingsInput,
   UpdateAppointmentSettingsInput,
 } from "@/types/appointment";
 
 const now = new Date();
 let appointmentSettings: AppointmentSettings = {
   appointmentConfirmationMode: "MANUAL_CONFIRMATION_REQUIRED",
+  updatedAt: now.toISOString(),
+};
+
+let autoConfirmSettings: AppointmentAutoConfirmSettings = {
+  aiAutoConfirmAppointmentsEnabled: false,
   updatedAt: now.toISOString(),
 };
 
@@ -54,6 +61,11 @@ let appointments: CalendarAppointment[] = [
     outcomeRequiredAt: null,
     outcomeConfirmedAt: null,
     appointmentConfirmationMode: "MANUAL_CONFIRMATION_REQUIRED",
+    confirmationSource: "AI_REQUEST",
+    autoConfirmedAt: null,
+    autoConfirmDecisionReason: null,
+    autoConfirmFailedReason: "Business confirmation is required before this request can be confirmed.",
+    autoConfirmConfidence: 0.74,
   },
   {
     id: "appt_demo_1",
@@ -80,6 +92,11 @@ let appointments: CalendarAppointment[] = [
     outcomeRequiredAt: null,
     outcomeConfirmedAt: null,
     appointmentConfirmationMode: "MANUAL_CONFIRMATION_REQUIRED",
+    confirmationSource: "AI_REQUEST",
+    autoConfirmedAt: null,
+    autoConfirmDecisionReason: null,
+    autoConfirmFailedReason: "Location must be confirmed before this appointment can be auto-confirmed.",
+    autoConfirmConfidence: 0.68,
   },
   {
     id: "appt_demo_outcome",
@@ -106,6 +123,11 @@ let appointments: CalendarAppointment[] = [
     outcomeRequiredAt: formatISO(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 35)),
     outcomeConfirmedAt: null,
     appointmentConfirmationMode: "MANUAL_CONFIRMATION_REQUIRED",
+    confirmationSource: "MANUAL",
+    autoConfirmedAt: null,
+    autoConfirmDecisionReason: null,
+    autoConfirmFailedReason: null,
+    autoConfirmConfidence: null,
   },
 ];
 
@@ -235,6 +257,19 @@ export const mockAppointmentService = {
     appointmentSettings = { appointmentConfirmationMode: input.appointmentConfirmationMode, updatedAt: new Date().toISOString() };
     return appointmentSettings;
   },
+  async autoConfirmSettings(): Promise<AppointmentAutoConfirmSettings> {
+    await delay();
+    return autoConfirmSettings;
+  },
+  async updateAutoConfirmSettings(input: UpdateAppointmentAutoConfirmSettingsInput): Promise<AppointmentAutoConfirmSettings> {
+    await delay();
+    autoConfirmSettings = { aiAutoConfirmAppointmentsEnabled: input.aiAutoConfirmAppointmentsEnabled, updatedAt: new Date().toISOString() };
+    appointmentSettings = {
+      appointmentConfirmationMode: input.aiAutoConfirmAppointmentsEnabled ? "AUTO_CONFIRM_SAFE_BOOKINGS" : "MANUAL_CONFIRMATION_REQUIRED",
+      updatedAt: autoConfirmSettings.updatedAt,
+    };
+    return autoConfirmSettings;
+  },
   async create(input: CreateAppointmentInput): Promise<CalendarAppointment> {
     await delay();
     const [hour, minute] = input.time.split(":").map(Number);
@@ -242,7 +277,9 @@ export const mockAppointmentService = {
     const end = addMinutes(start, input.durationMinutes ?? 45);
     const safeForAutoConfirm = input.locationType !== "TO_BE_CONFIRMED" && !input.notes?.toLowerCase().includes("unsafe");
     const autoConfirmWithStaff = appointmentSettings.appointmentConfirmationMode === "AUTO_CONFIRM_WHEN_STAFF_ASSIGNED" && Boolean(input.assignedStaffId);
-    const safeAutoConfirmed = appointmentSettings.appointmentConfirmationMode === "AUTO_CONFIRM_SAFE_BOOKINGS" && safeForAutoConfirm;
+    const safeAutoConfirmed = autoConfirmSettings.aiAutoConfirmAppointmentsEnabled && safeForAutoConfirm;
+    const autoConfirmSkipped = autoConfirmSettings.aiAutoConfirmAppointmentsEnabled && !safeAutoConfirmed;
+    const autoConfirmedAt = autoConfirmWithStaff || safeAutoConfirmed ? new Date().toISOString() : null;
     const appointment: CalendarAppointment = {
       id: `appt_${Date.now()}`,
       title: input.title,
@@ -269,6 +306,11 @@ export const mockAppointmentService = {
       outcomeConfirmedAt: null,
       appointmentConfirmationMode: appointmentSettings.appointmentConfirmationMode,
       autoConfirmed: autoConfirmWithStaff || safeAutoConfirmed,
+      confirmationSource: safeAutoConfirmed ? "AI_PREMIUM_AUTO_CONFIRM" : input.source === "AI_CREATED" || autoConfirmSkipped ? "AI_REQUEST" : "MANUAL",
+      autoConfirmedAt,
+      autoConfirmDecisionReason: safeAutoConfirmed ? "All premium auto-confirmation checks passed." : null,
+      autoConfirmFailedReason: autoConfirmSkipped ? (input.locationType === "TO_BE_CONFIRMED" ? "Customer location must be confirmed first." : "The appointment request needs human review before confirmation.") : null,
+      autoConfirmConfidence: safeAutoConfirmed ? 0.93 : autoConfirmSkipped ? 0.62 : null,
     };
     appointments = [...appointments, appointment].sort((a, b) => a.startTime.localeCompare(b.startTime));
     return appointment;
@@ -343,6 +385,11 @@ export const mockAppointmentService = {
       availableActions: autoConfirmWithStaff ? ["RESCHEDULE", "CANCEL", "COMPLETE", "NO_SHOW"] : appointment.availableActions,
       appointmentConfirmationMode: appointmentSettings.appointmentConfirmationMode,
       autoConfirmed: autoConfirmWithStaff || appointment.autoConfirmed,
+      confirmationSource: autoConfirmWithStaff ? "AI_PREMIUM_AUTO_CONFIRM" : appointment.confirmationSource,
+      autoConfirmedAt: autoConfirmWithStaff ? new Date().toISOString() : appointment.autoConfirmedAt,
+      autoConfirmDecisionReason: autoConfirmWithStaff ? "Staff assignment allowed safe automatic confirmation." : appointment.autoConfirmDecisionReason,
+      autoConfirmFailedReason: autoConfirmWithStaff ? null : appointment.autoConfirmFailedReason,
+      autoConfirmConfidence: autoConfirmWithStaff ? 0.88 : appointment.autoConfirmConfidence,
     });
   },
   async claim(appointmentId: string): Promise<AppointmentDetail> {

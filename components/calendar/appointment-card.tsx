@@ -48,6 +48,22 @@ function isUrgent(appointment: CalendarAppointment) {
     || appointment.status === "NEEDS_OUTCOME_CONFIRMATION";
 }
 
+function confirmationBadge(appointment: CalendarAppointment) {
+  if (appointment.confirmationSource === "AI_PREMIUM_AUTO_CONFIRM") {
+    return { label: "Auto-confirmed by AI", className: "border-primary/20 bg-secondary text-primary" };
+  }
+  if (appointment.autoConfirmFailedReason) {
+    return { label: "Auto-confirm skipped", className: "border-warning/20 bg-warning/10 text-warning" };
+  }
+  if (appointment.humanConfirmationRequired) {
+    return { label: "Pending confirmation", className: "border-warning/20 bg-warning/10 text-warning" };
+  }
+  if (appointment.confirmationSource === "MANUAL") {
+    return { label: "Manual confirmation", className: "border bg-background text-muted-foreground" };
+  }
+  return null;
+}
+
 const actionLabels: Record<AppointmentAction, string> = {
   CONFIRM: "Confirm",
   RESCHEDULE: "Reschedule",
@@ -85,6 +101,7 @@ export function AppointmentCard({
   const assignAction = canAssignStaff && !finalStatuses.has(appointment.status) && !actions.includes("ASSIGN_STAFF") ? ["ASSIGN_STAFF" as AppointmentAction] : [];
   const claimAction = canClaim && !appointment.assignedStaffId && !finalStatuses.has(appointment.status) ? ["CLAIM" as AppointmentAction] : [];
   const menuActions = urgent ? ["VIEW_DETAILS" as AppointmentAction, ...claimAction, ...assignAction] : ["VIEW_DETAILS" as AppointmentAction, ...claimAction, ...assignAction, ...actions];
+  const aiBadge = confirmationBadge(appointment);
 
   return (
     <article
@@ -129,6 +146,7 @@ export function AppointmentCard({
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <AppointmentStatusBadge status={appointment.status} />
+        {aiBadge && <span className={cn("rounded-full border px-2.5 py-1 text-xs font-bold", aiBadge.className)}>{aiBadge.label}</span>}
         {urgent && <span className="rounded-full border border-warning/25 bg-warning/10 px-2.5 py-1 text-xs font-bold text-warning">Action required</span>}
         {appointment.service && <span className="rounded-full border bg-background px-2.5 py-1 text-xs font-semibold">{appointment.service.name}</span>}
         <span className="rounded-full border bg-background px-2.5 py-1 text-xs font-semibold">{appointment.source.replaceAll("_", " ").toLowerCase()}</span>
