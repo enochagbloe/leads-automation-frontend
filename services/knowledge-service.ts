@@ -40,6 +40,87 @@ function unwrapArticle(value: unknown): KnowledgeArticle {
   return value as KnowledgeArticle;
 }
 
+function listItems<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === "object") {
+    const record = value as { items?: unknown; data?: unknown; articles?: unknown; documents?: unknown };
+    if (Array.isArray(record.items)) return record.items as T[];
+    if (Array.isArray(record.data)) return record.data as T[];
+    if (record.data && typeof record.data === "object") return listItems<T>(record.data);
+    if (Array.isArray(record.articles)) return record.articles as T[];
+    if (Array.isArray(record.documents)) return record.documents as T[];
+  }
+  return [];
+}
+
+function articleSearchResult(article: KnowledgeArticle): KnowledgeSearchResult {
+  return {
+    assetType: "ARTICLE",
+    id: article.id,
+    title: article.title,
+    summary: article.summary,
+    category: article.category,
+    tags: article.tags ?? [],
+    status: article.status,
+    visibility: article.visibility,
+    canSendToClient: article.status === "PUBLISHED" && article.visibility === "CLIENT_SENDABLE",
+    source: article.source,
+  };
+}
+
+function documentSearchResult(document: KnowledgeDocument): KnowledgeSearchResult {
+  return {
+    assetType: "DOCUMENT",
+    id: document.id,
+    title: document.title,
+    description: document.description,
+    category: document.category,
+    tags: document.tags ?? [],
+    status: document.status,
+    visibility: document.visibility,
+    canSendToClient: document.status === "ACTIVE" && document.visibility === "CLIENT_SENDABLE",
+    fileName: document.fileName,
+    fileUrl: document.fileUrl,
+    mimeType: document.mimeType,
+    fileSize: document.fileSize,
+  };
+}
+
+function normalizeSearchResult(value: unknown): KnowledgeSearchResult | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as {
+    assetType?: string;
+    type?: string;
+    article?: KnowledgeArticle;
+    document?: KnowledgeDocument;
+  };
+  if (record.assetType === "ARTICLE" || record.assetType === "DOCUMENT") return record as KnowledgeSearchResult;
+  if (record.article) return articleSearchResult(record.article);
+  if (record.document) return documentSearchResult(record.document);
+  return null;
+}
+
+function normalizeSearchResponse(value: unknown): KnowledgeSearchResult[] {
+  return listItems<unknown>(value).map(normalizeSearchResult).filter(Boolean) as KnowledgeSearchResult[];
+}
+
+async function defaultKnowledgeAssets() {
+  const [articles, documents] = await Promise.all([
+    apiRequest<unknown>(`/business/knowledge/articles?${queryString({ status: "PUBLISHED", visibility: "CLIENT_SENDABLE", limit: 8 })}`),
+    apiRequest<unknown>(`/business/knowledge/documents?${queryString({ status: "ACTIVE", visibility: "CLIENT_SENDABLE", limit: 8 })}`),
+  ]);
+  return [
+    ...listItems<KnowledgeArticle>(articles).map(articleSearchResult),
+    ...listItems<KnowledgeDocument>(documents).map(documentSearchResult),
+  ].slice(0, 10);
+}
+
+function knowledgeSendBody(input: KnowledgeSendInput) {
+  return input.assetType === "ARTICLE"
+    ? { assetType: "ARTICLE_PDF", articleId: input.assetId, note: input.messageText }
+    : { assetType: "UPLOADED_DOCUMENT", documentId: input.assetId, note: input.messageText };
+}
+
 function parseErrorBody(body: unknown, fallback: { code: string; message: string; status: number }) {
   const error = body && typeof body === "object" && "error" in body ? (body as { error?: { code?: string; message?: string; details?: Record<string, string[]> } }).error : undefined;
   return new ApiError(error?.code ?? fallback.code, error?.message ?? fallback.message, fallback.status, error?.details);
@@ -182,7 +263,9 @@ export const knowledgeService = {
     : apiRequest<KnowledgeListResponse<KnowledgeDocument>>(`/business/knowledge/documents?${queryString(query)}`),
   search: ({ query, conversationId }: { query: string; conversationId?: string }) => env.useMockApi
     ? mockKnowledgeService.search(query)
-    : apiRequest<KnowledgeSearchResult[]>(`/business/knowledge/search?${queryString({ query, conversationId })}`),
+    : query.trim()
+      ? apiRequest<unknown>(`/business/knowledge/search?${queryString({ query: query.trim(), conversationId })}`).then(normalizeSearchResponse)
+      : defaultKnowledgeAssets(),
   createArticle: (input: KnowledgeArticleInput) => env.useMockApi
     ? mockKnowledgeService.createArticle(input)
     : apiRequest<unknown>("/business/knowledge/articles", { method: "POST", body: JSON.stringify(input) }).then(unwrapArticle),
@@ -208,5 +291,5 @@ export const knowledgeService = {
     : apiRequest<KnowledgeDocument>(`/business/knowledge/documents/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
   send: ({ conversationId, input }: { conversationId: string; input: KnowledgeSendInput }) => env.useMockApi
     ? mockKnowledgeService.send(conversationId, input)
-    : apiRequest<KnowledgeSendResponse>(`/business/conversations/${conversationId}/knowledge/send`, { method: "POST", body: JSON.stringify(input) }),
+    : apiRequest<KnowledgeSendResponse>(`/business/conversations/${conversationId}/knowledge/send`, { method: "POST", body: JSON.stringify(knowledgeSendBody(input)) }),
 };
