@@ -309,7 +309,7 @@ export function ActionableNotificationHost({ activeBusinessId }: { activeBusines
 export function NotificationStack({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="pointer-events-none fixed right-4 top-[4.75rem] z-[75] flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-2 sm:right-5"
+      className="pointer-events-none fixed right-4 top-[4.75rem] z-[120] flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-2 sm:right-5"
       aria-live="polite"
       aria-relevant="additions"
     >
@@ -453,7 +453,7 @@ export function NotificationOptionsMenu({
         </AppButton>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" sideOffset={8} collisionPadding={12} className="z-[95] min-w-60 rounded-2xl border border-white/50 bg-popover/95 p-2 shadow-[0_18px_55px_rgba(20,35,27,0.18)] backdrop-blur-xl outline-none">
+        <DropdownMenu.Content align="end" sideOffset={8} collisionPadding={12} className="z-[130] min-w-60 rounded-2xl border border-white/50 bg-popover/95 p-2 shadow-[0_18px_55px_rgba(20,35,27,0.18)] backdrop-blur-xl outline-none">
           {actions.map((action) => (
             <DropdownMenu.Item
               key={action.action}

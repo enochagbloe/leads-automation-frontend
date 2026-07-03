@@ -146,6 +146,30 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if ([
+    "business.knowledge.article.created",
+    "business.knowledge.article.updated",
+    "business.knowledge.article.status_updated",
+    "business.knowledge.article.deleted",
+    "business.knowledge.document.created",
+    "business.knowledge.document.updated",
+    "business.knowledge.document.status_updated",
+    "business.knowledge.document.deleted",
+    "business.knowledge.asset.sent",
+  ].includes(type)) {
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.knowledgeArticles.all }),
+      client.invalidateQueries({ queryKey: queryKeys.knowledgeDocuments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.knowledgeSearch.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+      ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) })] : []),
+      ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.lists })] : []),
+      ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.stats })] : []),
+    ]);
+    return;
+  }
+
   if (type === "business.notification.created") {
     const notification = normalizeActionableNotification(payload.notification ?? payload);
     if (notification && typeof window !== "undefined") {
