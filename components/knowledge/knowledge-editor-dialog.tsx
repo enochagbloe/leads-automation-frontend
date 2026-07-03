@@ -75,10 +75,6 @@ function valueFromArticle(article: KnowledgeArticle | null): KnowledgeEditorValu
 //   return Math.max(1, Math.ceil(wordCount(value) / 180));
 // }
 
-function splitParagraphs(value: string) {
-  return value.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
-}
-
 function isWhitespace(value: string) {
   return /^\s+$/.test(value);
 }
@@ -509,9 +505,8 @@ function PdfToolbar({ zoom, onZoom }: { zoom: string; onZoom: (zoom: string) => 
   );
 }
 
-function PdfPreviewPanel({ value, drafting }: { value: KnowledgeEditorValue; drafting?: boolean }) {
+function PdfPreviewPanel({ value }: { value: KnowledgeEditorValue }) {
   const [zoom, setZoom] = useState("100%");
-  const paragraphs = splitParagraphs(value.body);
   const scale = zoom === "75%" ? "scale-[0.86]" : zoom === "125%" ? "scale-105" : "scale-100";
   return (
     <section className="flex min-h-0 flex-col border-l bg-muted/20">
@@ -536,11 +531,7 @@ function PdfPreviewPanel({ value, drafting }: { value: KnowledgeEditorValue; dra
           </div>
           <div className="my-5 h-px bg-slate-200" />
           <div className="space-y-3 text-sm leading-6 text-slate-800">
-            {drafting ? (
-              <LiveMarkdownDraft value={value.body} emptyText="Start writing to see the live PDF preview update instantly." variant="preview" />
-            ) : paragraphs.length ? paragraphs.map((paragraph, index) => (
-              <p key={`${paragraph}-${index}`}>{paragraph}</p>
-            )) : <p>Start writing to see the live PDF preview update instantly.</p>}
+            <LiveMarkdownDraft value={value.body} emptyText="Start writing to see the live PDF preview update instantly." variant="preview" />
           </div>
         </article>
       </div>
@@ -586,7 +577,7 @@ export function KnowledgeEditorDialog({ open, article, services, saving, draftin
   };
 
   const editorPane = useMemo(() => <ArticleMetadataForm value={value} services={services} titleError={titleError} drafting={drafting} onChange={updateValue} />, [drafting, services, titleError, updateValue, value]);
-  const previewPane = useMemo(() => <PdfPreviewPanel value={value} drafting={drafting} />, [drafting, value]);
+  const previewPane = useMemo(() => <PdfPreviewPanel value={value} />, [value]);
   //const assistantPane = useMemo(() => <AIAssistantPanel value={value} onChange={setValue} />, [value]);
 
   return (

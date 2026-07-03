@@ -1,16 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { BookOpen, ExternalLink, FileText, Filter, Plus, Search, Send, TriangleAlert } from "lucide-react";
 import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppEmptyState } from "@/components/app-empty-state";
 import { Dialog, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import { KnowledgeEditorDialog, type KnowledgeEditorValue } from "@/components/knowledge/knowledge-editor-dialog";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { useKnowledgeSearch, useSendKnowledgeAsset } from "@/hooks/use-knowledge";
-import { getApiErrorMessage } from "@/lib/api-client";
-import type { KnowledgeAssetType, KnowledgeSearchResult } from "@/types/knowledge";
+import { useBusinessServices } from "@/hooks/use-business-services";
+import { useCreateKnowledgeArticle, useKnowledgeSearch, useSendKnowledgeAsset, useStreamDraftKnowledgeArticle } from "@/hooks/use-knowledge";
+import { ApiError, getApiErrorMessage } from "@/lib/api-client";
+import type { KnowledgeAssetType, KnowledgeDraftStreamHandlers, KnowledgeSearchResult } from "@/types/knowledge";
 
 function titleCase(value: string) {
   return value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -55,6 +56,20 @@ function sendError(reason?: string) {
     PDF_GENERATION_FAILED: "BizReply could not prepare the PDF. Please try again.",
   };
   return reason ? reasons[reason] ?? titleCase(reason) : "The asset could not be sent. Please try again.";
+}
+
+function tagsFromText(value: string) {
+  return value.split(",").map((tag) => tag.trim()).filter(Boolean);
+}
+
+function knowledgeErrorMessage(error: unknown) {
+  if (error instanceof ApiError && error.details) {
+    const details = Object.entries(error.details)
+      .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
+      .join(" ");
+    if (details) return details;
+  }
+  return getApiErrorMessage(error);
 }
 
 function AssetCard({ asset, onPreview, onSend }: { asset: KnowledgeSearchResult; onPreview: () => void; onSend: () => void }) {
@@ -157,17 +172,84 @@ function SendAssetDialog({ asset, open, sending, error, onOpenChange, onSend }: 
 
 export function ConversationKnowledgeDrawer({ conversationId, canManage }: { conversationId: string; canManage: boolean }) {
   const profile = useCurrentUser();
+  const businessId = profile.data?.activeBusiness?.id;
+  const plan = profile.data?.plan?.code ?? "BASIC";
   const [query, setQuery] = useState("");
   const [selectedAsset, setSelectedAsset] = useState<KnowledgeSearchResult | null>(null);
   const [sendAsset, setSendAsset] = useState<KnowledgeSearchResult | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
   const [sendErrorMessage, setSendErrorMessage] = useState<string | null>(null);
-  const search = useKnowledgeSearch(profile.data?.activeBusiness?.id, conversationId, query);
+  const search = useKnowledgeSearch(businessId, conversationId, query);
+  const services = useBusinessServices(businessId, { status: "active", page: 1, limit: 100, sort: "displayOrder", sortOrder: "asc" });
+  const createArticle = useCreateKnowledgeArticle();
+  const draftArticle = useStreamDraftKnowledgeArticle();
   const send = useSendKnowledgeAsset(conversationId);
+  const aiDraftAllowed = plan !== "BASIC" && canManage;
 
   const results = search.data ?? [];
+  const openArticleEditor = () => {
+    setEditorKey((current) => current + 1);
+    setEditorOpen(true);
+  };
+
   const startSend = (asset: KnowledgeSearchResult) => {
     setSendErrorMessage(null);
     setSendAsset(asset);
+  };
+
+  const submitDraft = (input: KnowledgeEditorValue, handlers: KnowledgeDraftStreamHandlers) => {
+    const topic = input.title.trim();
+    if (!topic) return;
+    if (!aiDraftAllowed) {
+      systemNotify.info("AI article drafting is available on Plus and Premium.");
+      return;
+    }
+    const category = input.category.trim();
+    const summary = input.summary.trim();
+    const body = input.body.trim();
+    draftArticle.mutate(
+      {
+        input: {
+          topic,
+          ...(category ? { category } : {}),
+          relatedServiceIds: input.relatedServiceIds,
+          visibility: input.visibility,
+          ...(summary || body ? { customerQuestion: summary || body.slice(0, 500) } : {}),
+        },
+        handlers,
+      },
+      {
+        onSuccess: () => {
+          systemNotify.success("AI drafted a new article.", { description: "Review and publish it before sending to customers." });
+          void search.refetch();
+        },
+        onError: (error) => systemNotify.error("Could not draft article", { description: knowledgeErrorMessage(error) }),
+      },
+    );
+  };
+
+  const saveArticle = (input: KnowledgeEditorValue) => {
+    createArticle.mutate(
+      {
+        title: input.title,
+        summary: input.summary || null,
+        body: input.body,
+        category: input.category || null,
+        tags: tagsFromText(input.tags),
+        relatedServiceIds: input.relatedServiceIds,
+        visibility: input.visibility,
+        status: "DRAFT",
+      },
+      {
+        onSuccess: () => {
+          systemNotify.success("Knowledge article saved.", { description: "Publish it when it is ready to send to customers." });
+          setEditorOpen(false);
+          void search.refetch();
+        },
+        onError: (error) => systemNotify.error("Could not save article", { description: knowledgeErrorMessage(error) }),
+      },
+    );
   };
 
   const submitSend = (messageText: string) => {
@@ -211,7 +293,7 @@ export function ConversationKnowledgeDrawer({ conversationId, canManage }: { con
             <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 w-full rounded-lg border bg-card pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Search articles and documents" />
           </label>
           <AppButton size="icon" variant="outline" aria-label="Filters coming soon" disabled><Filter className="size-4" /></AppButton>
-          {canManage && <AppButton asChild size="icon" variant="outline" aria-label="Manage knowledge base"><Link href="/knowledge-base"><Plus className="size-4" /></Link></AppButton>}
+          {canManage && <AppButton size="icon" variant="outline" aria-label="Create knowledge article" onClick={openArticleEditor}><Plus className="size-4" /></AppButton>}
         </div>
       </div>
       <div className="min-h-0 flex-1 divide-y overflow-y-auto">
@@ -232,6 +314,18 @@ export function ConversationKnowledgeDrawer({ conversationId, canManage }: { con
           />
         )}
       </div>
+      <KnowledgeEditorDialog
+        key={editorKey}
+        article={null}
+        services={services.data?.items ?? []}
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        saving={createArticle.isPending}
+        drafting={draftArticle.isPending}
+        canDraftWithAi={aiDraftAllowed}
+        onDraft={submitDraft}
+        onSave={saveArticle}
+      />
       <SendAssetDialog asset={sendAsset} open={Boolean(sendAsset)} sending={send.isPending} error={sendErrorMessage} onOpenChange={(open) => { if (!open) setSendAsset(null); }} onSend={submitSend} />
     </div>
   );
