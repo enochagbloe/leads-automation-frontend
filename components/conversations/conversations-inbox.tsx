@@ -43,6 +43,7 @@ import {
   useUpdateConversationStatus,
 } from "@/hooks/use-conversations";
 import { useLead, useUpdateLead } from "@/hooks/use-leads";
+import { useSendKnowledgeAsset } from "@/hooks/use-knowledge";
 import { useWhatsAppStatus } from "@/hooks/use-whatsapp";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import {
@@ -57,6 +58,7 @@ import {
 import { cn } from "@/lib/utils";
 import { canAccessOperationalPage, getWorkspacePermissions } from "@/lib/workspace-permissions";
 import type { Conversation, ConversationListQuery, ConversationStatus, UpdateConversationInput } from "@/types/conversation";
+import type { StagedKnowledgeAsset } from "@/components/knowledge/conversation-knowledge-drawer";
 
 function parseQuery(params: URLSearchParams): ConversationListQuery {
   return {
@@ -274,6 +276,7 @@ export function ConversationsInbox() {
   const currentDetail = detail.data?.pages[0];
   const leadDetail = useLead(currentDetail?.conversation.leadId ?? "");
   const sendMessage = useSendConversationMessage();
+  const sendKnowledgeAsset = useSendKnowledgeAsset(selectedId);
   const retryMessage = useRetryConversationMessage();
   const markRead = useMarkConversationRead();
   const markConversationRead = markRead.mutate;
@@ -284,6 +287,7 @@ export function ConversationsInbox() {
   const remove = useDeleteConversation();
   const updateLead = useUpdateLead();
   const [draft, setDraft] = useState("");
+  const [stagedKnowledgeAsset, setStagedKnowledgeAsset] = useState<(StagedKnowledgeAsset & { conversationId: string }) | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const selectedConversation = currentDetail?.conversation;
   const canManage = permissions.canReassignConversationsToOthers || permissions.canViewAllOperationalConversations;
@@ -308,9 +312,35 @@ export function ConversationsInbox() {
     if (selectedConversation?.unreadCount) markConversationRead(selectedConversation.id);
   }, [markConversationRead, selectedConversation?.id, selectedConversation?.unreadCount]);
 
+  const stageKnowledgeAsset = (asset: StagedKnowledgeAsset) => {
+    if (!selectedId) return;
+    setStagedKnowledgeAsset({ ...asset, conversationId: selectedId });
+    setDraft(asset.messageText);
+  };
+  const activeStagedKnowledgeAsset = stagedKnowledgeAsset?.conversationId === selectedId ? stagedKnowledgeAsset : null;
+
   const send = () => {
     const content = draft.trim();
     if (!selectedId || !content) return;
+    if (activeStagedKnowledgeAsset) {
+      sendKnowledgeAsset.mutate(
+        { assetType: activeStagedKnowledgeAsset.assetType, assetId: activeStagedKnowledgeAsset.assetId, messageText: content },
+        {
+          onSuccess: (result) => {
+            if (result.status === "SENT") systemNotify.success("Knowledge asset sent to customer.");
+            if (result.status === "QUEUED") systemNotify.info("Knowledge asset queued", { description: "It will send when the delivery channel is ready." });
+            if (result.status === "FAILED") {
+              systemNotify.error("Knowledge asset could not be sent.", { description: result.reason ?? "Please try again." });
+              return;
+            }
+            setDraft("");
+            setStagedKnowledgeAsset(null);
+          },
+          onError: (error) => systemNotify.error("Knowledge asset could not be sent.", { description: getApiErrorMessage(error) }),
+        },
+      );
+      return;
+    }
     sendMessage.mutate({ id: selectedId, leadId: selectedConversation?.leadId, input: { content } }, {
       onSuccess: () => setDraft(""),
       onError: (error) => {
@@ -436,7 +466,8 @@ export function ConversationsInbox() {
       isOwner={isOwner}
       businessSetup={businessSetup.data}
       draft={draft}
-      sending={sendMessage.isPending}
+      stagedKnowledgeAsset={activeStagedKnowledgeAsset}
+      sending={sendMessage.isPending || sendKnowledgeAsset.isPending}
       ending={endConversation.isPending}
       retryingMessageId={retryMessage.isPending ? retryMessage.variables?.messageId ?? null : null}
       statusBusy={updateStatus.isPending}
@@ -452,6 +483,8 @@ export function ConversationsInbox() {
       onPrevious={() => selectedIndex > 0 && setParams({ conversationId: conversations.data?.data[selectedIndex - 1]?.id })}
       onNext={() => selectedIndex >= 0 && setParams({ conversationId: conversations.data?.data[selectedIndex + 1]?.id })}
       onDraftChange={setDraft}
+      onStageKnowledgeAsset={stageKnowledgeAsset}
+      onClearStagedKnowledgeAsset={() => setStagedKnowledgeAsset(null)}
       onSend={send}
       onEnd={end}
       onRetryMessage={retry}
