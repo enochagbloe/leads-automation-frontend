@@ -1,5 +1,6 @@
 "use client";
 
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   Activity,
   ArrowLeft,
@@ -9,10 +10,12 @@ import {
   CheckCheck,
   ChevronLeft,
   ChevronRight,
+  Clipboard,
   Clock3,
   CircleUserRound,
   ExternalLink,
   FileText,
+  Forward,
   Link2,
   LockKeyhole,
   MessageCircleMore,
@@ -23,6 +26,7 @@ import {
   Pin,
   PinOff,
   Send,
+  Trash2,
   TriangleAlert,
   UsersRound,
   X,
@@ -103,6 +107,31 @@ function ArticleMessageCard({ article }: { article: Article }) {
 }
 
 function MessageBubble({ message, channel, retrying, onRetry }: { message: ConversationMessage; channel: Conversation["channel"]; retrying: boolean; onRetry: () => void }) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const longPressTimer = useRef<number | null>(null);
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      systemNotify.success("Message copied");
+    } catch {
+      systemNotify.error("Could not copy message");
+    }
+    setActionsOpen(false);
+  };
+
+  const placeholderAction = (label: string) => {
+    systemNotify.info(`${label} will be connected later.`);
+    setActionsOpen(false);
+  };
+
   if (message.senderType === "SYSTEM") {
     return (
       <div className="my-6 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
@@ -125,7 +154,20 @@ function MessageBubble({ message, channel, retrying, onRetry }: { message: Conve
   const failed = showWhatsAppStatus && message.deliveryStatus === "FAILED";
 
   return (
-    <article className={cn("group mb-6 flex gap-3", outbound && "flex-row-reverse")}>
+    <article
+      className={cn("group relative mb-6 flex gap-3", outbound && "flex-row-reverse")}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setActionsOpen((open) => !open);
+      }}
+      onTouchStart={() => {
+        clearLongPress();
+        longPressTimer.current = window.setTimeout(() => setActionsOpen(true), 520);
+      }}
+      onTouchMove={clearLongPress}
+      onTouchEnd={clearLongPress}
+      onTouchCancel={clearLongPress}
+    >
       <span className={cn("grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-bold", outbound ? "bg-primary text-primary-foreground" : "bg-secondary text-primary")}>
         {message.senderType === "AI" ? <Bot className="size-4" /> : initials(senderName)}
       </span>
@@ -153,6 +195,14 @@ function MessageBubble({ message, channel, retrying, onRetry }: { message: Conve
           </div>
         )}
       </div>
+      {actionsOpen && (
+        <div className={cn("absolute top-2 z-30 w-40 rounded-xl border bg-popover p-1.5 text-xs shadow-[0_16px_40px_rgba(20,35,27,0.18)]", outbound ? "right-12" : "left-12")}>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" onClick={() => void copyMessage()}><Clipboard className="size-3.5" />Copy</button>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" onClick={() => placeholderAction("Forward to internal discussion")}><Forward className="size-3.5" />Forward</button>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" onClick={() => placeholderAction("Pin message")}><Pin className="size-3.5" />Pin</button>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold text-destructive outline-none transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring" onClick={() => placeholderAction("Delete message")}><Trash2 className="size-3.5" />Delete</button>
+        </div>
+      )}
     </article>
   );
 }
@@ -230,7 +280,7 @@ function MessageComposer({ draft, stagedKnowledgeAsset, onDraftChange, onClearSt
       : "WhatsApp is not connected for this business. Connect WhatsApp in Settings before sending replies.";
 
   return (
-    <div className="border-t bg-card px-3 py-3 sm:px-6">
+    <div className="border-t bg-card px-3 py-2 sm:px-6 sm:py-3">
       <div className="relative mx-auto max-w-4xl">
         {whatsAppBlocked && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/20 bg-warning/5 px-3 py-2 text-xs text-muted-foreground"><span>{blockedMessage}</span>{isOwner ? <a href="/settings/business/whatsapp" className="font-semibold text-primary underline underline-offset-4">Go to WhatsApp Settings</a> : <span className="font-semibold">Ask the business owner to reconnect WhatsApp.</span>}</div>}
         {stagedKnowledgeAsset && <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-primary/15 bg-secondary/70 px-3 py-2 text-xs text-primary">
@@ -256,7 +306,7 @@ function MessageComposer({ draft, stagedKnowledgeAsset, onDraftChange, onClearSt
           onOpenEmojiPicker={() => setEmojiOpen((open) => !open)}
         />
         {emojiOpen && <div ref={emojiRef} className="absolute bottom-12 left-10 z-20 flex w-56 flex-wrap gap-1 rounded-xl border bg-popover p-2 shadow-[0_14px_40px_rgba(20,35,27,0.16)]" aria-label="Emoji picker">{["🙂", "👍", "🙏", "✅", "🎉", "📅", "📍", "💬", "❤️", "👋", "😊", "🤝"].map((emoji) => <button key={emoji} type="button" className="grid size-9 place-items-center rounded-lg text-lg transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { onDraftChange(`${draft}${emoji}`); setEmojiOpen(false); }}>{emoji}</button>)}</div>}
-        <p className="mt-1.5 px-1 text-[10px] text-muted-foreground">{channel === "WHATSAPP" ? "Replies are sent through the connected WhatsApp provider." : "Stored in BizReply only."}</p>
+        <p className="mt-1.5 hidden px-1 text-[10px] text-muted-foreground sm:block">{channel === "WHATSAPP" ? "Replies are sent through the connected WhatsApp provider." : "Stored in BizReply only."}</p>
       </div>
     </div>
   );
@@ -518,12 +568,12 @@ export function ConversationWorkspace({
           <div className="hidden items-center gap-1 sm:flex"><AppButton size="icon" variant="ghost" className="size-9 min-h-9" aria-label="Previous conversation" disabled={!hasPrevious} onClick={onPrevious}><ChevronLeft className="size-4" /></AppButton><AppButton size="icon" variant="ghost" className="size-9 min-h-9" aria-label="Next conversation" disabled={!hasNext} onClick={onNext}><ChevronRight className="size-4" /></AppButton></div>
           <div className="min-w-0 flex-1 sm:ml-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="shrink-0 text-xs font-bold text-primary">{conversation.displayId}</span>
+              <span className="hidden shrink-0 text-xs font-bold text-primary sm:inline">{conversation.displayId}</span>
               {editingSubject
                 ? <form className="flex min-w-0 flex-1 items-center gap-1" onSubmit={(event) => { event.preventDefault(); onUpdate({ subject: subject.trim() || null }); setEditingSubject(false); }}><label className="sr-only" htmlFor="conversation-subject">Conversation subject</label><input id="conversation-subject" autoFocus value={subject} onChange={(event) => setSubject(event.target.value)} className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring" /><AppButton type="submit" size="sm" className="h-8 min-h-8" loading={updateBusy}>Save</AppButton><AppButton type="button" size="sm" variant="ghost" className="h-8 min-h-8" onClick={() => { setSubject(conversation.subject ?? ""); setEditingSubject(false); }}>Cancel</AppButton></form>
-                : <><h1 className="truncate text-sm font-bold sm:text-base">{conversation.subject ?? conversation.lead.fullName}</h1>{canEditConversation && <AppButton size="icon" variant="ghost" className="size-8 min-h-8 shrink-0" aria-label="Edit conversation subject" onClick={() => setEditingSubject(true)}><Pencil className="size-3.5" /></AppButton>}</>}
+                : <><h1 className="truncate text-sm font-bold sm:text-base"><span className="sm:hidden">{conversation.lead.fullName}</span><span className="hidden sm:inline">{conversation.subject ?? conversation.lead.fullName}</span></h1>{canEditConversation && <AppButton size="icon" variant="ghost" className="hidden size-8 min-h-8 shrink-0 sm:grid" aria-label="Edit conversation subject" onClick={() => setEditingSubject(true)}><Pencil className="size-3.5" /></AppButton>}</>}
             </div>
-            <p className="mt-0.5 flex items-center gap-2 truncate text-[11px] text-muted-foreground"><span className="truncate">{conversation.lead.fullName} · {CONVERSATION_CHANNEL_LABELS[conversation.channel]} channel</span><span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold", conversationPriorityTone(conversation.priority))}>{CONVERSATION_PRIORITY_LABELS[conversation.priority]}</span></p>
+            <p className="mt-0.5 hidden items-center gap-2 truncate text-[11px] text-muted-foreground sm:flex"><span className="truncate">{conversation.lead.fullName} · {CONVERSATION_CHANNEL_LABELS[conversation.channel]} channel</span><span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold", conversationPriorityTone(conversation.priority))}>{CONVERSATION_PRIORITY_LABELS[conversation.priority]}</span></p>
           </div>
           <RealtimeStatusIndicator className="hidden sm:inline-flex" />
           {!locked && <AppButton size="icon" variant={conversation.pinned ? "secondary" : "ghost"} className="shrink-0" loading={updateBusy} aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"} aria-pressed={conversation.pinned} onClick={() => onUpdate({ pinned: !conversation.pinned })}>{conversation.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}</AppButton>}
@@ -532,14 +582,26 @@ export function ConversationWorkspace({
             ? <ConversationStatusBadge status={conversation.status} />
             : <div className="hidden w-44 lg:block"><AppSelect aria-label="Conversation status" value={conversation.status} options={ACTIVE_CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} /></div>}
           <AppButton size="icon" variant="ghost" aria-label="Open lead profile" className="md:hidden" onClick={() => toggleContext("profile")}><CircleUserRound className="size-4" /></AppButton>
-          {canManage && !locked && <ConfirmDialog trigger={<AppButton size="icon" variant="ghost" aria-label="Delete conversation" title="Delete conversation"><MoreHorizontal className="size-4" /></AppButton>} title="Delete this conversation?" description="The conversation will disappear from this business inbox." confirmLabel="Delete conversation" loading={deleting} onConfirm={onDelete} />}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <AppButton size="icon" variant="ghost" aria-label="Conversation actions" className="md:hidden"><MoreHorizontal className="size-4" /></AppButton>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={8} className="account-menu-content z-[80] min-w-52 rounded-xl border bg-popover p-1.5 shadow-[0_14px_40px_rgba(20,35,27,0.14)]">
+                {canEditConversation && <DropdownMenu.Item onSelect={() => setEditingSubject(true)} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold outline-none data-[highlighted]:bg-muted"><Pencil className="size-3.5" />Edit conversation</DropdownMenu.Item>}
+                {canClose && <DropdownMenu.Item disabled={ending} onSelect={() => { if (window.confirm("End this conversation?")) onEnd(); }} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45 data-[highlighted]:bg-muted"><X className="size-3.5" />End Chat</DropdownMenu.Item>}
+                {canManage && !locked && <DropdownMenu.Item disabled={deleting} onSelect={() => { if (window.confirm("Delete this conversation from the business inbox?")) onDelete(); }} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-destructive outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45 data-[highlighted]:bg-destructive/10"><Trash2 className="size-3.5" />Delete chat</DropdownMenu.Item>}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+          {canManage && !locked && <ConfirmDialog trigger={<AppButton size="icon" variant="ghost" className="hidden md:inline-flex" aria-label="Delete conversation" title="Delete conversation"><MoreHorizontal className="size-4" /></AppButton>} title="Delete this conversation?" description="The conversation will disappear from this business inbox." confirmLabel="Delete conversation" loading={deleting} onConfirm={onDelete} />}
           {canClose && <ConfirmDialog trigger={<AppButton size="sm" className="hidden sm:inline-flex">End Chat</AppButton>} title="End this conversation?" description="The conversation will be closed. If the customer replies later, BizReply will automatically reopen it." confirmLabel="End Chat" loading={ending} onConfirm={onEnd} />}
         </header>
 
         <ConversationTabs active={tab} onChange={setTab} activityCount={activities.length} />
         {businessSetup && <IncompleteBusinessNotice status={businessSetup} canManage={canManage} />}
         <div className="flex gap-1 overflow-x-auto border-b bg-card px-2 py-1.5 md:hidden" aria-label="Conversation context tools">
-          {RAIL_ITEMS.map(({ id, label, icon: Icon }) => <AppButton key={id} size="sm" variant={context === id ? "secondary" : "ghost"} className="shrink-0" aria-pressed={context === id} onClick={() => toggleContext(id)}><Icon className="size-4" />{label}</AppButton>)}
+          {RAIL_ITEMS.map(({ id, label, icon: Icon }) => <AppButton key={id} size="icon" variant={context === id ? "secondary" : "ghost"} className="size-9 min-h-9 shrink-0 rounded-full" aria-label={label} aria-pressed={context === id} title={label} onClick={() => toggleContext(id)}><Icon className="size-4" /></AppButton>)}
         </div>
 
         <div className="flex min-h-0 flex-1">

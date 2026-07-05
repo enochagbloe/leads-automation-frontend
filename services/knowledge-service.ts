@@ -1,4 +1,4 @@
-import { apiRequest, ApiError } from "@/lib/api-client";
+import { apiRequest, ApiError, refreshAccessToken } from "@/lib/api-client";
 import { businessStore } from "@/lib/business-store";
 import { env } from "@/lib/env";
 import { tokenStore } from "@/lib/token-store";
@@ -126,6 +126,32 @@ function parseErrorBody(body: unknown, fallback: { code: string; message: string
   return new ApiError(error?.code ?? fallback.code, error?.message ?? fallback.message, fallback.status, error?.details);
 }
 
+function authHeaders(headers?: HeadersInit) {
+  const accessToken = tokenStore.getAccessToken();
+  const activeBusinessId = businessStore.get();
+  return {
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    ...(activeBusinessId ? { "X-Business-Id": activeBusinessId } : {}),
+    ...headers,
+  };
+}
+
+async function authenticatedKnowledgeFetch(path: string, init: RequestInit, allowRefresh = true): Promise<Response> {
+  const response = await fetch(`${env.apiUrl}${path}`, {
+    ...init,
+    headers: authHeaders(init.headers),
+  });
+
+  if (response.status === 401 && allowRefresh && tokenStore.getRefreshToken()) {
+    if (await refreshAccessToken()) {
+      return authenticatedKnowledgeFetch(path, init, false);
+    }
+    tokenStore.clear();
+  }
+
+  return response;
+}
+
 function sseEventName(raw: string) {
   return raw.split("\n").find((line) => line.startsWith("event:"))?.slice(6).trim() || "message";
 }
@@ -164,15 +190,11 @@ async function streamDraftArticle(input: DraftKnowledgeArticleInput, handlers: K
     return article;
   }
 
-  const accessToken = tokenStore.getAccessToken();
-  const activeBusinessId = businessStore.get();
-  const response = await fetch(`${env.apiUrl}/business/knowledge/articles/draft`, {
+  const response = await authenticatedKnowledgeFetch("/business/knowledge/articles/draft", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...(activeBusinessId ? { "X-Business-Id": activeBusinessId } : {}),
     },
     body: JSON.stringify(input),
   });
@@ -224,14 +246,8 @@ async function streamDraftArticle(input: DraftKnowledgeArticleInput, handlers: K
 }
 
 async function uploadMultipart<T>(path: string, form: FormData): Promise<T> {
-  const accessToken = tokenStore.getAccessToken();
-  const activeBusinessId = businessStore.get();
-  const response = await fetch(`${env.apiUrl}${path}`, {
+  const response = await authenticatedKnowledgeFetch(path, {
     method: "POST",
-    headers: {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...(activeBusinessId ? { "X-Business-Id": activeBusinessId } : {}),
-    },
     body: form,
   });
   const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string; details?: Record<string, string[]> } } | T | null;

@@ -391,10 +391,10 @@ function EditorToolbar() {
     Table2,
   ];
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b bg-muted/25 px-2 py-1.5">
-      <AppButton size="sm" variant="ghost" className="h-7 min-h-7 px-2 text-[11px]">Paragraph</AppButton>
+    <div className="flex items-center gap-0.5 overflow-x-auto border-b bg-muted/25 px-1.5 py-1 sm:flex-wrap sm:px-2 sm:py-1.5">
+      <AppButton size="sm" variant="ghost" className="h-6 min-h-6 shrink-0 px-2 text-[10px] sm:h-7 sm:min-h-7 sm:text-[11px]">Paragraph</AppButton>
       {iconButtons.map((Icon, index) => (
-        <AppButton key={index} type="button" size="icon" variant="ghost" className="size-7 min-h-7" aria-label="Editor formatting option">
+        <AppButton key={index} type="button" size="icon" variant="ghost" className="size-6 min-h-6 shrink-0 sm:size-7 sm:min-h-7" aria-label="Editor formatting option">
           <Icon className="size-3" />
         </AppButton>
       ))}
@@ -417,12 +417,12 @@ function ArticleMetadataForm({
 }) {
   const selectedServiceId = value.relatedServiceIds[0] ?? "__none";
   return (
-    <section className="space-y-3 p-4">
+    <section className="space-y-2.5 p-3 sm:space-y-3 sm:p-4">
       <div className="flex items-center gap-2">
         <span className="grid size-6 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">1</span>
         <h3 className="font-bold">Article Information</h3>
       </div>
-      <label className="block text-sm font-semibold">
+      <label className="block text-xs font-semibold sm:text-sm">
         Title <span className="text-destructive">*</span>
         <input
           value={value.title}
@@ -430,7 +430,7 @@ function ArticleMetadataForm({
           aria-invalid={Boolean(titleError)}
           aria-describedby={titleError ? "knowledge-title-error" : undefined}
           className={cn(
-            "mt-1.5 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "mt-1 h-8 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mt-1.5 sm:h-9",
             titleError && "border-destructive bg-destructive/5 focus-visible:ring-destructive/20",
           )}
           placeholder="Type the article topic here, e.g. How our booking process works"
@@ -440,42 +440,42 @@ function ArticleMetadataForm({
           <span className="ml-auto text-muted-foreground">{value.title.length}/100</span>
         </span>
       </label>
-      <label className="block text-sm font-semibold">
+      <label className="block text-xs font-semibold sm:text-sm">
         Summary <span className="text-destructive">*</span>
-        <textarea value={value.summary} onChange={(event) => onChange({ ...value, summary: event.target.value })} rows={2} className="mt-1.5 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Briefly explain what this article helps customers understand." />
+        <textarea value={value.summary} onChange={(event) => onChange({ ...value, summary: event.target.value })} rows={2} className="mt-1 w-full resize-y rounded-lg border bg-background px-3 py-1.5 text-sm leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mt-1.5 sm:py-2" placeholder="Briefly explain what this article helps customers understand." />
         <span className="mt-0.5 block text-right text-[11px] text-muted-foreground">{value.summary.length}/160</span>
       </label>
-      <label className="block text-sm font-semibold">
+      <label className="block text-xs font-semibold sm:text-sm">
         Body / Content <span className="text-destructive">*</span>
-        <div className="mt-1.5 overflow-hidden rounded-lg border bg-background">
+        <div className="mt-1 overflow-hidden rounded-lg border bg-background sm:mt-1.5">
           <EditorToolbar />
           {drafting ? (
-            <div className="min-h-40 w-full bg-transparent px-3 py-2.5 text-sm leading-6 outline-none">
+            <div className="min-h-28 w-full bg-transparent px-3 py-2 text-sm leading-6 outline-none sm:min-h-40 sm:py-2.5">
               <LiveMarkdownDraft value={value.body} emptyText="AI is getting ready to write..." />
             </div>
           ) : (
-            <textarea value={value.body} onChange={(event) => onChange({ ...value, body: event.target.value })} rows={8} className="min-h-40 w-full resize-y bg-transparent px-3 py-2.5 text-sm leading-6 outline-none" placeholder="Write the article content..." />
+            <textarea value={value.body} onChange={(event) => onChange({ ...value, body: event.target.value })} rows={6} className="min-h-28 w-full resize-y bg-transparent px-3 py-2 text-sm leading-6 outline-none sm:min-h-40 sm:py-2.5" placeholder="Write the article content..." />
           )}
         </div>
       </label>
       <div className="grid gap-3 md:grid-cols-2">
-        <label className="block text-sm font-semibold">
+        <label className="block text-xs font-semibold sm:text-sm">
           Category
-          <input value={value.category} onChange={(event) => onChange({ ...value, category: event.target.value })} className="mt-1.5 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Customer Service" />
+          <input value={value.category} onChange={(event) => onChange({ ...value, category: event.target.value })} className="mt-1 h-8 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mt-1.5 sm:h-9" placeholder="Customer Service" />
         </label>
-        <label className="block text-sm font-semibold">
+        <label className="block text-xs font-semibold sm:text-sm">
           Related service
-          <AppSelect className="mt-1.5 h-9" value={selectedServiceId} onValueChange={(serviceId) => onChange({ ...value, relatedServiceIds: serviceId === "__none" ? [] : [serviceId] })} options={[{ value: "__none", label: "No specific service" }, ...services.map((service) => ({ value: service.id, label: service.name, description: service.category ?? undefined }))]} />
+          <AppSelect className="mt-1 h-8 sm:mt-1.5 sm:h-9" value={selectedServiceId} onValueChange={(serviceId) => onChange({ ...value, relatedServiceIds: serviceId === "__none" ? [] : [serviceId] })} options={[{ value: "__none", label: "No specific service" }, ...services.map((service) => ({ value: service.id, label: service.name, description: service.category ?? undefined }))]} />
         </label>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
-        <label className="block text-sm font-semibold">
+        <label className="block text-xs font-semibold sm:text-sm">
           Tags
-          <input value={value.tags} onChange={(event) => onChange({ ...value, tags: event.target.value })} className="mt-1.5 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="WhatsApp, Tips, Customer Service" />
+          <input value={value.tags} onChange={(event) => onChange({ ...value, tags: event.target.value })} className="mt-1 h-8 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mt-1.5 sm:h-9" placeholder="WhatsApp, Tips, Customer Service" />
         </label>
-        <label className="block text-sm font-semibold">
+        <label className="block text-xs font-semibold sm:text-sm">
           Visibility
-          <select value={value.visibility} onChange={(event) => onChange({ ...value, visibility: event.target.value as KnowledgeVisibility })} className="mt-1.5 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <select value={value.visibility} onChange={(event) => onChange({ ...value, visibility: event.target.value as KnowledgeVisibility })} className="mt-1 h-8 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mt-1.5 sm:h-9">
             <option value="CLIENT_SENDABLE">Client Sendable</option>
             <option value="INTERNAL_ONLY">Internal Only</option>
           </select>
@@ -584,7 +584,7 @@ export function KnowledgeEditorDialog({ open, article, services, saving, draftin
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         <DialogOverlay className="bg-background/45 backdrop-blur-[1px]" />
-        <DialogContent className="left-1/2 top-1/2 flex h-[82dvh] w-[min(1180px,88vw)] max-w-none -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border bg-card p-0 shadow-[0_22px_70px_rgba(20,35,27,0.24)]">
+        <DialogContent className="left-1/2 top-1/2 flex h-[90dvh] w-[calc(100vw-1rem)] max-w-none -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border bg-card p-0 shadow-[0_22px_70px_rgba(20,35,27,0.24)] sm:h-[82dvh] sm:w-[min(1180px,88vw)]">
           <ArticleHeader canDraftWithAi={canUseAiDraft} saving={saving} drafting={drafting} onClose={() => onOpenChange(false)} onDraft={draftWithAi} />
           <div className="flex items-center gap-2 border-b px-3 py-2 lg:hidden">
             {(["editor", "preview"] as EditorTab[]).map((tab) => <button key={tab} type="button" onClick={() => setMobileTab(tab)} className={cn("rounded-lg px-3 py-1.5 text-xs font-bold capitalize", mobileTab === tab ? "bg-secondary text-primary" : "text-muted-foreground")}>{tab}</button>)}
@@ -597,9 +597,9 @@ export function KnowledgeEditorDialog({ open, article, services, saving, draftin
             {/* <div className={cn("min-h-0 overflow-y-auto lg:hidden", mobileTab === "assistant" ? "block" : "hidden")}>
             {assistantPane}</div> */}
           </div>
-          <footer className="flex h-12 shrink-0 items-center justify-between gap-3 border-t bg-card px-4">
+          <footer className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-t bg-card px-3 py-2 sm:h-12 sm:flex-nowrap sm:px-4 sm:py-0">
             <span className="truncate text-xs text-muted-foreground"><CheckCircle2 className="mr-1 inline size-3.5 text-success" />Editing {title}</span>
-            <div className="flex gap-2">
+            <div className="flex min-w-0 flex-wrap justify-end gap-2">
               <AppButton className="h-8 min-h-8 px-3 text-xs md:hidden" variant="secondary" disabled={!canUseAiDraft} loading={drafting} loadingText="Drafting" onClick={draftWithAi}><Sparkles className="size-3.5" />Draft with AI</AppButton>
               {canPublish && <AppButton className="h-8 min-h-8 px-3 text-xs" variant="outline" loading={publishing} loadingText="Publishing" onClick={onPublish}>Publish</AppButton>}
               <AppButton className="h-8 min-h-8 px-3 text-xs" loading={saving} loadingText="Saving" onClick={() => onSave(value)}><Save className="size-3.5" />Save Article</AppButton>

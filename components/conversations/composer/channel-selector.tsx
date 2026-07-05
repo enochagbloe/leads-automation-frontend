@@ -8,7 +8,7 @@ export function ChannelSelector({ channels, activeId, disabled, onChange }: { ch
   const active = channels.find((item) => item.id === activeId) ?? channels[0];
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger disabled={disabled} className="inline-flex h-8 max-w-40 cursor-pointer items-center gap-1.5 rounded-lg bg-composer-control px-2.5 text-xs font-semibold text-composer-foreground outline-none transition-colors hover:bg-composer-control/70 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+      <DropdownMenu.Trigger disabled={disabled} className="inline-flex h-7 max-w-36 cursor-pointer items-center gap-1.5 rounded-lg bg-composer-control px-2 text-xs font-semibold text-composer-foreground outline-none transition-colors hover:bg-composer-control/70 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:max-w-40 sm:px-2.5">
         <span className="grid size-4 shrink-0 place-items-center text-success">{active?.icon ?? <MessageCircle className="size-3.5 fill-current" />}</span>
         <span className="truncate">{active?.name ?? "Channel"}</span>
         <ChevronDown className="size-3 shrink-0 opacity-60" />
