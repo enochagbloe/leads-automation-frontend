@@ -46,7 +46,7 @@ export function AppGlobalSearch() {
   const leads = useLeads({ page: 1, limit: 100, sortBy: "updatedAt", sortOrder: "desc" }, activated);
 
   const items = useMemo<SearchItem[]>(() => {
-    const canViewCustomerIssues = profile.data?.plan?.code !== "BASIC" && canAccessCustomerIssues(profile.data);
+    const canViewCustomerIssues = canAccessCustomerIssues(profile.data);
     const pageItems: SearchItem[] = [
       { id: "dashboard", kind: "page", group: "Pages", title: "Dashboard", subtitle: "Business workspace overview", meta: "Page", href: "/dashboard", searchText: ["overview", "workspace", "home"], status: [], source: [], tags: [], assigned: [], type: ["page"], icon: LayoutDashboard },
       { id: "leads", kind: "page", group: "Pages", title: "Leads", subtitle: "Manage customer opportunities", meta: "CRM page", href: "/leads", searchText: ["crm", "customers", "contacts"], status: [], source: [], tags: [], assigned: [], type: ["page", "leads"], icon: ContactRound },

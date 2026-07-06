@@ -2,7 +2,7 @@ import { apiDateFrom, apiDateTo } from "@/lib/date-query";
 import { env } from "@/lib/env";
 import { apiRequest } from "@/lib/api-client";
 import { mockCustomerIssueService } from "@/services/mock-customer-issue-service";
-import type { CustomerIssue, CustomerIssueLead, CustomerIssueListQuery, CustomerIssueListResponse, CustomerIssueMember, UpdateCustomerIssueStatusInput } from "@/types/customer-issue";
+import type { CustomerIssue, CustomerIssueLead, CustomerIssueListQuery, CustomerIssueListResponse, CustomerIssueMember, CustomerIssueMessage, CustomerIssueTimelineEvent, UpdateCustomerIssueStatusInput } from "@/types/customer-issue";
 
 function queryString(query: CustomerIssueListQuery) {
   const params = new URLSearchParams();
@@ -56,6 +56,45 @@ function normalizeLead(value: unknown, issue: Record<string, unknown>): Customer
   return { id: id ?? "unknown-lead", name: name ?? null, phone: phone ?? null };
 }
 
+function normalizeTimelineEvent(value: unknown): CustomerIssueTimelineEvent {
+  const source = record(value);
+  const metadata = record(source.metadata);
+  return {
+    ...source,
+    id: text(source.id),
+    type: text(source.type) ?? text(source.eventType),
+    title: text(source.title),
+    description: text(source.description),
+    message: text(source.message),
+    actorType: text(source.actorType),
+    actorName: text(source.actorName),
+    previousStatus: (text(source.previousStatus) ?? text(metadata.previousStatus) ?? null) as CustomerIssueTimelineEvent["previousStatus"],
+    newStatus: (text(source.newStatus) ?? text(metadata.newStatus) ?? null) as CustomerIssueTimelineEvent["newStatus"],
+    reopenSource: text(source.reopenSource) ?? text(metadata.reopenSource) ?? null,
+    previousCategory: (text(source.previousCategory) ?? text(metadata.previousCategory) ?? null) as CustomerIssueTimelineEvent["previousCategory"],
+    previousSeverity: (text(source.previousSeverity) ?? text(metadata.previousSeverity) ?? null) as CustomerIssueTimelineEvent["previousSeverity"],
+    createdAt: text(source.createdAt) ?? text(source.timestamp) ?? null,
+    timestamp: text(source.timestamp) ?? text(source.createdAt) ?? null,
+    metadata: Object.keys(metadata).length ? metadata : null,
+  };
+}
+
+function normalizeIssueMessage(value: unknown): CustomerIssueMessage {
+  const source = record(value);
+  const metadata = record(source.metadata);
+  return {
+    ...source,
+    id: text(source.id) ?? text(source.messageId) ?? "unknown-message",
+    direction: text(source.direction),
+    body: text(source.body) ?? text(source.text) ?? text(source.content) ?? null,
+    text: text(source.text) ?? null,
+    content: text(source.content) ?? null,
+    deliveryStatus: text(source.deliveryStatus) ?? text(source.status) ?? null,
+    createdAt: text(source.createdAt) ?? null,
+    metadata: Object.keys(metadata).length ? metadata : null,
+  };
+}
+
 function normalizeIssue(value: unknown): CustomerIssue {
   const wrapped = record(value);
   const source = record(wrapped.issue ?? wrapped.customerIssue ?? wrapped.data ?? value);
@@ -86,10 +125,13 @@ function normalizeIssue(value: unknown): CustomerIssue {
     } : null,
     routingReason: text(source.routingReason) ?? text(source.reason) ?? null,
     status: (text(source.status) ?? "OPEN") as CustomerIssue["status"],
+    reopenCount: typeof source.reopenCount === "number" ? source.reopenCount : undefined,
     createdBy: (text(source.createdBy) ?? "AI") as CustomerIssue["createdBy"],
     createdAt: text(source.createdAt) ?? new Date().toISOString(),
     updatedAt: text(source.updatedAt) ?? text(source.createdAt) ?? new Date().toISOString(),
     resolvedAt: text(source.resolvedAt) ?? null,
+    timelineEvents: Array.isArray(source.timelineEvents) ? source.timelineEvents.map(normalizeTimelineEvent) : undefined,
+    issueMessages: Array.isArray(source.issueMessages) ? source.issueMessages.map(normalizeIssueMessage) : undefined,
   };
 }
 

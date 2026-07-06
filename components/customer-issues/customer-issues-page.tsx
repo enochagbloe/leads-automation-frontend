@@ -1,14 +1,16 @@
 "use client";
 
-import { AlertTriangle, ArrowRight, CheckCircle2, CircleAlert, Clock3, ExternalLink, Inbox, MessageSquareText, MoreVertical, ShieldAlert, Tag, UserCheck, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, CircleAlert, Clock3, ExternalLink, Inbox, MessageSquareText, MoreVertical, RotateCcw, Search, ShieldAlert, Tag, UserCheck, UserRound, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { systemNotify } from "@/lib/system-notifications";
 import { AppButton } from "@/components/app-button";
 import { AppCard } from "@/components/app-card";
 import { AppEmptyState } from "@/components/app-empty-state";
 import { AppErrorState } from "@/components/app-error-state";
+import { AppInput } from "@/components/app-input";
 import { AppSelect } from "@/components/app-select";
 import { LoadingCard } from "@/components/states/loading-states";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -28,8 +30,10 @@ import {
   formatCustomerIssueTime,
 } from "@/lib/customer-issues";
 import { cn } from "@/lib/utils";
+import { queryKeys } from "@/lib/query-keys";
 import { canAccessCustomerIssues, canManageBilling, canUpdateCustomerIssueStatus } from "@/lib/workspace-permissions";
 import type { CustomerIssue, CustomerIssueCategory, CustomerIssueListQuery, CustomerIssueSeverity, CustomerIssueStatus } from "@/types/customer-issue";
+import type { BusinessRole } from "@/types/auth";
 import type { Lead } from "@/types/lead";
 
 type IssueTab = NonNullable<CustomerIssueListQuery["tab"]>;
@@ -52,6 +56,7 @@ function parseQuery(params: URLSearchParams): CustomerIssueListQuery {
     status: CUSTOMER_ISSUE_STATUSES.includes(status as CustomerIssueStatus) ? status as CustomerIssueStatus : undefined,
     severity: CUSTOMER_ISSUE_SEVERITIES.includes(severity as CustomerIssueSeverity) ? severity as CustomerIssueSeverity : undefined,
     category: CUSTOMER_ISSUE_CATEGORIES.includes(category as CustomerIssueCategory) ? category as CustomerIssueCategory : undefined,
+    search: params.get("search")?.trim() || undefined,
     tab: TABS.some((item) => item.key === tab) ? tab as IssueTab : "all",
   };
 }
@@ -86,14 +91,30 @@ function typeLabel(issue: CustomerIssue) {
   return CUSTOMER_ISSUE_TYPE_LABELS[issue.type] ?? issue.type ?? "Issue";
 }
 
-function nextActions(status: CustomerIssueStatus, canUpdate: boolean) {
+function canUseManagerIssueActions(role?: BusinessRole | null) {
+  return role === "BUSINESS_OWNER" || role === "MANAGER";
+}
+
+function nextActions(status: CustomerIssueStatus, canUpdate: boolean, canUseManagerActions: boolean) {
   if (!canUpdate || status === "CLOSED") return [];
   if (status === "OPEN") return [
     { label: "Acknowledge", status: "ACKNOWLEDGED" as const },
     { label: "Mark Resolved", status: "RESOLVED" as const },
+    ...(canUseManagerActions ? [{ label: "Close", status: "CLOSED" as const }] : []),
   ];
-  if (status === "ACKNOWLEDGED") return [{ label: "Mark Resolved", status: "RESOLVED" as const }];
-  if (status === "RESOLVED") return [{ label: "Close", status: "CLOSED" as const }];
+  if (status === "ACKNOWLEDGED") return [
+    { label: "Mark Resolved", status: "RESOLVED" as const },
+    ...(canUseManagerActions ? [{ label: "Close", status: "CLOSED" as const }] : []),
+  ];
+  if (status === "REOPENED") return [
+    { label: "Acknowledge", status: "ACKNOWLEDGED" as const },
+    { label: "Mark Resolved", status: "RESOLVED" as const },
+    ...(canUseManagerActions ? [{ label: "Close", status: "CLOSED" as const }] : []),
+  ];
+  if (status === "RESOLVED" && canUseManagerActions) return [
+    { label: "Reopen", status: "REOPENED" as const },
+    { label: "Close", status: "CLOSED" as const },
+  ];
   return [];
 }
 
@@ -101,12 +122,59 @@ function issueErrorMessage(error: unknown) {
   if (!(error instanceof ApiError)) return getApiErrorMessage(error);
   const messages: Record<string, string> = {
     FORBIDDEN: "You do not have permission to manage this issue.",
-    CUSTOMER_ISSUE_NOT_FOUND: "This customer issue could not be found.",
+    CUSTOMER_ISSUE_NOT_FOUND: "This issue was not found or your access was removed.",
+    CUSTOMER_ISSUE_STATE_CHANGED: "This complaint changed. Refresh and try again.",
+    INVALID_CUSTOMER_ISSUE_STATUS_TRANSITION: "That status change is no longer available. Refresh the issue and try again.",
+    CUSTOMER_ISSUE_CLOSED: "This complaint is closed and cannot be changed.",
     PLAN_UPGRADE_REQUIRED: "Customer issue tracking is available on Plus and Premium plans.",
     BUSINESS_ACCESS_DENIED: "You do not have access to this business.",
     VALIDATION_ERROR: error.message,
   };
+  if (error.status === 404) return "This issue was not found or your access was removed.";
   return messages[error.code] ?? error.message;
+}
+
+function statusChangeDescription(previous?: CustomerIssueStatus | null, next?: CustomerIssueStatus | null) {
+  if (previous && next) return `${CUSTOMER_ISSUE_STATUS_LABELS[previous] ?? previous} to ${CUSTOMER_ISSUE_STATUS_LABELS[next] ?? next}`;
+  if (next) return `Changed to ${CUSTOMER_ISSUE_STATUS_LABELS[next] ?? next}`;
+  return "The complaint status changed.";
+}
+
+function timelineTitle(type?: string, fallback?: string, reopenSource?: string | null) {
+  const normalized = type?.toUpperCase() ?? "";
+  if (reopenSource === "MANAGER_ACTION") return "Manually reopened by manager";
+  if (reopenSource || normalized.includes("REOPEN")) return "Reopened from customer follow-up";
+  if (normalized.includes("STATUS")) return "Status updated";
+  if (normalized.includes("INTELLIGENCE") || normalized.includes("CATEGORY") || normalized.includes("SEVERITY")) return "Complaint intelligence updated";
+  if (normalized.includes("MESSAGE")) return "Customer message linked";
+  return fallback || "Complaint activity";
+}
+
+function timelineItems(issue: CustomerIssue) {
+  const eventItems = (issue.timelineEvents ?? []).map((event) => ({
+    key: event.id ?? `${event.type ?? "event"}-${event.createdAt ?? event.timestamp ?? Math.random()}`,
+    icon: event.reopenSource || event.newStatus === "REOPENED" ? RotateCcw : event.newStatus === "RESOLVED" ? CheckCircle2 : Clock3,
+    title: timelineTitle(event.type, event.title, event.reopenSource),
+    time: formatCustomerIssueTime(event.createdAt ?? event.timestamp),
+    description: event.description || event.message || statusChangeDescription(event.previousStatus, event.newStatus),
+  }));
+  const messageItems = (issue.issueMessages ?? []).map((message) => {
+    const body = message.body || message.text || message.content || "Message content is not available.";
+    const status = message.deliveryStatus ? ` Delivery: ${message.deliveryStatus.toLowerCase()}.` : "";
+    return {
+      key: `message-${message.id}`,
+      icon: MessageSquareText,
+      title: message.direction === "OUTBOUND" ? "Resolution message created" : "Customer message linked",
+      time: formatCustomerIssueTime(message.createdAt),
+      description: `${body}${status}`,
+    };
+  });
+  if (eventItems.length || messageItems.length) return [...eventItems, ...messageItems];
+  return [
+    { key: "created", icon: MessageSquareText, title: "Issue detected from customer message", time: formatCustomerIssueTime(issue.createdAt), description: issue.customerMessageExcerpt || "A customer interaction was flagged for internal review." },
+    { key: "routing", icon: UserCheck, title: responsibleLabel(issue), time: formatCustomerIssueTime(issue.updatedAt), description: issue.routingReason || "Responsible ownership can be adjusted by the team." },
+    ...(issue.resolvedAt ? [{ key: "resolved", icon: CheckCircle2, title: "Issue resolved", time: formatCustomerIssueTime(issue.resolvedAt), description: "This issue has been marked resolved by the team." }] : []),
+  ];
 }
 
 function UpgradeState({ showBillingAction }: { showBillingAction: boolean }) {
@@ -134,6 +202,7 @@ function IssueCard({
   issue,
   selected,
   canUpdate,
+  canUseManagerActions,
   updating,
   onOpen,
   onStatus,
@@ -141,11 +210,12 @@ function IssueCard({
   issue: CustomerIssue;
   selected: boolean;
   canUpdate: boolean;
+  canUseManagerActions: boolean;
   updating: boolean;
   onOpen: () => void;
   onStatus: (status: CustomerIssueStatus) => void;
 }) {
-  const actions = nextActions(issue.status, canUpdate);
+  const actions = nextActions(issue.status, canUpdate, canUseManagerActions);
   return (
     <article className={cn("rounded-2xl border bg-card p-4 shadow-sm transition hover:border-primary/25", selected && "border-primary/35 bg-secondary/20")}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -181,6 +251,7 @@ function IssueDetailPanel({
   businessId,
   issueId,
   canUpdate,
+  canUseManagerActions,
   onClose,
   onStatus,
   updating,
@@ -188,6 +259,7 @@ function IssueDetailPanel({
   businessId: string;
   issueId: string | null;
   canUpdate: boolean;
+  canUseManagerActions: boolean;
   onClose: () => void;
   onStatus: (issueId: string, status: CustomerIssueStatus) => void;
   updating: boolean;
@@ -268,9 +340,7 @@ function IssueDetailPanel({
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Today</p>
                   <ol className="mt-4 space-y-4">
-                    <TimelineItem icon={MessageSquareText} title="Issue detected from customer message" time={formatCustomerIssueTime(issue.createdAt)} description={issue.customerMessageExcerpt || "A customer interaction was flagged for internal review."} />
-                    <TimelineItem icon={UserCheck} title={responsibleLabel(issue)} time={formatCustomerIssueTime(issue.updatedAt)} description={issue.routingReason || "Responsible ownership can be adjusted by the team."} />
-                    {issue.resolvedAt && <TimelineItem icon={CheckCircle2} title="Issue resolved" time={formatCustomerIssueTime(issue.resolvedAt)} description="This issue has been marked resolved by the team." />}
+                    {timelineItems(issue).map((item) => <TimelineItem key={item.key} icon={item.icon} title={item.title} time={item.time} description={item.description} />)}
                   </ol>
                 </div>
               )}
@@ -293,7 +363,7 @@ function IssueDetailPanel({
                   <h4 className="text-sm font-bold">Status actions</h4>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">Move this issue forward without leaving the page.</p>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {nextActions(issue.status, canUpdate).length ? nextActions(issue.status, canUpdate).map((action) => (
+                    {nextActions(issue.status, canUpdate, canUseManagerActions).length ? nextActions(issue.status, canUpdate, canUseManagerActions).map((action) => (
                       <AppButton key={action.status} size="sm" loading={updating} variant={action.status === "RESOLVED" ? "default" : "outline"} onClick={() => onStatus(issue.id, action.status)}>
                         {action.label}
                       </AppButton>
@@ -309,7 +379,7 @@ function IssueDetailPanel({
   );
 }
 
-function PanelMetaRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon: typeof Clock3 }) {
+function PanelMetaRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon: LucideIcon }) {
   return (
     <div className="grid grid-cols-[1rem_minmax(7rem,0.42fr)_minmax(0,1fr)] items-center gap-3">
       <Icon className="size-4 text-muted-foreground" />
@@ -319,7 +389,7 @@ function PanelMetaRow({ label, value, icon: Icon }: { label: string; value: Reac
   );
 }
 
-function TimelineItem({ title, time, description, icon: Icon }: { title: string; time: string; description: string; icon: typeof Clock3 }) {
+function TimelineItem({ title, time, description, icon: Icon }: { title: string; time: string; description: string; icon: LucideIcon }) {
   return (
     <li className="flex gap-3">
       <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-primary"><Icon className="size-4" /></span>
@@ -332,7 +402,7 @@ function TimelineItem({ title, time, description, icon: Icon }: { title: string;
   );
 }
 
-function DetailRow({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Clock3 }) {
+function DetailRow({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
   return (
     <div className="flex gap-3 rounded-xl border bg-card p-3">
       <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><Icon className="size-4" /></span>
@@ -347,6 +417,7 @@ function DetailRow({ label, value, icon: Icon }: { label: string; value: string;
 export function CustomerIssuesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const profile = useCurrentUser();
   const query = parseQuery(searchParams);
   const activeTab = query.tab ?? "all";
@@ -358,12 +429,12 @@ export function CustomerIssuesPage() {
     ...(activeTab === "resolved" ? { status: "RESOLVED" } : {}),
   };
   const activeBusinessId = profile.data?.activeBusiness?.id;
-  const planCode = profile.data?.plan?.code;
   const billingAllowed = canManageBilling(profile.data);
   const canAccess = canAccessCustomerIssues(profile.data);
   const canUpdate = canUpdateCustomerIssueStatus(profile.data);
+  const canUseManagerActions = canUseManagerIssueActions(profile.data?.membership?.role);
   const selectedIssueId = searchParams.get("issue");
-  const issues = useCustomerIssues(activeBusinessId, requestQuery, Boolean(profile.data && canAccess && planCode !== "BASIC"));
+  const issues = useCustomerIssues(activeBusinessId, requestQuery, Boolean(profile.data && canAccess));
   const updateStatus = useUpdateCustomerIssueStatus(activeBusinessId);
   const [updatingIssueId, setUpdatingIssueId] = useState<string | null>(null);
 
@@ -380,14 +451,24 @@ export function CustomerIssuesPage() {
     setUpdatingIssueId(issueId);
     updateStatus.mutate({ issueId, status }, {
       onSuccess: () => systemNotify.success(`Issue marked ${CUSTOMER_ISSUE_STATUS_LABELS[status].toLowerCase()}.`),
-      onError: (error) => systemNotify.error("Could not update issue", { description: issueErrorMessage(error) }),
+      onError: (error) => {
+        systemNotify.error("Could not update issue", { description: issueErrorMessage(error) });
+        if (error instanceof ApiError && ["CUSTOMER_ISSUE_STATE_CHANGED", "INVALID_CUSTOMER_ISSUE_STATUS_TRANSITION", "CUSTOMER_ISSUE_CLOSED"].includes(error.code)) {
+          if (activeBusinessId) {
+            void Promise.all([
+              queryClient.invalidateQueries({ queryKey: queryKeys.customerIssues.business(activeBusinessId) }),
+              queryClient.invalidateQueries({ queryKey: queryKeys.customerIssues.detail(activeBusinessId, issueId) }),
+            ]);
+          }
+          void issues.refetch();
+        }
+      },
       onSettled: () => setUpdatingIssueId(null),
     });
   };
 
   if (profile.isPending) return <main className="space-y-4 p-4 sm:p-6 lg:p-8"><LoadingCard className="min-h-40" /><LoadingCard className="min-h-80" /></main>;
   if (!activeBusinessId) return <AppErrorState title="No active business" description="Select a business before viewing customer issues." />;
-  if (planCode === "BASIC") return <UpgradeState showBillingAction={billingAllowed} />;
   if (!canAccess) {
     return (
       <main className="grid min-h-[calc(100dvh-4rem)] place-items-center p-6">
@@ -425,7 +506,17 @@ export function CustomerIssuesPage() {
       </section>
 
       <AppCard className="shadow-none">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="relative md:col-span-4 lg:col-span-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <AppInput
+              value={query.search ?? ""}
+              onChange={(event) => setParams({ search: event.target.value, page: 1 })}
+              placeholder="Search complaints"
+              className="pl-9"
+              aria-label="Search issues by summary, customer message, lead, phone, category, subcategory, or conversation ID"
+            />
+          </div>
           <AppSelect
             value={query.status ?? "all"}
             onValueChange={(value) => setParams({ status: value === "all" ? undefined : value, page: 1 })}
@@ -465,6 +556,7 @@ export function CustomerIssuesPage() {
               issue={issue}
               selected={selectedIssueId === issue.id}
               canUpdate={canUpdate}
+              canUseManagerActions={canUseManagerActions}
               updating={updatingIssueId === issue.id && updateStatus.isPending}
               onOpen={() => setParams({ issue: issue.id })}
               onStatus={(status) => handleStatus(issue.id, status)}
@@ -493,6 +585,7 @@ export function CustomerIssuesPage() {
         businessId={activeBusinessId}
         issueId={selectedIssueId}
         canUpdate={canUpdate}
+        canUseManagerActions={canUseManagerActions}
         updating={Boolean(selectedIssueId && updatingIssueId === selectedIssueId && updateStatus.isPending)}
         onClose={() => setParams({ issue: undefined })}
         onStatus={handleStatus}

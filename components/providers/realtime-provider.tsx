@@ -183,15 +183,25 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
-  if (["business.customer_issue.created", "business.customer_issue.routed", "business.customer_issue.status_updated"].includes(type)) {
+  if (type.startsWith("business.customer_issue.") || type.startsWith("customer_issue.")) {
     const issueId = typeof payload.issueId === "string" ? payload.issueId : typeof payload.customerIssueId === "string" ? payload.customerIssueId : undefined;
+    const relatedConversationId = conversationId
+      ?? (typeof payload.conversationId === "string" ? payload.conversationId : undefined)
+      ?? (payload.conversation && typeof payload.conversation === "object" && typeof (payload.conversation as Record<string, unknown>).id === "string" ? (payload.conversation as Record<string, unknown>).id as string : undefined);
+    const relatedLeadId = leadId
+      ?? (typeof payload.leadId === "string" ? payload.leadId : undefined)
+      ?? (payload.lead && typeof payload.lead === "object" && typeof (payload.lead as Record<string, unknown>).id === "string" ? (payload.lead as Record<string, unknown>).id as string : undefined);
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.customerIssues.business(event.businessId) }),
       client.invalidateQueries({ queryKey: queryKeys.notifications.business(event.businessId) }),
       client.invalidateQueries({ queryKey: queryKeys.notifications.counts(event.businessId) }),
       ...(issueId ? [client.invalidateQueries({ queryKey: queryKeys.customerIssues.detail(event.businessId, issueId) })] : []),
-      ...(leadId ? [client.invalidateQueries({ queryKey: queryKeys.leads.detail(leadId) })] : []),
-      ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) })] : []),
+      ...(relatedLeadId ? [client.invalidateQueries({ queryKey: queryKeys.leads.detail(relatedLeadId) })] : []),
+      ...(relatedConversationId ? [
+        client.invalidateQueries({ queryKey: queryKeys.conversations.detail(relatedConversationId) }),
+        client.invalidateQueries({ queryKey: queryKeys.conversations.lists }),
+        client.invalidateQueries({ queryKey: queryKeys.conversations.stats }),
+      ] : []),
     ]);
     return;
   }

@@ -40,23 +40,64 @@ let issues: CustomerIssue[] = [
     lead: { id: "lead_2", name: "Akosua Owusu", phone: "+233271112233" },
     conversation: { id: "conv_2", displayId: "CONV-001001", title: "Pricing clarification", lastMessagePreview: "Please let someone senior confirm..." },
     routingReason: "AI found a pricing concern that needs human confirmation.",
-    status: "ACKNOWLEDGED",
+    status: "RESOLVED",
     createdBy: "AI",
     createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 5).toISOString(),
     updatedAt: new Date(now.getTime() - 1000 * 60 * 60 * 4).toISOString(),
-    resolvedAt: null,
+    resolvedAt: new Date(now.getTime() - 1000 * 60 * 60 * 3).toISOString(),
+    reopenCount: 1,
+    timelineEvents: [
+      {
+        id: "event_demo_1",
+        type: "CUSTOMER_ISSUE_REOPENED",
+        previousStatus: "RESOLVED",
+        newStatus: "REOPENED",
+        reopenSource: "MANAGER_ACTION",
+        createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 2).toISOString(),
+      },
+    ],
+    issueMessages: [
+      {
+        id: "msg_demo_resolution",
+        direction: "OUTBOUND",
+        body: "Thanks for raising this. A manager has reviewed the pricing and confirmed the revised quote.",
+        deliveryStatus: "PENDING",
+        createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 3).toISOString(),
+      },
+    ],
   },
 ];
 
+const allowedTransitions: Record<CustomerIssueStatus, CustomerIssueStatus[]> = {
+  OPEN: ["ACKNOWLEDGED", "RESOLVED", "CLOSED"],
+  ACKNOWLEDGED: ["RESOLVED", "CLOSED"],
+  REOPENED: ["ACKNOWLEDGED", "RESOLVED", "CLOSED"],
+  RESOLVED: ["REOPENED", "CLOSED"],
+  CLOSED: [],
+};
+
 function filterIssues(query: CustomerIssueListQuery) {
+  const search = query.search?.trim().toLowerCase();
   return issues
     .filter((issue) => !query.status || issue.status === query.status)
     .filter((issue) => !query.severity || issue.severity === query.severity)
     .filter((issue) => !query.category || issue.category === query.category)
     .filter((issue) => query.tab !== "assigned-to-me" || issue.responsibleMembershipId === "member_demo")
     .filter((issue) => query.tab !== "unassigned" || !issue.responsibleMembershipId)
-    .filter((issue) => query.tab !== "open" || ["OPEN", "ACKNOWLEDGED"].includes(issue.status))
-    .filter((issue) => query.tab !== "resolved" || ["RESOLVED", "CLOSED"].includes(issue.status));
+    .filter((issue) => query.tab !== "open" || ["OPEN", "ACKNOWLEDGED", "REOPENED"].includes(issue.status))
+    .filter((issue) => query.tab !== "resolved" || ["RESOLVED", "CLOSED"].includes(issue.status))
+    .filter((issue) => {
+      if (!search) return true;
+      return [
+        issue.summary,
+        issue.customerMessageExcerpt,
+        issue.lead?.name,
+        issue.lead?.phone,
+        issue.category,
+        issue.subcategory,
+        issue.conversation?.displayId,
+      ].some((value) => value?.toLowerCase().includes(search));
+    });
 }
 
 export const mockCustomerIssueService = {
@@ -81,11 +122,13 @@ export const mockCustomerIssueService = {
     let updated: CustomerIssue | undefined;
     issues = issues.map((issue) => {
       if (issue.id !== issueId) return issue;
+      if (!allowedTransitions[issue.status].includes(input.status)) return issue;
       updated = {
         ...issue,
         status: input.status as CustomerIssueStatus,
+        reopenCount: input.status === "REOPENED" ? (issue.reopenCount ?? 0) + 1 : issue.reopenCount,
         updatedAt: new Date().toISOString(),
-        resolvedAt: input.status === "RESOLVED" || input.status === "CLOSED" ? new Date().toISOString() : issue.resolvedAt,
+        resolvedAt: input.status === "RESOLVED" || input.status === "CLOSED" ? new Date().toISOString() : input.status === "REOPENED" ? null : issue.resolvedAt,
       };
       return updated;
     });
