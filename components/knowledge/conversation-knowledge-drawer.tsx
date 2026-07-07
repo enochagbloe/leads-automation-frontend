@@ -66,8 +66,8 @@ function knowledgeErrorMessage(error: unknown) {
   return getApiErrorMessage(error);
 }
 
-function AssetCard({ asset, onPreview, onSend }: { asset: KnowledgeSearchResult; onPreview: () => void; onSend: () => void }) {
-  const reason = disabledReason(asset);
+function AssetCard({ asset, sendUnavailableReason, onPreview, onSend }: { asset: KnowledgeSearchResult; sendUnavailableReason?: string | null; onPreview: () => void; onSend: () => void }) {
+  const reason = disabledReason(asset) ?? sendUnavailableReason;
   return (
     <article className="p-4">
       <button type="button" className="flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onPreview}>
@@ -97,8 +97,8 @@ function AssetCard({ asset, onPreview, onSend }: { asset: KnowledgeSearchResult;
   );
 }
 
-function PreviewPanel({ asset, onBack, onSend }: { asset: KnowledgeSearchResult; onBack: () => void; onSend: () => void }) {
-  const reason = disabledReason(asset);
+function PreviewPanel({ asset, sendUnavailableReason, onBack, onSend }: { asset: KnowledgeSearchResult; sendUnavailableReason?: string | null; onBack: () => void; onSend: () => void }) {
+  const reason = disabledReason(asset) ?? sendUnavailableReason;
   return (
     <div className="flex h-full flex-col">
       <div className="border-b p-4">
@@ -129,7 +129,19 @@ function PreviewPanel({ asset, onBack, onSend }: { asset: KnowledgeSearchResult;
   );
 }
 
-export function ConversationKnowledgeDrawer({ conversationId, canManage, onStageAsset }: { conversationId: string; canManage: boolean; onStageAsset?: (asset: StagedKnowledgeAsset) => void }) {
+export function ConversationKnowledgeDrawer({
+  conversationId,
+  canManage,
+  canStageAssets = true,
+  stageUnavailableReason,
+  onStageAsset,
+}: {
+  conversationId: string;
+  canManage: boolean;
+  canStageAssets?: boolean;
+  stageUnavailableReason?: string | null;
+  onStageAsset?: (asset: StagedKnowledgeAsset) => void;
+}) {
   const profile = useCurrentUser();
   const businessId = profile.data?.activeBusiness?.id;
   const plan = profile.data?.plan?.code ?? "BASIC";
@@ -142,6 +154,11 @@ export function ConversationKnowledgeDrawer({ conversationId, canManage, onStage
   const createArticle = useCreateKnowledgeArticle();
   const draftArticle = useStreamDraftKnowledgeArticle();
   const aiDraftAllowed = plan !== "BASIC" && canManage;
+  const sendUnavailableReason = !canStageAssets
+    ? stageUnavailableReason ?? "Replies are unavailable for this conversation."
+    : !onStageAsset
+      ? "Knowledge assets cannot be added from this view."
+      : null;
 
   const results = search.data ?? [];
   const openArticleEditor = () => {
@@ -150,6 +167,10 @@ export function ConversationKnowledgeDrawer({ conversationId, canManage, onStage
   };
 
   const startSend = (asset: KnowledgeSearchResult) => {
+    if (sendUnavailableReason) {
+      systemNotify.info("Knowledge asset cannot be added", { description: sendUnavailableReason });
+      return;
+    }
     onStageAsset?.({
       assetType: asset.assetType as KnowledgeAssetType,
       assetId: asset.id,
@@ -214,7 +235,7 @@ export function ConversationKnowledgeDrawer({ conversationId, canManage, onStage
   };
 
   if (selectedAsset) {
-    return <PreviewPanel asset={selectedAsset} onBack={() => setSelectedAsset(null)} onSend={() => startSend(selectedAsset)} />;
+    return <PreviewPanel asset={selectedAsset} sendUnavailableReason={sendUnavailableReason} onBack={() => setSelectedAsset(null)} onSend={() => startSend(selectedAsset)} />;
   }
 
   return (
@@ -222,6 +243,7 @@ export function ConversationKnowledgeDrawer({ conversationId, canManage, onStage
       <div className="border-b p-4">
         <h3 className="font-bold">Knowledge Base</h3>
         <p className="mt-1 text-xs text-muted-foreground">Search published articles and uploaded documents you can send during this conversation.</p>
+        {sendUnavailableReason && <p className="mt-3 rounded-xl border border-warning/20 bg-warning/10 px-3 py-2 text-xs font-semibold leading-5 text-warning">{sendUnavailableReason}</p>}
         <div className="mt-4 flex gap-2">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search knowledge base</span>
@@ -240,7 +262,7 @@ export function ConversationKnowledgeDrawer({ conversationId, canManage, onStage
         ) : search.isError ? (
           <AppEmptyState className="m-4 min-h-52 border-0" icon={TriangleAlert} title="Could not load knowledge assets" description={getApiErrorMessage(search.error)} />
         ) : results.length ? (
-          results.map((asset) => <AssetCard key={`${asset.assetType}-${asset.id}`} asset={asset} onPreview={() => setSelectedAsset(asset)} onSend={() => startSend(asset)} />)
+          results.map((asset) => <AssetCard key={`${asset.assetType}-${asset.id}`} asset={asset} sendUnavailableReason={sendUnavailableReason} onPreview={() => setSelectedAsset(asset)} onSend={() => startSend(asset)} />)
         ) : (
           <AppEmptyState
             className="m-4 min-h-52 border-0"

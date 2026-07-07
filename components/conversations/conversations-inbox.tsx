@@ -313,7 +313,23 @@ export function ConversationsInbox() {
   }, [markConversationRead, selectedConversation?.id, selectedConversation?.unreadCount]);
 
   const stageKnowledgeAsset = (asset: StagedKnowledgeAsset) => {
-    if (!selectedId) return;
+    if (!selectedId || !selectedConversation) return;
+    if (selectedConversation.status === "PLAN_LIMIT_BLOCKED" || selectedConversation.accessBlocked) {
+      systemNotify.error("Knowledge asset cannot be added", { description: "Replies are locked for this conversation." });
+      return;
+    }
+    if (selectedConversation.status === "CLOSED") {
+      systemNotify.error("Knowledge asset cannot be added", { description: "This conversation is closed." });
+      return;
+    }
+    if (selectedConversation.permissions?.canReply === false) {
+      systemNotify.error("Knowledge asset cannot be added", { description: "You do not have permission to reply in this conversation." });
+      return;
+    }
+    if (selectedConversation.channel === "WHATSAPP" && !(whatsapp.data?.canSendMessages ?? true)) {
+      systemNotify.error("Knowledge asset cannot be added", { description: "WhatsApp is not available for replies right now." });
+      return;
+    }
     setStagedKnowledgeAsset({ ...asset, conversationId: selectedId });
     setDraft(asset.messageText);
   };
