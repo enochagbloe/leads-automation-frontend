@@ -1,6 +1,6 @@
 import type { CustomerIssueCategory, CustomerIssueSeverity, CustomerIssueStatus, CustomerIssueType } from "@/types/customer-issue";
 
-export const CUSTOMER_ISSUE_STATUSES: CustomerIssueStatus[] = ["OPEN", "ACKNOWLEDGED", "RESOLVED", "CLOSED"];
+export const CUSTOMER_ISSUE_STATUSES: CustomerIssueStatus[] = ["OPEN", "ACKNOWLEDGED", "REOPENED", "RESOLVED", "CLOSED"];
 export const CUSTOMER_ISSUE_SEVERITIES: CustomerIssueSeverity[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 export const CUSTOMER_ISSUE_CATEGORIES: CustomerIssueCategory[] = [
   "DELAY",
@@ -19,6 +19,7 @@ export const CUSTOMER_ISSUE_CATEGORIES: CustomerIssueCategory[] = [
 export const CUSTOMER_ISSUE_STATUS_LABELS: Record<CustomerIssueStatus, string> = {
   OPEN: "Open",
   ACKNOWLEDGED: "Acknowledged",
+  REOPENED: "Reopened",
   RESOLVED: "Resolved",
   CLOSED: "Closed",
 };
@@ -53,6 +54,7 @@ export const CUSTOMER_ISSUE_TYPE_LABELS: Record<CustomerIssueType, string> = {
 export function customerIssueStatusTone(status: CustomerIssueStatus) {
   if (status === "OPEN") return "bg-warning/10 text-warning";
   if (status === "ACKNOWLEDGED") return "bg-info/10 text-info";
+  if (status === "REOPENED") return "bg-warning/10 text-warning";
   if (status === "RESOLVED") return "bg-success/10 text-success";
   return "bg-muted text-muted-foreground";
 }

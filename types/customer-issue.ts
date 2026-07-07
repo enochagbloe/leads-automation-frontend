@@ -14,7 +14,8 @@ export type CustomerIssueCategory =
   | "OTHER";
 
 export type CustomerIssueSeverity = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
-export type CustomerIssueStatus = "OPEN" | "ACKNOWLEDGED" | "RESOLVED" | "CLOSED";
+export type CustomerIssueStatus = "OPEN" | "ACKNOWLEDGED" | "REOPENED" | "RESOLVED" | "CLOSED";
+export type CustomerIssueReopenSource = "MANAGER_ACTION" | "CUSTOMER_MESSAGE" | "AI_MATCH" | string;
 
 export interface CustomerIssueMember {
   id: string;
@@ -35,6 +36,35 @@ export interface CustomerIssueConversation {
   displayId?: string | null;
   title?: string | null;
   lastMessagePreview?: string | null;
+}
+
+export interface CustomerIssueTimelineEvent {
+  id?: string;
+  type?: string;
+  title?: string;
+  description?: string | null;
+  message?: string | null;
+  actorType?: string | null;
+  actorName?: string | null;
+  previousStatus?: CustomerIssueStatus | null;
+  newStatus?: CustomerIssueStatus | null;
+  reopenSource?: CustomerIssueReopenSource | null;
+  previousCategory?: CustomerIssueCategory | null;
+  previousSeverity?: CustomerIssueSeverity | null;
+  createdAt?: string | null;
+  timestamp?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface CustomerIssueMessage {
+  id: string;
+  direction?: "INBOUND" | "OUTBOUND" | string;
+  body?: string | null;
+  text?: string | null;
+  content?: string | null;
+  deliveryStatus?: "PENDING" | "SENT" | "DELIVERED" | "READ" | "FAILED" | string | null;
+  createdAt?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface CustomerIssue {
@@ -59,10 +89,13 @@ export interface CustomerIssue {
   conversation?: CustomerIssueConversation | null;
   routingReason?: string | null;
   status: CustomerIssueStatus;
+  reopenCount?: number;
   createdBy: "AI" | "MANUAL";
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string | null;
+  timelineEvents?: CustomerIssueTimelineEvent[];
+  issueMessages?: CustomerIssueMessage[];
 }
 
 export interface CustomerIssueListQuery {
@@ -71,6 +104,7 @@ export interface CustomerIssueListQuery {
   status?: CustomerIssueStatus;
   severity?: CustomerIssueSeverity;
   category?: CustomerIssueCategory;
+  search?: string;
   responsibleMembershipId?: string;
   tab?: "all" | "assigned-to-me" | "unassigned" | "open" | "resolved";
   dateFrom?: string;

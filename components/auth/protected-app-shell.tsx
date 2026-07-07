@@ -138,7 +138,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const canViewLeads = canAccessOperationalPage(profile.data, "leads");
   const canViewConversations = canAccessOperationalPage(profile.data, "conversations");
   const canViewAppointments = canAccessOperationalPage(profile.data, "appointments");
-  const canViewCustomerIssues = profile.data.plan?.code !== "BASIC" && canAccessCustomerIssues(profile.data);
+  const canViewCustomerIssues = canAccessCustomerIssues(profile.data);
   const canViewKnowledgeBase = canManageBusinessSettings || permissions.canManageAiSettings || permissions.canUseAi || canViewConversations;
   const navItems: SidebarNavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main", visible: permissions.canViewDashboard },

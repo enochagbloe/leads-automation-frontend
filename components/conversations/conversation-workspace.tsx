@@ -1,5 +1,6 @@
 "use client";
 
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   Activity,
   ArrowLeft,
@@ -9,10 +10,12 @@ import {
   CheckCheck,
   ChevronLeft,
   ChevronRight,
+  Clipboard,
   Clock3,
   CircleUserRound,
   ExternalLink,
   FileText,
+  Forward,
   Link2,
   LockKeyhole,
   MessageCircleMore,
@@ -23,6 +26,7 @@ import {
   Pin,
   PinOff,
   Send,
+  Trash2,
   TriangleAlert,
   UsersRound,
   X,
@@ -35,7 +39,7 @@ import { AppSelect, type AppSelectOption } from "@/components/app-select";
 import { IncompleteBusinessNotice } from "@/components/business-setup/incomplete-business-notice";
 import { ConversationComposer, type Macro } from "@/components/conversations/composer/conversation-composer";
 import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
-import { ConversationKnowledgeDrawer } from "@/components/knowledge/conversation-knowledge-drawer";
+import { ConversationKnowledgeDrawer, type StagedKnowledgeAsset } from "@/components/knowledge/conversation-knowledge-drawer";
 import { RealtimeStatusIndicator } from "@/components/conversations/realtime-status-indicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ACTIVE_CONVERSATION_STATUSES, CONVERSATION_CHANNEL_LABELS, CONVERSATION_PRIORITIES, CONVERSATION_PRIORITY_LABELS, CONVERSATION_STATUS_LABELS, conversationPriorityTone, formatConversationDateTime, formatMessageTime } from "@/lib/conversations";
@@ -103,6 +107,31 @@ function ArticleMessageCard({ article }: { article: Article }) {
 }
 
 function MessageBubble({ message, channel, retrying, onRetry }: { message: ConversationMessage; channel: Conversation["channel"]; retrying: boolean; onRetry: () => void }) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const longPressTimer = useRef<number | null>(null);
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      systemNotify.success("Message copied");
+    } catch {
+      systemNotify.error("Could not copy message");
+    }
+    setActionsOpen(false);
+  };
+
+  const placeholderAction = (label: string) => {
+    systemNotify.info(`${label} will be connected later.`);
+    setActionsOpen(false);
+  };
+
   if (message.senderType === "SYSTEM") {
     return (
       <div className="my-6 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
@@ -125,7 +154,20 @@ function MessageBubble({ message, channel, retrying, onRetry }: { message: Conve
   const failed = showWhatsAppStatus && message.deliveryStatus === "FAILED";
 
   return (
-    <article className={cn("group mb-6 flex gap-3", outbound && "flex-row-reverse")}>
+    <article
+      className={cn("group relative mb-6 flex gap-3", outbound && "flex-row-reverse")}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setActionsOpen((open) => !open);
+      }}
+      onTouchStart={() => {
+        clearLongPress();
+        longPressTimer.current = window.setTimeout(() => setActionsOpen(true), 520);
+      }}
+      onTouchMove={clearLongPress}
+      onTouchEnd={clearLongPress}
+      onTouchCancel={clearLongPress}
+    >
       <span className={cn("grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-bold", outbound ? "bg-primary text-primary-foreground" : "bg-secondary text-primary")}>
         {message.senderType === "AI" ? <Bot className="size-4" /> : initials(senderName)}
       </span>
@@ -153,6 +195,14 @@ function MessageBubble({ message, channel, retrying, onRetry }: { message: Conve
           </div>
         )}
       </div>
+      {actionsOpen && (
+        <div className={cn("absolute top-2 z-30 w-40 rounded-xl border bg-popover p-1.5 text-xs shadow-[0_16px_40px_rgba(20,35,27,0.18)]", outbound ? "right-12" : "left-12")}>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" onClick={() => void copyMessage()}><Clipboard className="size-3.5" />Copy</button>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" onClick={() => placeholderAction("Forward to internal discussion")}><Forward className="size-3.5" />Forward</button>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" onClick={() => placeholderAction("Pin message")}><Pin className="size-3.5" />Pin</button>
+          <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left font-semibold text-destructive outline-none transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring" onClick={() => placeholderAction("Delete message")}><Trash2 className="size-3.5" />Delete</button>
+        </div>
+      )}
     </article>
   );
 }
@@ -191,7 +241,7 @@ const REPLY_MACROS: Macro[] = [
   { id: "appointment", title: "Appointment request", content: "What day and time would work best for your appointment?" },
 ];
 
-function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending, closed, closedAt, channel, senderName, whatsappCanSend, whatsappStatus, isOwner }: { draft: string; onDraftChange: (value: string) => void; onSend: () => void; onEnd: () => void; sending: boolean; ending: boolean; closed: boolean; closedAt: string | null; channel: Conversation["channel"]; senderName: string; whatsappCanSend: boolean; whatsappStatus?: string; isOwner: boolean }) {
+function MessageComposer({ draft, stagedKnowledgeAsset, onDraftChange, onClearStagedKnowledgeAsset, onSend, onEnd, sending, ending, closed, closedAt, channel, senderName, whatsappCanSend, whatsappStatus, isOwner }: { draft: string; stagedKnowledgeAsset?: StagedKnowledgeAsset | null; onDraftChange: (value: string) => void; onClearStagedKnowledgeAsset?: () => void; onSend: () => void; onEnd: () => void; sending: boolean; ending: boolean; closed: boolean; closedAt: string | null; channel: Conversation["channel"]; senderName: string; whatsappCanSend: boolean; whatsappStatus?: string; isOwner: boolean }) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const emojiRef = useRef<HTMLDivElement>(null);
 
@@ -230,9 +280,13 @@ function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending,
       : "WhatsApp is not connected for this business. Connect WhatsApp in Settings before sending replies.";
 
   return (
-    <div className="border-t bg-card px-3 py-3 sm:px-6">
+    <div className="border-t bg-card px-3 py-2 sm:px-6 sm:py-3">
       <div className="relative mx-auto max-w-4xl">
         {whatsAppBlocked && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/20 bg-warning/5 px-3 py-2 text-xs text-muted-foreground"><span>{blockedMessage}</span>{isOwner ? <a href="/settings/business/whatsapp" className="font-semibold text-primary underline underline-offset-4">Go to WhatsApp Settings</a> : <span className="font-semibold">Ask the business owner to reconnect WhatsApp.</span>}</div>}
+        {stagedKnowledgeAsset && <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-primary/15 bg-secondary/70 px-3 py-2 text-xs text-primary">
+          <span className="min-w-0 truncate"><BookOpen className="mr-1.5 inline size-3.5" />Attached: <strong>{stagedKnowledgeAsset.title}</strong></span>
+          <button type="button" className="shrink-0 font-bold underline underline-offset-4 hover:text-primary/80" onClick={onClearStagedKnowledgeAsset}>Remove</button>
+        </div>}
         <ConversationComposer
           channels={[
             { id: channel, name: CONVERSATION_CHANNEL_LABELS[channel], description: channel === "WHATSAPP" ? "WhatsApp delivery" : "Stored internally" },
@@ -252,7 +306,7 @@ function MessageComposer({ draft, onDraftChange, onSend, onEnd, sending, ending,
           onOpenEmojiPicker={() => setEmojiOpen((open) => !open)}
         />
         {emojiOpen && <div ref={emojiRef} className="absolute bottom-12 left-10 z-20 flex w-56 flex-wrap gap-1 rounded-xl border bg-popover p-2 shadow-[0_14px_40px_rgba(20,35,27,0.16)]" aria-label="Emoji picker">{["🙂", "👍", "🙏", "✅", "🎉", "📅", "📍", "💬", "❤️", "👋", "😊", "🤝"].map((emoji) => <button key={emoji} type="button" className="grid size-9 place-items-center rounded-lg text-lg transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { onDraftChange(`${draft}${emoji}`); setEmojiOpen(false); }}>{emoji}</button>)}</div>}
-        <p className="mt-1.5 px-1 text-[10px] text-muted-foreground">{channel === "WHATSAPP" ? "Replies are sent through the connected WhatsApp provider." : "Stored in BizReply only."}</p>
+        <p className="mt-1.5 hidden px-1 text-[10px] text-muted-foreground sm:block">{channel === "WHATSAPP" ? "Replies are sent through the connected WhatsApp provider." : "Stored in BizReply only."}</p>
       </div>
     </div>
   );
@@ -354,7 +408,7 @@ function ActivityPanel({ activities }: { activities: LeadActivity[] }) {
   return <div className="h-full overflow-y-auto p-5"><h3 className="font-bold">Recent activity</h3><ol className="mt-5 space-y-5">{activities.length ? activities.map((item) => <li key={item.id} className="relative border-l-2 border-secondary pl-4"><span className="absolute -left-[5px] top-0 size-2 rounded-full bg-primary" /><p className="text-sm font-semibold">{getLeadActivityLabel(item.action)}</p><p className="mt-1 text-xs text-muted-foreground">{item.actor ? `${item.actor.firstName} ${item.actor.lastName} · ` : ""}{formatLeadDate(item.createdAt)}</p></li>) : <li><AppEmptyState className="min-h-52 border-0" icon={Activity} title="No activity yet" description="Lead and conversation events will appear here." /></li>}</ol></div>;
 }
 
-function ConversationContextDrawer({ active, open, onClose, conversation, leadDetail, activities, assigneeOptions, canManage, statusBusy, assignBusy, notesBusy, onStatus, onAssign, onNotes }: { active: ContextPanel; open: boolean; onClose: () => void; conversation: Conversation; leadDetail?: LeadDetailResponse; activities: LeadActivity[]; assigneeOptions: AppSelectOption[]; canManage: boolean; statusBusy: boolean; assignBusy: boolean; notesBusy: boolean; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void; onNotes: (notes: string | null) => void }) {
+function ConversationContextDrawer({ active, open, onClose, conversation, leadDetail, activities, assigneeOptions, canManage, statusBusy, assignBusy, notesBusy, onStageKnowledgeAsset, onStatus, onAssign, onNotes }: { active: ContextPanel; open: boolean; onClose: () => void; conversation: Conversation; leadDetail?: LeadDetailResponse; activities: LeadActivity[]; assigneeOptions: AppSelectOption[]; canManage: boolean; statusBusy: boolean; assignBusy: boolean; notesBusy: boolean; onStageKnowledgeAsset?: (asset: StagedKnowledgeAsset) => void; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void; onNotes: (notes: string | null) => void }) {
   const title = RAIL_ITEMS.find((item) => item.id === active)?.label ?? "Context";
   return (
     <aside
@@ -366,7 +420,7 @@ function ConversationContextDrawer({ active, open, onClose, conversation, leadDe
     >
       <div className="flex h-14 shrink-0 items-center justify-between border-b px-4 xl:hidden"><p className="font-bold">{title}</p><AppButton size="icon" variant="ghost" aria-label="Close context panel" onClick={onClose}><X className="size-4" /></AppButton></div>
       <div key={active} className="conversation-context-content min-h-0 flex-1">
-        {active === "knowledge" && <ConversationKnowledgeDrawer conversationId={conversation.id} canManage={canManage} />}
+        {active === "knowledge" && <ConversationKnowledgeDrawer conversationId={conversation.id} canManage={canManage} onStageAsset={onStageKnowledgeAsset} />}
         {active === "profile" && <LeadProfilePanel conversation={conversation} leadDetail={leadDetail} assigneeOptions={assigneeOptions} canManage={canManage} statusBusy={statusBusy} assignBusy={assignBusy} onStatus={onStatus} onAssign={onAssign} />}
         {active === "internal" && <SideConversationPanel conversation={conversation} />}
         {active === "notes" && <NotesPanel notes={leadDetail?.lead.notes} saving={notesBusy} onSave={onNotes} />}
@@ -413,6 +467,7 @@ export function ConversationWorkspace({
   isOwner,
   businessSetup,
   draft,
+  stagedKnowledgeAsset,
   sending,
   ending,
   retryingMessageId,
@@ -429,6 +484,8 @@ export function ConversationWorkspace({
   onPrevious,
   onNext,
   onDraftChange,
+  onStageKnowledgeAsset,
+  onClearStagedKnowledgeAsset,
   onSend,
   onEnd,
   onRetryMessage,
@@ -451,6 +508,7 @@ export function ConversationWorkspace({
   isOwner: boolean;
   businessSetup?: BusinessSetupStatus;
   draft: string;
+  stagedKnowledgeAsset?: StagedKnowledgeAsset | null;
   sending: boolean;
   ending: boolean;
   retryingMessageId: string | null;
@@ -467,6 +525,8 @@ export function ConversationWorkspace({
   onPrevious: () => void;
   onNext: () => void;
   onDraftChange: (value: string) => void;
+  onStageKnowledgeAsset?: (asset: StagedKnowledgeAsset) => void;
+  onClearStagedKnowledgeAsset?: () => void;
   onSend: () => void;
   onEnd: () => void;
   onRetryMessage: (messageId: string) => void;
@@ -508,12 +568,12 @@ export function ConversationWorkspace({
           <div className="hidden items-center gap-1 sm:flex"><AppButton size="icon" variant="ghost" className="size-9 min-h-9" aria-label="Previous conversation" disabled={!hasPrevious} onClick={onPrevious}><ChevronLeft className="size-4" /></AppButton><AppButton size="icon" variant="ghost" className="size-9 min-h-9" aria-label="Next conversation" disabled={!hasNext} onClick={onNext}><ChevronRight className="size-4" /></AppButton></div>
           <div className="min-w-0 flex-1 sm:ml-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="shrink-0 text-xs font-bold text-primary">{conversation.displayId}</span>
+              <span className="hidden shrink-0 text-xs font-bold text-primary sm:inline">{conversation.displayId}</span>
               {editingSubject
                 ? <form className="flex min-w-0 flex-1 items-center gap-1" onSubmit={(event) => { event.preventDefault(); onUpdate({ subject: subject.trim() || null }); setEditingSubject(false); }}><label className="sr-only" htmlFor="conversation-subject">Conversation subject</label><input id="conversation-subject" autoFocus value={subject} onChange={(event) => setSubject(event.target.value)} className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring" /><AppButton type="submit" size="sm" className="h-8 min-h-8" loading={updateBusy}>Save</AppButton><AppButton type="button" size="sm" variant="ghost" className="h-8 min-h-8" onClick={() => { setSubject(conversation.subject ?? ""); setEditingSubject(false); }}>Cancel</AppButton></form>
-                : <><h1 className="truncate text-sm font-bold sm:text-base">{conversation.subject ?? conversation.lead.fullName}</h1>{canEditConversation && <AppButton size="icon" variant="ghost" className="size-8 min-h-8 shrink-0" aria-label="Edit conversation subject" onClick={() => setEditingSubject(true)}><Pencil className="size-3.5" /></AppButton>}</>}
+                : <><h1 className="truncate text-sm font-bold sm:text-base"><span className="sm:hidden">{conversation.lead.fullName}</span><span className="hidden sm:inline">{conversation.subject ?? conversation.lead.fullName}</span></h1>{canEditConversation && <AppButton size="icon" variant="ghost" className="hidden size-8 min-h-8 shrink-0 sm:grid" aria-label="Edit conversation subject" onClick={() => setEditingSubject(true)}><Pencil className="size-3.5" /></AppButton>}</>}
             </div>
-            <p className="mt-0.5 flex items-center gap-2 truncate text-[11px] text-muted-foreground"><span className="truncate">{conversation.lead.fullName} · {CONVERSATION_CHANNEL_LABELS[conversation.channel]} channel</span><span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold", conversationPriorityTone(conversation.priority))}>{CONVERSATION_PRIORITY_LABELS[conversation.priority]}</span></p>
+            <p className="mt-0.5 hidden items-center gap-2 truncate text-[11px] text-muted-foreground sm:flex"><span className="truncate">{conversation.lead.fullName} · {CONVERSATION_CHANNEL_LABELS[conversation.channel]} channel</span><span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold", conversationPriorityTone(conversation.priority))}>{CONVERSATION_PRIORITY_LABELS[conversation.priority]}</span></p>
           </div>
           <RealtimeStatusIndicator className="hidden sm:inline-flex" />
           {!locked && <AppButton size="icon" variant={conversation.pinned ? "secondary" : "ghost"} className="shrink-0" loading={updateBusy} aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"} aria-pressed={conversation.pinned} onClick={() => onUpdate({ pinned: !conversation.pinned })}>{conversation.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}</AppButton>}
@@ -522,28 +582,40 @@ export function ConversationWorkspace({
             ? <ConversationStatusBadge status={conversation.status} />
             : <div className="hidden w-44 lg:block"><AppSelect aria-label="Conversation status" value={conversation.status} options={ACTIVE_CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} /></div>}
           <AppButton size="icon" variant="ghost" aria-label="Open lead profile" className="md:hidden" onClick={() => toggleContext("profile")}><CircleUserRound className="size-4" /></AppButton>
-          {canManage && !locked && <ConfirmDialog trigger={<AppButton size="icon" variant="ghost" aria-label="Delete conversation" title="Delete conversation"><MoreHorizontal className="size-4" /></AppButton>} title="Delete this conversation?" description="The conversation will disappear from this business inbox." confirmLabel="Delete conversation" loading={deleting} onConfirm={onDelete} />}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <AppButton size="icon" variant="ghost" aria-label="Conversation actions" className="md:hidden"><MoreHorizontal className="size-4" /></AppButton>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={8} className="account-menu-content z-[80] min-w-52 rounded-xl border bg-popover p-1.5 shadow-[0_14px_40px_rgba(20,35,27,0.14)]">
+                {canEditConversation && <DropdownMenu.Item onSelect={() => setEditingSubject(true)} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold outline-none data-[highlighted]:bg-muted"><Pencil className="size-3.5" />Edit conversation</DropdownMenu.Item>}
+                {canClose && <DropdownMenu.Item disabled={ending} onSelect={() => { if (window.confirm("End this conversation?")) onEnd(); }} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45 data-[highlighted]:bg-muted"><X className="size-3.5" />End Chat</DropdownMenu.Item>}
+                {canManage && !locked && <DropdownMenu.Item disabled={deleting} onSelect={() => { if (window.confirm("Delete this conversation from the business inbox?")) onDelete(); }} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-destructive outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45 data-[highlighted]:bg-destructive/10"><Trash2 className="size-3.5" />Delete chat</DropdownMenu.Item>}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+          {canManage && !locked && <ConfirmDialog trigger={<AppButton size="icon" variant="ghost" className="hidden md:inline-flex" aria-label="Delete conversation" title="Delete conversation"><MoreHorizontal className="size-4" /></AppButton>} title="Delete this conversation?" description="The conversation will disappear from this business inbox." confirmLabel="Delete conversation" loading={deleting} onConfirm={onDelete} />}
           {canClose && <ConfirmDialog trigger={<AppButton size="sm" className="hidden sm:inline-flex">End Chat</AppButton>} title="End this conversation?" description="The conversation will be closed. If the customer replies later, BizReply will automatically reopen it." confirmLabel="End Chat" loading={ending} onConfirm={onEnd} />}
         </header>
 
         <ConversationTabs active={tab} onChange={setTab} activityCount={activities.length} />
         {businessSetup && <IncompleteBusinessNotice status={businessSetup} canManage={canManage} />}
         <div className="flex gap-1 overflow-x-auto border-b bg-card px-2 py-1.5 md:hidden" aria-label="Conversation context tools">
-          {RAIL_ITEMS.map(({ id, label, icon: Icon }) => <AppButton key={id} size="sm" variant={context === id ? "secondary" : "ghost"} className="shrink-0" aria-pressed={context === id} onClick={() => toggleContext(id)}><Icon className="size-4" />{label}</AppButton>)}
+          {RAIL_ITEMS.map(({ id, label, icon: Icon }) => <AppButton key={id} size="icon" variant={context === id ? "secondary" : "ghost"} className="size-9 min-h-9 shrink-0 rounded-full" aria-label={label} aria-pressed={context === id} title={label} onClick={() => toggleContext(id)}><Icon className="size-4" /></AppButton>)}
         </div>
 
         <div className="flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
             {tab === "conversation" && (locked && !canViewMessages
               ? <LockedConversationState conversation={conversation} canManageBilling={isOwner} />
-              : <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} />{locked ? <ConversationReplyNotice title="Replies are locked" description="Restore payment, upgrade your plan, or wait for quota reset before replying to this customer." action={isOwner ? <AppButton asChild size="sm"><a href="/settings/billing">View Billing</a></AppButton> : undefined} /> : !canReply && !closed ? <ConversationReplyNotice title="Replies are unavailable" description="You do not have permission to reply in this conversation." /> : <MessageComposer draft={draft} onDraftChange={onDraftChange} onSend={onSend} onEnd={onEnd} sending={sending} ending={ending} closed={closed} closedAt={conversation.closedAt} channel={conversation.channel} senderName={senderName} whatsappCanSend={whatsappCanSend} whatsappStatus={whatsappStatus} isOwner={isOwner} />}</>)}
+              : <><ConversationTimeline messages={messages} channel={conversation.channel} retryingMessageId={retryingMessageId} hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} onRetryMessage={onRetryMessage} />{locked ? <ConversationReplyNotice title="Replies are locked" description="Restore payment, upgrade your plan, or wait for quota reset before replying to this customer." action={isOwner ? <AppButton asChild size="sm"><a href="/settings/billing">View Billing</a></AppButton> : undefined} /> : !canReply && !closed ? <ConversationReplyNotice title="Replies are unavailable" description="You do not have permission to reply in this conversation." /> : <MessageComposer draft={draft} stagedKnowledgeAsset={stagedKnowledgeAsset} onDraftChange={onDraftChange} onClearStagedKnowledgeAsset={onClearStagedKnowledgeAsset} onSend={onSend} onEnd={onEnd} sending={sending} ending={ending} closed={closed} closedAt={conversation.closedAt} channel={conversation.channel} senderName={senderName} whatsappCanSend={whatsappCanSend} whatsappStatus={whatsappStatus} isOwner={isOwner} />}</>)}
             {tab === "tasks" && <AppEmptyState className="m-6 min-h-72 border-0 bg-transparent" icon={FileText} title="Tasks are coming later" description="The conversation workspace is prepared for a future task module." />}
             {tab === "activity" && <ActivityPanel activities={activities} />}
             {tab === "notes" && <NotesPanel notes={leadDetail?.lead.notes} saving={notesBusy} onSave={onNotes} />}
           </div>
           <div className={cn("grid h-full min-h-0 shrink-0 overflow-hidden transition-[grid-template-columns] duration-300 ease-out xl:grid", context ? "xl:grid-cols-[340px]" : "xl:grid-cols-[0px]")}>
             <div className="h-full min-h-0 min-w-0 overflow-hidden xl:w-[340px]">
-              <ConversationContextDrawer active={renderedContext} open={Boolean(context)} onClose={() => setContext(null)} conversation={conversation} leadDetail={leadDetail} activities={activities} assigneeOptions={assigneeOptions} canManage={canAssign} statusBusy={statusBusy} assignBusy={assignBusy} notesBusy={notesBusy} onStatus={onStatus} onAssign={onAssign} onNotes={onNotes} />
+              <ConversationContextDrawer active={renderedContext} open={Boolean(context)} onClose={() => setContext(null)} conversation={conversation} leadDetail={leadDetail} activities={activities} assigneeOptions={assigneeOptions} canManage={canAssign} statusBusy={statusBusy} assignBusy={assignBusy} notesBusy={notesBusy} onStageKnowledgeAsset={onStageKnowledgeAsset} onStatus={onStatus} onAssign={onAssign} onNotes={onNotes} />
             </div>
           </div>
           <ConversationRightRail active={context} onSelect={toggleContext} />

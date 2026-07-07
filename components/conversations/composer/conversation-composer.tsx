@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle, Send, Unplug } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChannelSelector } from "@/components/conversations/composer/channel-selector";
 import { ComposerToolbar } from "@/components/conversations/composer/composer-toolbar";
 import { SenderSelector } from "@/components/conversations/composer/sender-selector";
@@ -41,6 +41,17 @@ export function ConversationComposer({
     onMessageChange?.(next);
   };
 
+  const resizeTextarea = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 72)}px`;
+  };
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [value]);
+
   const selectMacro = (macro: Macro) => {
     updateMessage(value ? `${value}\n${macro.content}` : macro.content);
     onSelectMacro?.(macro);
@@ -55,38 +66,49 @@ export function ConversationComposer({
   };
 
   return (
-    <section aria-label="Conversation message composer" className={cn("w-full rounded-xl border border-composer-foreground/15 bg-composer px-2.5 py-2.5 text-composer-foreground shadow-[0_2px_8px_rgba(48,44,36,0.05)] transition-[border-color,box-shadow] focus-within:border-composer-foreground/25 focus-within:shadow-[0_3px_12px_rgba(48,44,36,0.08)]", disabled && "opacity-65")}>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <section aria-label="Conversation message composer" className={cn("w-full rounded-full border border-composer-foreground/15 bg-composer px-2 py-1.5 text-composer-foreground shadow-[0_2px_8px_rgba(48,44,36,0.05)] transition-[border-color,box-shadow] focus-within:border-composer-foreground/25 focus-within:shadow-[0_3px_12px_rgba(48,44,36,0.08)] sm:rounded-xl sm:px-2.5 sm:py-2.5", disabled && "opacity-65")}>
+      <div className="hidden min-w-0 items-center gap-2 sm:flex">
         <ChannelSelector channels={channels} activeId={activeChannelId} disabled={disabled || isSending} onChange={onChannelChange} />
         <span className="text-[10px] font-medium text-composer-foreground/50">From</span>
-        <SenderSelector accounts={senderAccounts} activeId={activeSenderAccountId} disabled={disabled || isSending} onChange={onSenderAccountChange} />
-        <button type="button" disabled className="ml-auto grid size-8 place-items-center rounded-lg bg-composer-control text-composer-foreground/45" aria-label="Connection settings coming soon" title="Connection settings coming soon"><Unplug className="size-3.5" /></button>
+        <span className="min-w-0"><SenderSelector accounts={senderAccounts} activeId={activeSenderAccountId} disabled={disabled || isSending} onChange={onSenderAccountChange} /></span>
+        <button type="button" disabled className="ml-auto hidden size-8 place-items-center rounded-lg bg-composer-control text-composer-foreground/45 sm:grid" aria-label="Connection settings coming soon" title="Connection settings coming soon"><Unplug className="size-3.5" /></button>
       </div>
 
-      <label htmlFor="conversation-composer-input" className="sr-only">Message</label>
-      <textarea
-        ref={textareaRef}
-        id="conversation-composer-input"
-        rows={2}
-        value={value}
-        disabled={disabled || isSending}
-        onChange={(event) => updateMessage(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            void sendMessage();
-          }
-        }}
-        placeholder="Comment or Type '/' For commands"
-        className="my-1.5 min-h-14 w-full resize-none bg-transparent px-1.5 py-2 text-sm leading-5 text-composer-foreground outline-none placeholder:text-composer-foreground/40 disabled:cursor-not-allowed"
-      />
+      <div className="flex items-center gap-1.5 sm:block">
+        <div className="sm:hidden">
+          <ComposerToolbar macros={macros} disabled={disabled || isSending} attachmentDisabled={attachmentDisabled} emojiDisabled={emojiDisabled} voiceNoteDisabled={voiceNoteDisabled} onAttachFile={onAttachFile} onOpenEmojiPicker={onOpenEmojiPicker} onStartVoiceNote={onStartVoiceNote} onSelectMacro={selectMacro} />
+        </div>
+        <label htmlFor="conversation-composer-input" className="sr-only">Message</label>
+        <textarea
+          ref={textareaRef}
+          id="conversation-composer-input"
+          rows={1}
+          value={value}
+          disabled={disabled || isSending}
+          onChange={(event) => {
+            updateMessage(event.target.value);
+            requestAnimationFrame(resizeTextarea);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void sendMessage();
+            }
+          }}
+          placeholder="Message"
+          className="max-h-[72px] min-h-7 flex-1 resize-none bg-transparent px-1 py-1 text-sm leading-5 text-composer-foreground outline-none placeholder:text-composer-foreground/40 disabled:cursor-not-allowed sm:my-1.5 sm:min-h-14 sm:w-full sm:px-1.5 sm:py-2 sm:placeholder:text-composer-foreground/40"
+        />
+        <button type="button" disabled={disabled || isSending || !value.trim()} onClick={() => void sendMessage()} className="inline-flex min-h-8 min-w-8 cursor-pointer items-center justify-center rounded-full bg-composer-foreground text-xs font-semibold text-composer transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:hidden">
+          {isSending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+        </button>
+      </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="hidden items-center gap-2 sm:flex">
         <ComposerToolbar macros={macros} disabled={disabled || isSending} attachmentDisabled={attachmentDisabled} emojiDisabled={emojiDisabled} voiceNoteDisabled={voiceNoteDisabled} onAttachFile={onAttachFile} onOpenEmojiPicker={onOpenEmojiPicker} onStartVoiceNote={onStartVoiceNote} onSelectMacro={selectMacro} />
         <div className="ml-auto flex items-center gap-2">
-          {endChatTrigger ?? <button type="button" disabled={disabled || isSending || endChatDisabled} onClick={onEndChat} className="min-h-8 cursor-pointer px-2 text-xs font-semibold text-composer-foreground underline decoration-composer-foreground/35 underline-offset-4 outline-none hover:decoration-composer-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40">End Chat</button>}
-          <button type="button" disabled={disabled || isSending || !value.trim()} onClick={() => void sendMessage()} className="inline-flex min-h-9 min-w-16 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-composer-foreground px-4 text-xs font-semibold text-composer transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40">
-            {isSending ? <><LoaderCircle className="size-3.5 animate-spin" />Sending</> : <><Send className="size-3.5 sm:hidden" />Send</>}
+          <span className="hidden sm:inline-flex">{endChatTrigger ?? <button type="button" disabled={disabled || isSending || endChatDisabled} onClick={onEndChat} className="min-h-8 cursor-pointer px-2 text-xs font-semibold text-composer-foreground underline decoration-composer-foreground/35 underline-offset-4 outline-none hover:decoration-composer-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40">End Chat</button>}</span>
+          <button type="button" disabled={disabled || isSending || !value.trim()} onClick={() => void sendMessage()} className="inline-flex min-h-8 min-w-8 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-composer-foreground px-0 text-xs font-semibold text-composer transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9 sm:min-w-16 sm:rounded-lg sm:px-4">
+            {isSending ? <><LoaderCircle className="size-3.5 animate-spin" /><span className="hidden sm:inline">Sending</span></> : <><Send className="size-3.5 sm:hidden" /><span className="hidden sm:inline">Send</span></>}
           </button>
         </div>
       </div>
