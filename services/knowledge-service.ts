@@ -136,18 +136,26 @@ function authHeaders(headers?: HeadersInit) {
   };
 }
 
-async function authenticatedKnowledgeFetch(path: string, init: RequestInit, allowRefresh = true): Promise<Response> {
-  const response = await fetch(`${env.apiUrl}${path}`, {
+function knowledgeFetch(path: string, init: RequestInit) {
+  return fetch(`${env.apiUrl}${path}`, {
     ...init,
     headers: authHeaders(init.headers),
   });
+}
+
+async function authenticatedKnowledgeFetch(path: string, init: RequestInit, allowRefresh = true): Promise<Response> {
+  const response = await knowledgeFetch(path, init);
 
   if (response.status === 401 && allowRefresh && tokenStore.getRefreshToken()) {
     if (await refreshAccessToken()) {
-      return authenticatedKnowledgeFetch(path, init, false);
+      const retried = await authenticatedKnowledgeFetch(path, init, false);
+      if (retried.status === 401) tokenStore.clear();
+      return retried;
     }
     tokenStore.clear();
   }
+
+  if (response.status === 401 && allowRefresh) tokenStore.clear();
 
   return response;
 }
