@@ -286,7 +286,7 @@ export function ConversationsInbox() {
   const assign = useAssignConversation();
   const remove = useDeleteConversation();
   const updateLead = useUpdateLead();
-  const [draft, setDraft] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [stagedKnowledgeAsset, setStagedKnowledgeAsset] = useState<(StagedKnowledgeAsset & { conversationId: string }) | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const selectedConversation = currentDetail?.conversation;
@@ -297,6 +297,8 @@ export function ConversationsInbox() {
   const isOwner = profile.data?.membership?.role === "BUSINESS_OWNER";
   const messages = useMemo(() => detail.data ? [...detail.data.pages].reverse().flatMap((page) => page.messages) : [], [detail.data]);
   const selectedIndex = conversations.data?.data.findIndex((item) => item.id === selectedId) ?? -1;
+  const activeStagedKnowledgeAsset = stagedKnowledgeAsset?.conversationId === selectedId ? stagedKnowledgeAsset : null;
+  const draft = selectedId ? drafts[selectedId] ?? "" : "";
 
   const setParams = (updates: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -312,12 +314,44 @@ export function ConversationsInbox() {
     if (selectedConversation?.unreadCount) markConversationRead(selectedConversation.id);
   }, [markConversationRead, selectedConversation?.id, selectedConversation?.unreadCount]);
 
-  const stageKnowledgeAsset = (asset: StagedKnowledgeAsset) => {
-    if (!selectedId) return;
-    setStagedKnowledgeAsset({ ...asset, conversationId: selectedId });
-    setDraft(asset.messageText);
+  const updateDraft = (value: string) => {
+    if (selectedId) setDrafts((current) => ({ ...current, [selectedId]: value }));
+    if (!activeStagedKnowledgeAsset) return;
+    setStagedKnowledgeAsset((current) => current?.conversationId === selectedId ? { ...current, messageText: value } : current);
   };
-  const activeStagedKnowledgeAsset = stagedKnowledgeAsset?.conversationId === selectedId ? stagedKnowledgeAsset : null;
+
+  const clearStagedKnowledgeAsset = () => {
+    if (activeStagedKnowledgeAsset && draft === activeStagedKnowledgeAsset.messageText) {
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[selectedId];
+        return next;
+      });
+    }
+    setStagedKnowledgeAsset((current) => current?.conversationId === selectedId ? null : current);
+  };
+
+  const stageKnowledgeAsset = (asset: StagedKnowledgeAsset) => {
+    if (!selectedId || !selectedConversation) return;
+    if (selectedConversation.status === "PLAN_LIMIT_BLOCKED" || selectedConversation.accessBlocked) {
+      systemNotify.error("Knowledge asset cannot be added", { description: "Replies are locked for this conversation." });
+      return;
+    }
+    if (selectedConversation.status === "CLOSED") {
+      systemNotify.error("Knowledge asset cannot be added", { description: "This conversation is closed." });
+      return;
+    }
+    if (selectedConversation.permissions?.canReply === false) {
+      systemNotify.error("Knowledge asset cannot be added", { description: "You do not have permission to reply in this conversation." });
+      return;
+    }
+    if (selectedConversation.channel === "WHATSAPP" && !(whatsapp.data?.canSendMessages ?? true)) {
+      systemNotify.error("Knowledge asset cannot be added", { description: "WhatsApp is not available for replies right now." });
+      return;
+    }
+    setStagedKnowledgeAsset({ ...asset, conversationId: selectedId });
+    setDrafts((current) => ({ ...current, [selectedId]: asset.messageText }));
+  };
 
   const send = () => {
     const content = draft.trim();
@@ -333,7 +367,11 @@ export function ConversationsInbox() {
               systemNotify.error("Knowledge asset could not be sent.", { description: result.reason ?? "Please try again." });
               return;
             }
-            setDraft("");
+            setDrafts((current) => {
+              const next = { ...current };
+              delete next[selectedId];
+              return next;
+            });
             setStagedKnowledgeAsset(null);
           },
           onError: (error) => systemNotify.error("Knowledge asset could not be sent.", { description: getApiErrorMessage(error) }),
@@ -342,7 +380,11 @@ export function ConversationsInbox() {
       return;
     }
     sendMessage.mutate({ id: selectedId, leadId: selectedConversation?.leadId, input: { content } }, {
-      onSuccess: () => setDraft(""),
+      onSuccess: () => setDrafts((current) => {
+        const next = { ...current };
+        delete next[selectedId];
+        return next;
+      }),
       onError: (error) => {
         const title = error instanceof ApiError && error.code === "WHATSAPP_NOT_CONNECTED"
           ? "WhatsApp is not connected for this business. Connect WhatsApp in Settings before sending replies."
@@ -482,9 +524,9 @@ export function ConversationsInbox() {
       onBack={() => setParams({ conversationId: undefined })}
       onPrevious={() => selectedIndex > 0 && setParams({ conversationId: conversations.data?.data[selectedIndex - 1]?.id })}
       onNext={() => selectedIndex >= 0 && setParams({ conversationId: conversations.data?.data[selectedIndex + 1]?.id })}
-      onDraftChange={setDraft}
+      onDraftChange={updateDraft}
       onStageKnowledgeAsset={stageKnowledgeAsset}
-      onClearStagedKnowledgeAsset={() => setStagedKnowledgeAsset(null)}
+      onClearStagedKnowledgeAsset={clearStagedKnowledgeAsset}
       onSend={send}
       onEnd={end}
       onRetryMessage={retry}

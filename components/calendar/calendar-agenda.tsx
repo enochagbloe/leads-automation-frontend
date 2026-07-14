@@ -34,8 +34,8 @@ export function CalendarAgenda({
 }) {
   if (loading) {
     return (
-      <div className="space-y-4">
-        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)}
+      <div className="space-y-5">
+        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-28 rounded-2xl" />)}
       </div>
     );
   }
@@ -45,12 +45,16 @@ export function CalendarAgenda({
   const groups = groupedByDay(appointments);
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-8">
       {Object.entries(groups).map(([date, items]) => (
-        <section key={date} aria-labelledby={`agenda-${date}`}>
-          <div className="mb-3 flex items-center gap-3">
-            <h2 id={`agenda-${date}`} className="text-sm font-bold">{format(new Date(`${date}T00:00:00`), "EEEE, MMMM d")}</h2>
-            <span className="h-px flex-1 bg-border" />
+        <section key={date} aria-labelledby={`agenda-${date}`} className="grid gap-3 lg:grid-cols-[132px_minmax(0,1fr)]">
+          <div className="flex items-end justify-between gap-3 border-b pb-3 lg:block lg:border-b-0 lg:pb-0 lg:pt-2">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">{format(new Date(`${date}T00:00:00`), "EEEE")}</p>
+              <h2 id={`agenda-${date}`} className="mt-1 text-base font-bold tracking-tight">{format(new Date(`${date}T00:00:00`), "MMMM d")}</h2>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">{items.length} {items.length === 1 ? "appointment" : "appointments"}</p>
+            </div>
+            <span className="h-px flex-1 bg-border lg:mt-5 lg:block lg:w-full" aria-hidden="true" />
           </div>
           <div className="space-y-3">
             {items.map((appointment) => (

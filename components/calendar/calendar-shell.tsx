@@ -8,7 +8,6 @@ import { AppointmentActionDialog } from "@/components/calendar/appointment-actio
 import { AppointmentAssignmentDialog } from "@/components/calendar/appointment-assignment-dialog";
 import { AppointmentDetailDialog } from "@/components/calendar/appointment-detail-dialog";
 import { CalendarAgenda } from "@/components/calendar/calendar-agenda";
-import { CalendarSidebar } from "@/components/calendar/calendar-sidebar";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { FloatingAppointmentComposer } from "@/components/calendar/floating-appointment-composer";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -95,8 +94,6 @@ export function CalendarShell() {
     () => [...(appointments.data?.appointments ?? [])].sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [appointments.data?.appointments],
   );
-  const pendingConfirmationCount = orderedAppointments.filter((appointment) => appointment.status === "PENDING_BUSINESS_CONFIRMATION" || appointment.status === "NEEDS_HUMAN_CONFIRMATION").length;
-  const outcomeNeededCount = orderedAppointments.filter((appointment) => appointment.status === "NEEDS_OUTCOME_CONFIRMATION").length;
   const dialogLoading = confirmAppointment.isPending || rescheduleAppointment.isPending || cancelAppointment.isPending || completeAppointment.isPending || noShowAppointment.isPending || missedAppointment.isPending || availabilityCheck.isPending;
 
   const handleCreated = (appointment: CalendarAppointment) => {
@@ -148,8 +145,7 @@ export function CalendarShell() {
 
   return (
     <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6">
-      <div className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
-        <CalendarSidebar appointments={orderedAppointments} selectedDate={selectedDate} />
+      <div className="mx-auto max-w-6xl">
         <section className="min-w-0 space-y-5">
           <CalendarToolbar
             selectedDate={selectedDate}
@@ -177,18 +173,6 @@ export function CalendarShell() {
                   {item.label}
                 </button>
               ))}
-            </div>
-          )}
-          {pendingConfirmationCount > 0 && (
-            <div className="rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-sm text-warning">
-              <p className="font-bold">{pendingConfirmationCount} {pendingConfirmationCount === 1 ? "appointment needs" : "appointments need"} confirmation</p>
-              <p className="mt-1 text-xs leading-5">Review pending appointments and choose Confirm, Reschedule, or Cancel.</p>
-            </div>
-          )}
-          {outcomeNeededCount > 0 && (
-            <div className="rounded-2xl border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-warning">
-              <p className="font-bold">{outcomeNeededCount} {outcomeNeededCount === 1 ? "appointment needs" : "appointments need"} outcome confirmation</p>
-              <p className="mt-1 text-xs leading-5">Mark completed, no-show, or missed so the calendar stays accurate.</p>
             </div>
           )}
           {appointments.isError ? (
