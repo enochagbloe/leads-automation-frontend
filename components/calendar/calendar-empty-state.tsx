@@ -9,7 +9,7 @@ export function CalendarEmptyState({ canCreate, onCreate }: { canCreate: boolean
           <CalendarPlus className="size-6" aria-hidden="true" />
         </span>
         <h2 className="mt-4 text-lg font-bold">No appointments scheduled</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">Create an appointment manually or from a customer conversation.</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">Create an appointment or let BizReply AI book one from customer conversations.</p>
         {canCreate && <AppButton className="mt-5" onClick={onCreate}><CalendarPlus className="size-4" />Create appointment</AppButton>}
       </div>
     </div>

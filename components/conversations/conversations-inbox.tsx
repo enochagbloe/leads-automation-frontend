@@ -286,7 +286,7 @@ export function ConversationsInbox() {
   const assign = useAssignConversation();
   const remove = useDeleteConversation();
   const updateLead = useUpdateLead();
-  const [draft, setDraft] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [stagedKnowledgeAsset, setStagedKnowledgeAsset] = useState<(StagedKnowledgeAsset & { conversationId: string }) | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const selectedConversation = currentDetail?.conversation;
@@ -297,6 +297,8 @@ export function ConversationsInbox() {
   const isOwner = profile.data?.membership?.role === "BUSINESS_OWNER";
   const messages = useMemo(() => detail.data ? [...detail.data.pages].reverse().flatMap((page) => page.messages) : [], [detail.data]);
   const selectedIndex = conversations.data?.data.findIndex((item) => item.id === selectedId) ?? -1;
+  const activeStagedKnowledgeAsset = stagedKnowledgeAsset?.conversationId === selectedId ? stagedKnowledgeAsset : null;
+  const draft = selectedId ? drafts[selectedId] ?? "" : "";
 
   const setParams = (updates: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -311,6 +313,23 @@ export function ConversationsInbox() {
   useEffect(() => {
     if (selectedConversation?.unreadCount) markConversationRead(selectedConversation.id);
   }, [markConversationRead, selectedConversation?.id, selectedConversation?.unreadCount]);
+
+  const updateDraft = (value: string) => {
+    if (selectedId) setDrafts((current) => ({ ...current, [selectedId]: value }));
+    if (!activeStagedKnowledgeAsset) return;
+    setStagedKnowledgeAsset((current) => current?.conversationId === selectedId ? { ...current, messageText: value } : current);
+  };
+
+  const clearStagedKnowledgeAsset = () => {
+    if (activeStagedKnowledgeAsset && draft === activeStagedKnowledgeAsset.messageText) {
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[selectedId];
+        return next;
+      });
+    }
+    setStagedKnowledgeAsset((current) => current?.conversationId === selectedId ? null : current);
+  };
 
   const stageKnowledgeAsset = (asset: StagedKnowledgeAsset) => {
     if (!selectedId || !selectedConversation) return;
@@ -331,9 +350,8 @@ export function ConversationsInbox() {
       return;
     }
     setStagedKnowledgeAsset({ ...asset, conversationId: selectedId });
-    setDraft(asset.messageText);
+    setDrafts((current) => ({ ...current, [selectedId]: asset.messageText }));
   };
-  const activeStagedKnowledgeAsset = stagedKnowledgeAsset?.conversationId === selectedId ? stagedKnowledgeAsset : null;
 
   const send = () => {
     const content = draft.trim();
@@ -349,7 +367,11 @@ export function ConversationsInbox() {
               systemNotify.error("Knowledge asset could not be sent.", { description: result.reason ?? "Please try again." });
               return;
             }
-            setDraft("");
+            setDrafts((current) => {
+              const next = { ...current };
+              delete next[selectedId];
+              return next;
+            });
             setStagedKnowledgeAsset(null);
           },
           onError: (error) => systemNotify.error("Knowledge asset could not be sent.", { description: getApiErrorMessage(error) }),
@@ -358,7 +380,11 @@ export function ConversationsInbox() {
       return;
     }
     sendMessage.mutate({ id: selectedId, leadId: selectedConversation?.leadId, input: { content } }, {
-      onSuccess: () => setDraft(""),
+      onSuccess: () => setDrafts((current) => {
+        const next = { ...current };
+        delete next[selectedId];
+        return next;
+      }),
       onError: (error) => {
         const title = error instanceof ApiError && error.code === "WHATSAPP_NOT_CONNECTED"
           ? "WhatsApp is not connected for this business. Connect WhatsApp in Settings before sending replies."
@@ -498,9 +524,9 @@ export function ConversationsInbox() {
       onBack={() => setParams({ conversationId: undefined })}
       onPrevious={() => selectedIndex > 0 && setParams({ conversationId: conversations.data?.data[selectedIndex - 1]?.id })}
       onNext={() => selectedIndex >= 0 && setParams({ conversationId: conversations.data?.data[selectedIndex + 1]?.id })}
-      onDraftChange={setDraft}
+      onDraftChange={updateDraft}
       onStageKnowledgeAsset={stageKnowledgeAsset}
-      onClearStagedKnowledgeAsset={() => setStagedKnowledgeAsset(null)}
+      onClearStagedKnowledgeAsset={clearStagedKnowledgeAsset}
       onSend={send}
       onEnd={end}
       onRetryMessage={retry}

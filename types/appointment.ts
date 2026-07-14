@@ -19,6 +19,23 @@ export type AppointmentView = "day" | "week" | "month";
 export type AppointmentConfirmationMode = "MANUAL_CONFIRMATION_REQUIRED" | "AUTO_CONFIRM_WHEN_STAFF_ASSIGNED" | "AUTO_CONFIRM_SAFE_BOOKINGS";
 export type AppointmentConfirmationSource = "MANUAL" | "AI_REQUEST" | "AI_PREMIUM_AUTO_CONFIRM" | "SYSTEM";
 export type AppointmentAction = "CONFIRM" | "RESCHEDULE" | "CANCEL" | "COMPLETE" | "NO_SHOW" | "MISSED" | "ASSIGN_STAFF" | "CLAIM" | "REVIEW" | "VIEW_DETAILS";
+export type AppointmentStatusIndicatorType =
+  | "NEED_CONFIRMATION"
+  | "COMPLAINT_LINKED"
+  | "OUTCOME_REQUIRED"
+  | "STARTING_SOON"
+  | "IN_PROGRESS"
+  | "MISSED"
+  | "NO_SHOW"
+  | "RESCHEDULED"
+  | "COMPLETED"
+  | "NORMAL"
+  | string;
+
+export interface AppointmentStatusIndicator {
+  type: AppointmentStatusIndicatorType;
+  label: string;
+}
 
 export interface AppointmentPerson {
   id: string;
@@ -56,6 +73,8 @@ export interface CalendarAppointment {
   service: { id: string; name: string; durationMinutes: number | null } | null;
   assignedStaff: AppointmentStaff | null;
   availableActions?: AppointmentAction[];
+  statusIndicator?: AppointmentStatusIndicator | null;
+  secondaryStatusIndicators?: AppointmentStatusIndicator[];
   humanConfirmationRequired?: boolean;
   humanConfirmationReason?: string | null;
   rescheduleCount?: number;
