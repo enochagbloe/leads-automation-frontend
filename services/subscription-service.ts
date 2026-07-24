@@ -9,10 +9,10 @@ interface SubscriptionApiResponse {
   account: { id: string; name: string; ownerId: string };
   businesses: unknown[];
   activeBusiness: unknown | null;
-  id: string;
-  plan: ActivePlan | PlanCode;
-  status: SubscriptionStatus;
-  accountUsage: {
+  id?: string | null;
+  plan?: ActivePlan | PlanCode | null;
+  status?: SubscriptionStatus | null;
+  accountUsage?: {
     businessesCount: number;
     staffCount: number;
     servicesCount: number;
@@ -20,10 +20,10 @@ interface SubscriptionApiResponse {
     conversationsUsed: number;
     aiRepliesUsed: number;
     knowledgeItemsCount: number;
-  };
-  businessUsage: BusinessUsage;
-  limits: ApiLimits;
-  features: ApiPlanFeatures;
+  } | null;
+  businessUsage?: BusinessUsage | null;
+  limits?: ApiLimits | null;
+  features?: ApiPlanFeatures | null;
   startsAt?: string;
   trialEndsAt?: string | null;
   currentPeriodStart?: string;
@@ -31,7 +31,18 @@ interface SubscriptionApiResponse {
   cancelledAt?: string | null;
 }
 
-function normalizeSubscription(response: SubscriptionApiResponse): Subscription {
+function normalizeSubscription(response: SubscriptionApiResponse | null): Subscription | null {
+  if (
+    !response?.id ||
+    !response.plan ||
+    !response.status ||
+    !response.accountUsage ||
+    !response.businessUsage ||
+    !response.limits ||
+    !response.features
+  ) {
+    return null;
+  }
   const planCode = typeof response.plan === "string" ? response.plan : response.plan.code;
   const catalogPlan = PLAN_CATALOG[planCode];
   if (!catalogPlan) throw new Error(`Unsupported subscription plan returned by the API: ${String(planCode)}`);

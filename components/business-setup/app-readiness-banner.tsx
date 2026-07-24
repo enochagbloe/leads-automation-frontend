@@ -25,15 +25,28 @@ export function AppReadinessBanner({
   profile,
   canCreateBusiness,
   canManageBusinessSettings,
+  canManageBilling,
 }: {
   profile: AuthProfile;
   canCreateBusiness: boolean;
   canManageBusinessSettings: boolean;
+  canManageBilling: boolean;
 }) {
   const businessId = profile.activeBusiness?.id;
   const setup = useBusinessSetupStatus(businessId);
   const whatsapp = useWhatsAppStatus(businessId);
   const issues: ReadinessIssue[] = [];
+
+  if (!profile.subscription || !profile.plan) {
+    issues.push({
+      key: "inactive-subscription",
+      title: "Your subscription is inactive",
+      description: "You can still access account and billing settings, but subscription features are unavailable.",
+      href: canManageBilling ? "/settings/billing" : undefined,
+      actionLabel: "Choose plan",
+      icon: AlertTriangle,
+    });
+  }
 
   if (!profile.activeBusiness) {
     issues.push({

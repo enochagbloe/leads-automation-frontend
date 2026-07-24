@@ -4,6 +4,8 @@ import { tokenStore } from "@/lib/token-store";
 import type { ApiErrorResponse, RefreshResponse } from "@/types/auth";
 import type { PlanCode } from "@/types/subscription";
 
+export const SUBSCRIPTION_REQUIRED_EVENT = "bizreply:subscription-required";
+
 export class ApiError extends Error {
   constructor(
     public code: string,
@@ -85,6 +87,9 @@ async function request<T>(path: string, init: RequestInit, allowRefresh: boolean
     if (error?.code === "BUSINESS_ACCESS_DENIED") {
       businessStore.clear();
       if (path !== "/auth/me" && typeof window !== "undefined") window.dispatchEvent(new Event(BUSINESS_ACCESS_DENIED_EVENT));
+    }
+    if (error?.code === "SUBSCRIPTION_REQUIRED" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(SUBSCRIPTION_REQUIRED_EVENT));
     }
     if (response.status === 401 && allowRefresh) tokenStore.clear();
     throw new ApiError(

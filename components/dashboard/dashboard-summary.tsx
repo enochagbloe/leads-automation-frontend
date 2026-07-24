@@ -1,6 +1,8 @@
 "use client";
 
 import { AlertTriangle, BarChart3, CalendarDays, Check, Inbox, Minus, UsersRound } from "lucide-react";
+import Link from "next/link";
+import { AppButton } from "@/components/app-button";
 import { AppCard } from "@/components/app-card";
 import { AppErrorState } from "@/components/app-error-state";
 import { PlanBadge } from "@/components/subscription/plan-badge";
@@ -15,7 +17,7 @@ export function DashboardSummary() {
   if (profile.isPending) return <LoadingPage />;
   if (profile.isError) return <AppErrorState />;
   const { account, accountUsage, activeBusiness, businessUsage, features, limits, membership, plan, subscription, permissions } = profile.data;
-  if (!activeBusiness || !membership || !plan || !subscription) return <AppErrorState title="No active business" description="Select or join a business to continue." />;
+  if (!activeBusiness || !membership) return <AppErrorState title="No active business" description="Select or join a business to continue." />;
   const workspacePermissions = getWorkspacePermissions(profile.data);
   if (!workspacePermissions.canViewDashboard) {
     return (
@@ -28,6 +30,25 @@ export function DashboardSummary() {
     );
   }
   const showBillingContext = canManageBilling(profile.data);
+  if (!plan || !subscription) {
+    return (
+      <main className="mx-auto max-w-5xl p-5 sm:p-8">
+        <AppCard className="border-warning/25 bg-warning/10 shadow-none">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-warning/15 text-warning"><AlertTriangle className="size-5" /></span>
+              <div>
+                <p className="text-sm font-medium text-primary">{account.name} · {accountUsage.businessesCount} {accountUsage.businessesCount === 1 ? "business" : "businesses"}</p>
+                <h1 className="mt-2 text-2xl font-bold tracking-tight">Your subscription is inactive</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">You can still access billing and business profile settings, but workspace features are unavailable until a plan is active.</p>
+              </div>
+            </div>
+            {showBillingContext && <AppButton asChild className="shrink-0"><Link href="/settings/billing">Choose plan</Link></AppButton>}
+          </div>
+        </AppCard>
+      </main>
+    );
+  }
   const conversationQuotaReached = limits.maxConversationsPerMonth !== null && accountUsage.conversationsUsed >= limits.maxConversationsPerMonth;
 
   const featureRows = [

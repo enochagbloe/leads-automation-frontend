@@ -14,11 +14,12 @@ import { RealtimeProvider } from "@/components/providers/realtime-provider";
 import { AppSidebar, type SidebarNavItem } from "@/components/sidebar/app-sidebar";
 import { SidebarProvider, useSidebar } from "@/components/sidebar/sidebar-provider";
 import { FullScreenLoading, LogoutLoadingState } from "@/components/states/loading-states";
+import { SubscriptionWelcomeDialog } from "@/components/subscription/subscription-welcome-dialog";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
 import { useBusinesses, useSelectBusiness } from "@/hooks/use-businesses";
 import { useNotificationCounts } from "@/hooks/use-notifications";
 import { useCurrentSubscription } from "@/hooks/use-subscription";
-import { ApiError } from "@/lib/api-client";
+import { ApiError, SUBSCRIPTION_REQUIRED_EVENT } from "@/lib/api-client";
 import { resetBusinessContext } from "@/lib/business-query-cache";
 import { BUSINESS_ACCESS_DENIED_EVENT } from "@/lib/business-store";
 import { canCreateBusiness } from "@/lib/subscription";
@@ -68,6 +69,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const selectBusiness = useSelectBusiness();
   const permissions = getWorkspacePermissions(profile.data);
   const canManageBilling = userCanManageBilling(profile.data);
+  const subscriptionInactive = Boolean(profile.data && (!profile.data.subscription || !profile.data.plan));
   const accountCanCreateBusiness = Boolean(
     profile.data && (
       profile.data.account.canCreateBusiness ??
@@ -77,11 +79,11 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   );
   const canManageBusinessSettings = userCanManageBusinessSettings(profile.data);
   const canManageTeam = userCanManageTeam(profile.data);
-  const subscription = useCurrentSubscription(canManageBilling || accountCanCreateBusiness);
+  const subscription = useCurrentSubscription(!subscriptionInactive && (canManageBilling || accountCanCreateBusiness));
   const activeBusinessId = profile.data?.activeBusiness?.id;
   const canViewNotifications = permissions.canViewNotifications || permissions.canManageOwnNotifications;
   const notificationCounts = useNotificationCounts(canViewNotifications ? activeBusinessId : null);
-  const businessCreation = subscription.data ? canCreateBusiness(subscription.data) : null;
+  const businessCreation = !subscriptionInactive && subscription.data ? canCreateBusiness(subscription.data) : null;
   const sessionEnded = profile.error instanceof ApiError && profile.error.status === 401;
 
   useEffect(() => {
@@ -92,9 +94,16 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const recoverBusinessAccess = () => void resetBusinessContext(client);
+    const openSubscriptionPage = () => {
+      if (window.location.pathname !== "/settings/billing") router.push("/settings/billing");
+    };
     window.addEventListener(BUSINESS_ACCESS_DENIED_EVENT, recoverBusinessAccess);
-    return () => window.removeEventListener(BUSINESS_ACCESS_DENIED_EVENT, recoverBusinessAccess);
-  }, [client]);
+    window.addEventListener(SUBSCRIPTION_REQUIRED_EVENT, openSubscriptionPage);
+    return () => {
+      window.removeEventListener(BUSINESS_ACCESS_DENIED_EVENT, recoverBusinessAccess);
+      window.removeEventListener(SUBSCRIPTION_REQUIRED_EVENT, openSubscriptionPage);
+    };
+  }, [client, router]);
 
   if (profile.isPending) return <FullScreenLoading />;
   if (profile.isError) {
@@ -135,11 +144,12 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
     shortcut: `⌘${index + 1}`,
   }));
 
-  const canViewLeads = canAccessOperationalPage(profile.data, "leads");
-  const canViewConversations = canAccessOperationalPage(profile.data, "conversations");
-  const canViewAppointments = canAccessOperationalPage(profile.data, "appointments");
-  const canViewCustomerIssues = canAccessCustomerIssues(profile.data);
-  const canViewKnowledgeBase = canManageBusinessSettings || permissions.canManageAiSettings || permissions.canUseAi || canViewConversations;
+  const canUseSubscriptionFeatures = !subscriptionInactive;
+  const canViewLeads = canUseSubscriptionFeatures && canAccessOperationalPage(profile.data, "leads");
+  const canViewConversations = canUseSubscriptionFeatures && canAccessOperationalPage(profile.data, "conversations");
+  const canViewAppointments = canUseSubscriptionFeatures && canAccessOperationalPage(profile.data, "appointments");
+  const canViewCustomerIssues = canUseSubscriptionFeatures && canAccessCustomerIssues(profile.data);
+  const canViewKnowledgeBase = canUseSubscriptionFeatures && (canManageBusinessSettings || permissions.canManageAiSettings || permissions.canUseAi || canViewConversations);
   const navItems: SidebarNavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main", visible: permissions.canViewDashboard },
     { label: "Leads", href: "/leads", icon: ContactRound, section: "main", visible: canViewLeads },
@@ -149,7 +159,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
     { label: "Business profile", href: "/settings/business/profile", icon: Building2, section: "workspace", visible: canManageBusinessSettings },
     { label: "Knowledge Base", href: "/knowledge-base", icon: BookOpen, section: "workspace", visible: canViewKnowledgeBase },
     { label: "Team members", href: "/settings/members", icon: Users, section: "workspace", visible: canManageTeam },
-    { label: "WhatsApp connection", href: "/settings/business/whatsapp", icon: Smartphone, section: "workspace", visible: canManageBusinessSettings },
+    { label: "WhatsApp connection", href: "/settings/business/whatsapp", icon: Smartphone, section: "workspace", visible: canUseSubscriptionFeatures && canManageBusinessSettings },
     { label: "Billing & plan", href: "/settings/billing", icon: CreditCard, section: "workspace", visible: canManageBilling },
   ];
   const openCreateBusiness = () => {
@@ -170,7 +180,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
         userEmail={profile.data.user.email}
         currentPlan={subscription.data?.plan.code ?? profile.data.plan?.code}
         showBillingActions={canManageBilling}
-        canCreateBusiness={accountCanCreateBusiness && (businessCreation?.allowed ?? false)}
+        canCreateBusiness={!subscriptionInactive && accountCanCreateBusiness && (businessCreation?.allowed ?? false)}
         showCreateBusiness={accountCanCreateBusiness}
         createBusinessReason={accountCanCreateBusiness && businessCreation && !businessCreation.allowed ? businessCreation.reason : undefined}
         onSelectBusiness={selectBusiness}
@@ -198,7 +208,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
               currentPlan={subscription.data?.plan.code ?? profile.data.plan?.code}
               onSelectAccount={(business) => selectBusiness(business.id)}
               onAddAccount={openCreateBusiness}
-              canAddAccount={accountCanCreateBusiness && (businessCreation?.allowed ?? false)}
+              canAddAccount={!subscriptionInactive && accountCanCreateBusiness && (businessCreation?.allowed ?? false)}
               showAddAccount={accountCanCreateBusiness}
               addAccountLabel="Create new business"
               addAccountDisabledReason={accountCanCreateBusiness && businessCreation && !businessCreation.allowed ? businessCreation.reason : undefined}
@@ -215,8 +225,10 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
           profile={profile.data}
           canCreateBusiness={accountCanCreateBusiness}
           canManageBusinessSettings={canManageBusinessSettings}
+          canManageBilling={canManageBilling}
         />
         {children}
+        <SubscriptionWelcomeDialog profile={profile.data} subscription={subscription.data} />
         {canViewNotifications && <ActionableNotificationHost key={profile.data.activeBusiness?.id ?? "no-active-business"} activeBusinessId={profile.data.activeBusiness?.id} />}
       </div>
     </div>
