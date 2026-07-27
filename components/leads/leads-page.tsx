@@ -37,8 +37,8 @@ import { AppEmptyState } from "@/components/app-empty-state";
 import { AppErrorState } from "@/components/app-error-state";
 import { AppInput } from "@/components/app-input";
 import { AppSelect } from "@/components/app-select";
-import { LeadStatusBadge } from "@/components/leads/lead-status-badge";
 import { LeadDetailPanel } from "@/components/leads/lead-detail-panel";
+import { LeadStatusBadge } from "@/components/leads/lead-status-badge";
 import { LeadSearch } from "@/components/search/lead-search";
 import { LoadingCard } from "@/components/states/loading-states";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -338,7 +338,7 @@ export function LeadsPage() {
                         <p className="mt-1 text-xs text-muted-foreground">Added {formatLeadDate(lead.createdAt)}</p>
                       </div>
                       <div className="flex shrink-0 gap-1">
-                        <AppButton size="icon" variant="ghost" aria-label={`View ${lead.fullName}`} onClick={() => openLead(lead.id)}><Eye className="size-4" /></AppButton>
+                        <AppButton size="icon" variant="ghost" aria-label={`View details for ${lead.fullName}`} onClick={() => openLead(lead.id)}><Eye className="size-4" /></AppButton>
                         <AppButton size="icon" variant="ghost" asChild><Link href={`/leads/${lead.id}/edit`} aria-label={`Edit ${lead.fullName}`}><Pencil className="size-4" /></Link></AppButton>
                         <AppButton size="icon" variant="ghost" aria-label={`More actions for ${lead.fullName}`} onClick={() => handlePlaceholder("More lead actions")}><MoreHorizontal className="size-4" /></AppButton>
                       </div>
@@ -376,7 +376,7 @@ export function LeadsPage() {
                             Assign to me
                           </AppButton>
                         )}
-                        <AppButton size="sm" variant="ghost" onClick={() => openLead(lead.id)}>View</AppButton>
+                        <AppButton size="sm" variant="ghost" onClick={() => openLead(lead.id)}>View details</AppButton>
                         {canDelete && (
                           <ConfirmDialog
                             trigger={<AppButton size="icon" variant="ghost" aria-label={`Delete ${lead.fullName}`}><Trash2 className="size-4 text-destructive" /></AppButton>}
@@ -403,7 +403,7 @@ export function LeadsPage() {
           </>
         )}
       </section>
-      <LeadDetailPanel leadId={selectedLeadId} open={Boolean(selectedLeadId)} onOpenChange={(open) => { if (!open) closeLead(); }} />
+      <LeadDetailPanel leadId={selectedLeadId} open={Boolean(selectedLeadId)} onOpenChange={(panelOpen) => { if (!panelOpen) closeLead(); }} />
     </main>
   );
 }

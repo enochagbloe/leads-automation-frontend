@@ -106,6 +106,8 @@ export interface CustomerIssueListQuery {
   category?: CustomerIssueCategory;
   search?: string;
   responsibleMembershipId?: string;
+  leadId?: string;
+  conversationId?: string;
   tab?: "all" | "assigned-to-me" | "unassigned" | "open" | "resolved";
   dateFrom?: string;
   dateTo?: string;

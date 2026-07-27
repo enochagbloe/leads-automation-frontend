@@ -1,4 +1,5 @@
 import { CheckCircle2, LockKeyhole, MessagesSquare, Sparkles } from "lucide-react";
+import { AuthBackgroundRotator } from "@/components/auth/auth-background-rotator";
 import { AppLogo } from "@/components/app-logo";
 
 const assurances = [
@@ -17,8 +18,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </section>
 
       <aside className="relative hidden overflow-hidden bg-primary p-10 text-primary-foreground lg:flex lg:flex-col lg:justify-between xl:p-14" aria-label="About BizReply AI">
-        <div className="absolute -right-28 -top-28 size-80 rounded-full border border-primary-foreground/15" />
-        <div className="absolute -right-10 -top-10 size-48 rounded-full border border-primary-foreground/15" />
+        <AuthBackgroundRotator />
+        <div className="absolute -right-28 -top-28 size-80 rounded-full border border-primary-foreground/15 bg-primary-foreground/5 backdrop-blur-sm" />
+        <div className="absolute -right-10 -top-10 size-48 rounded-full border border-primary-foreground/15 bg-primary-foreground/5 backdrop-blur-sm" />
         <div className="relative flex items-center gap-2 text-sm font-medium text-primary-foreground/75"><CheckCircle2 className="size-4 text-accent" /> Built for service-focused businesses</div>
         <div className="relative max-w-lg">
           <p className="mb-5 text-xs font-bold uppercase tracking-[0.22em] text-accent">Clear conversations. Stronger business.</p>
