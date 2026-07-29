@@ -346,10 +346,30 @@ select {
   outline-offset: 2px;
 }
 
+.app-calendar .rdp-day_button {
+  position: relative;
+}
+
+.app-calendar .rdp-marked-date .rdp-day_button::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--success);
+}
+
 .app-calendar .rdp-selected .rdp-day_button {
   background: var(--primary);
   color: var(--primary-foreground);
   font-weight: 700;
+}
+
+.app-calendar .rdp-selected.rdp-marked-date .rdp-day_button::after {
+  background: var(--primary-foreground);
 }
 
 .app-calendar .rdp-today:not(.rdp-selected) .rdp-day_button {

@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, format, subDays } from "date-fns";
+import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { useMemo, useState } from "react";
 import { systemNotify } from "@/lib/system-notifications";
 import { AppErrorState } from "@/components/app-error-state";
@@ -25,6 +25,7 @@ import {
   useRescheduleAppointment,
 } from "@/hooks/use-calendar-appointments";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
+import { appointmentDateKey } from "@/lib/appointment-dates";
 import { canAccessOperationalPage, getWorkspacePermissions } from "@/lib/workspace-permissions";
 import type { AppointmentAction, AppointmentCalendarQuery, CalendarAppointment } from "@/types/appointment";
 
@@ -79,7 +80,13 @@ export function CalendarShell() {
     view: "week",
     assignedStaffId: staffFilter === "all" ? undefined : staffFilter,
   }), [selectedDate, staffFilter]);
+  const markerQuery = useMemo<AppointmentCalendarQuery>(() => ({
+    dateFrom: format(startOfMonth(selectedDate), "yyyy-MM-dd"),
+    dateTo: format(endOfMonth(selectedDate), "yyyy-MM-dd"),
+    view: "month",
+  }), [selectedDate]);
   const appointments = useCalendarAppointments(activeBusinessId, query, Boolean(profile.data && canViewAppointments));
+  const markerAppointments = useCalendarAppointments(activeBusinessId, markerQuery, Boolean(profile.data && canViewAppointments));
   const members = useBusinessMembers(canViewAppointments ? activeBusinessId : null);
   const availabilityCheck = useCheckAppointmentAvailability();
   const confirmAppointment = useConfirmAppointment(activeBusinessId, actionAppointment?.id ?? "");
@@ -93,6 +100,17 @@ export function CalendarShell() {
   const orderedAppointments = useMemo(
     () => [...(appointments.data?.appointments ?? [])].sort((a, b) => a.startTime.localeCompare(b.startTime)),
     [appointments.data?.appointments],
+  );
+  const markedDateKeys = useMemo(
+    () => [...new Set((markerAppointments.data?.appointments ?? []).map((appointment) => appointmentDateKey(appointment.startTime, appointment.timezone)))],
+    [markerAppointments.data?.appointments],
+  );
+  const missedSelectedDay = useMemo(
+    () => {
+      const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+      return (markerAppointments.data?.appointments ?? []).filter((appointment) => appointment.status === "MISSED" && appointmentDateKey(appointment.startTime, appointment.timezone) === selectedDateKey).length;
+    },
+    [markerAppointments.data?.appointments, selectedDate],
   );
   const dialogLoading = confirmAppointment.isPending || rescheduleAppointment.isPending || cancelAppointment.isPending || completeAppointment.isPending || noShowAppointment.isPending || missedAppointment.isPending || availabilityCheck.isPending;
 
@@ -152,6 +170,8 @@ export function CalendarShell() {
             canCreate={canCreate}
             staff={members.data}
             staffFilter={staffFilter}
+            markedDateKeys={markedDateKeys}
+            missedSelectedDay={missedSelectedDay}
             onDateChange={setSelectedDate}
             onStaffFilterChange={setStaffFilter}
             onCreate={() => setComposerOpen(true)}
@@ -195,6 +215,7 @@ export function CalendarShell() {
         <FloatingAppointmentComposer
           open={composerOpen}
           businessId={activeBusinessId}
+          markedDateKeys={markedDateKeys}
           onOpenChange={setComposerOpen}
           onCreated={handleCreated}
         />

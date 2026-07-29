@@ -14,6 +14,7 @@ export function AvailabilityPicker({
   timeError,
   availability,
   checking,
+  markedDateKeys,
   onDateChange,
   onTimeChange,
 }: {
@@ -23,6 +24,7 @@ export function AvailabilityPicker({
   timeError?: string;
   availability?: AppointmentAvailabilityResponse | null;
   checking: boolean;
+  markedDateKeys?: string[];
   onDateChange: (value: string) => void;
   onTimeChange: (value: string) => void;
 }) {
@@ -30,7 +32,7 @@ export function AvailabilityPicker({
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <AppFormField id="appointment-date" label="Date" required error={dateError}>
-          <AppIsoDatePicker id="appointment-date" value={date} onChange={onDateChange} clearable={false} />
+          <AppIsoDatePicker id="appointment-date" value={date} onChange={onDateChange} clearable={false} markedDateKeys={markedDateKeys} />
         </AppFormField>
         <AppFormField id="appointment-time" label="Start time" required error={timeError}>
           <AppTimePicker id="appointment-time" value={time} onChange={onTimeChange} clearable={false} />

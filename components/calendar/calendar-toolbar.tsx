@@ -1,7 +1,9 @@
-import { addDays, subDays } from "date-fns";
-import { CalendarPlus, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { CalendarPlus, Search } from "lucide-react";
 import { AppButton } from "@/components/app-button";
 import { AppSelect } from "@/components/app-select";
+import { CalendarDateJump } from "@/components/calendar/calendar-date-jump";
+import { CalendarDayStrip } from "@/components/calendar/calendar-day-strip";
+import { CalendarMissedDayInsight } from "@/components/calendar/calendar-month-insight";
 import type { AppointmentAssigneeOption } from "@/types/appointment";
 
 export function CalendarToolbar({
@@ -9,6 +11,8 @@ export function CalendarToolbar({
   canCreate,
   staff,
   staffFilter,
+  markedDateKeys,
+  missedSelectedDay,
   onDateChange,
   onStaffFilterChange,
   onCreate,
@@ -17,19 +21,21 @@ export function CalendarToolbar({
   canCreate: boolean;
   staff: AppointmentAssigneeOption[];
   staffFilter: string;
+  markedDateKeys?: string[];
+  missedSelectedDay: number;
   onDateChange: (date: Date) => void;
   onStaffFilterChange: (value: string) => void;
   onCreate: () => void;
 }) {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <AppButton size="icon" variant="outline" onClick={() => onDateChange(subDays(selectedDate, 1))} aria-label="Previous day"><ChevronLeft className="size-4" /></AppButton>
-          <AppButton variant="outline" onClick={() => onDateChange(new Date())}>Today</AppButton>
-          <AppButton size="icon" variant="outline" onClick={() => onDateChange(addDays(selectedDate, 1))} aria-label="Next day"><ChevronRight className="size-4" /></AppButton>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <CalendarDateJump selectedDate={selectedDate} markedDateKeys={markedDateKeys} onDateChange={onDateChange} />
+          <CalendarDayStrip key={selectedDate.toDateString()} selectedDate={selectedDate} onDateChange={onDateChange} className="flex-1 justify-start lg:justify-center" />
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <CalendarMissedDayInsight missedCount={missedSelectedDay} />
           <div className="w-48">
             <AppSelect
               aria-label="Filter appointments by staff"
