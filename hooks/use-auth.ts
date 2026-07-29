@@ -5,7 +5,12 @@ import { queryKeys } from "@/lib/query-keys";
 import { authService } from "@/services/auth-service";
 
 export function useCurrentUser() {
-  return useQuery({ queryKey: queryKeys.auth.currentUser, queryFn: authService.currentUser });
+  return useQuery({
+    queryKey: queryKeys.auth.currentUser,
+    queryFn: authService.currentUser,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
 }
 
 export function useLogin() {

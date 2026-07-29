@@ -21,7 +21,13 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   const login = useLogin();
   const { register, control, handleSubmit, setError, getValues, formState: { errors } } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "", rememberMe: false } });
   const onSubmit = handleSubmit(({ email, password }) => login.mutate({ email, password }, {
-    onSuccess: (data) => router.push(nextPath?.startsWith("/invite/") || nextPath === "/onboarding" || data.activeBusiness?.status === "PENDING_SETUP" ? nextPath ?? "/onboarding" : "/dashboard"),
+    onSuccess: (data) => {
+      if (nextPath?.startsWith("/invite/") || nextPath === "/onboarding" || data.activeBusiness?.status === "PENDING_SETUP") {
+        router.push(nextPath ?? "/onboarding");
+        return;
+      }
+      router.push(!data.subscription || !data.plan ? "/settings/billing" : "/dashboard");
+    },
     onError: (error) => applyApiFieldErrors(error, setError),
   }));
   const needsVerification = login.error instanceof ApiError && login.error.code === "EMAIL_NOT_VERIFIED";

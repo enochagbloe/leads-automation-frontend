@@ -5,6 +5,39 @@ import { tokenStore } from "@/lib/token-store";
 import { mockAuthService } from "@/services/mock-auth-service";
 import type { ApiMessage, AuthProfile, EmailInput, LoginInput, LoginResponse, RegisterInput, RegisterResponse, ResetPasswordInput, VerifyEmailInput, WorkspacePermissions } from "@/types/auth";
 
+const EMPTY_ACCOUNT_USAGE = {
+  businessesCount: 0,
+  staffCount: 0,
+  servicesCount: 0,
+  appointmentsUsed: 0,
+  conversationsUsed: 0,
+  aiRepliesUsed: 0,
+  knowledgeItemsCount: 0,
+};
+
+const EMPTY_BUSINESS_USAGE = {
+  conversationsUsed: 0,
+  aiRepliesUsed: 0,
+  appointmentsUsed: 0,
+  leadsCreated: 0,
+};
+
+const LOCKED_LIMITS = {
+  maxBusinesses: 0,
+  maxStaff: 0,
+  maxServices: 0,
+  maxAppointmentsPerMonth: 0,
+  maxConversationsPerMonth: 0,
+  maxAiRepliesPerMonth: 0,
+  maxKnowledgeItems: 0,
+};
+
+const DISABLED_FEATURES = {
+  allowAnalytics: false,
+  allowRemoveBranding: false,
+  allowPrioritySupport: false,
+};
+
 const permissionMap: Partial<Record<keyof WorkspacePermissions, string>> = {
   canViewDashboard: "dashboard:view",
   canViewOperationalQueues: "operations:view",
@@ -41,16 +74,29 @@ function normalizePermissions(
 }
 
 function normalizeAuthProfile<T extends AuthProfile>(profile: T): T {
-  const root = profile as T & { accountType?: AuthProfile["account"]["accountType"]; canCreateBusiness?: boolean; permissions?: Partial<WorkspacePermissions> | string[] };
+  const root = profile as T & {
+    accountType?: AuthProfile["account"]["accountType"];
+    canCreateBusiness?: boolean;
+    permissions?: Partial<WorkspacePermissions> | string[];
+    accountUsage?: AuthProfile["accountUsage"] | null;
+    businessUsage?: AuthProfile["businessUsage"] | null;
+    limits?: AuthProfile["limits"] | null;
+    features?: AuthProfile["features"] | null;
+  };
   const { permissionList, workspacePermissions } = normalizePermissions(root.permissions, profile.workspacePermissions);
   const accountType = root.account.accountType ?? root.accountType ?? (root.canCreateBusiness === false ? "STAFF_ONLY" : "OWNER_CAPABLE");
   const canCreateBusiness = root.account.canCreateBusiness ?? root.canCreateBusiness ?? accountType !== "STAFF_ONLY";
+  const accountUsage = root.accountUsage ?? EMPTY_ACCOUNT_USAGE;
 
   return {
     ...profile,
     accountType,
     canCreateBusiness,
     account: { ...profile.account, accountType, canCreateBusiness },
+    accountUsage,
+    businessUsage: root.businessUsage ?? EMPTY_BUSINESS_USAGE,
+    limits: root.limits ?? { ...LOCKED_LIMITS, maxBusinesses: accountUsage.businessesCount },
+    features: root.features ?? DISABLED_FEATURES,
     permissions: permissionList,
     workspacePermissions: workspacePermissions ?? profile.workspacePermissions,
   };
