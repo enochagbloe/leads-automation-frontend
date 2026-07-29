@@ -29,10 +29,10 @@ export const useCalendarAppointments = (businessId: string | null | undefined, q
   enabled: Boolean(businessId) && enabled,
 });
 
-export const useAppointments = (businessId: string | null | undefined, query: AppointmentListQuery) => useQuery({
+export const useAppointments = (businessId: string | null | undefined, query: AppointmentListQuery, enabled = true) => useQuery({
   queryKey: queryKeys.businessAppointments.list(businessId ?? "", query),
   queryFn: () => appointmentService.list(query),
-  enabled: Boolean(businessId),
+  enabled: Boolean(businessId) && enabled,
 });
 
 export const useAppointment = (businessId: string | null | undefined, appointmentId: string | null | undefined) => useQuery({

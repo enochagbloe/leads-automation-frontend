@@ -31,6 +31,7 @@ export interface AppDatePickerProps {
   clearable?: boolean;
   error?: boolean;
   disabledDates?: Matcher | Matcher[];
+  markedDateKeys?: string[];
   startMonth?: Date;
   endMonth?: Date;
   className?: string;
@@ -52,6 +53,7 @@ export function AppDatePicker({
   clearable = true,
   error,
   disabledDates,
+  markedDateKeys,
   startMonth,
   endMonth,
   className,
@@ -60,7 +62,18 @@ export function AppDatePicker({
   "aria-describedby": ariaDescribedBy,
 }: AppDatePickerProps) {
   const [open, setOpen] = useState(false);
+  const defaultStartMonth = useMemo(() => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 10, 0, 1);
+    return date;
+  }, []);
+  const defaultEndMonth = useMemo(() => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() + 10, 11, 31);
+    return date;
+  }, []);
   const selectedLabel = useMemo(() => value && isValid(value) ? format(value, displayFormat) : null, [displayFormat, value]);
+  const markedDateSet = useMemo(() => new Set(markedDateKeys ?? []), [markedDateKeys]);
   const todayDisabled = disabledDates ? dateMatchModifiers(new Date(), disabledDates) : false;
   const selectDate = (date: Date | undefined) => {
     onChange?.(date);
@@ -112,8 +125,10 @@ export function AppDatePicker({
             selected={value}
             onSelect={selectDate}
             disabled={disabledDates}
-            startMonth={startMonth}
-            endMonth={endMonth}
+            modifiers={{ marked: (date) => markedDateSet.has(formatDateValue(date)) }}
+            modifiersClassNames={{ marked: "rdp-marked-date" }}
+            startMonth={startMonth ?? defaultStartMonth}
+            endMonth={endMonth ?? defaultEndMonth}
             defaultMonth={value}
             autoFocus
           />

@@ -16,6 +16,8 @@ export type DetailSidePanelProps = {
   width?: number | string;
   children: ReactNode;
   className?: string;
+  hideHeader?: boolean;
+  contentClassName?: string;
 };
 
 export function DetailSidePanel({
@@ -28,6 +30,8 @@ export function DetailSidePanel({
   width = "min(760px, 44vw)",
   children,
   className,
+  hideHeader = false,
+  contentClassName,
 }: DetailSidePanelProps) {
   const panelStyle = { "--detail-panel-width": typeof width === "number" ? `${width}px` : width } as CSSProperties;
 
@@ -38,28 +42,36 @@ export function DetailSidePanel({
         <DialogContent
           style={panelStyle}
           className={cn(
-            "inset-y-0 right-0 grid h-dvh w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden border bg-card text-card-foreground shadow-[-18px_0_54px_rgba(20,35,27,0.16)] will-change-transform",
+            "inset-y-0 right-0 grid h-dvh w-full overflow-hidden border bg-card text-card-foreground shadow-[-18px_0_54px_rgba(20,35,27,0.16)] will-change-transform",
+            hideHeader ? "grid-rows-[minmax(0,1fr)]" : "grid-rows-[auto_minmax(0,1fr)]",
             "sm:right-3 sm:top-3 sm:h-[calc(100dvh-1.5rem)] sm:w-[var(--detail-panel-width)] sm:rounded-2xl",
             className,
           )}
         >
-          <header className="relative z-10 flex min-h-20 items-center justify-between gap-3 border-b bg-card px-4 py-3 sm:px-6">
-            <div className="flex min-w-0 items-center gap-2">
-              <AppButton size="icon" variant="ghost" aria-label={`Close ${title}`} onClick={() => onOpenChange(false)}>
-                <X className="size-5" aria-hidden="true" />
-              </AppButton>
-              <div className="min-w-0">
-                <DialogTitle className="truncate text-base font-bold tracking-tight sm:text-lg">{title}</DialogTitle>
-                <DialogDescription className="sr-only">{description}</DialogDescription>
+          {hideHeader ? (
+            <>
+              <DialogTitle className="sr-only">{title}</DialogTitle>
+              <DialogDescription className="sr-only">{description}</DialogDescription>
+            </>
+          ) : (
+            <header className="relative z-10 flex min-h-20 items-center justify-between gap-3 border-b bg-card px-4 py-3 sm:px-6">
+              <div className="flex min-w-0 items-center gap-2">
+                <AppButton size="icon" variant="ghost" aria-label={`Close ${title}`} onClick={() => onOpenChange(false)}>
+                  <X className="size-5" aria-hidden="true" />
+                </AppButton>
+                <div className="min-w-0">
+                  <DialogTitle className="truncate text-base font-bold tracking-tight sm:text-lg">{title}</DialogTitle>
+                  <DialogDescription className="sr-only">{description}</DialogDescription>
+                </div>
               </div>
-            </div>
-            {actionLabel && (
-              <AppButton size="sm" onClick={onActionClick} className="shrink-0">
-                {actionLabel}
-              </AppButton>
-            )}
-          </header>
-          <div className="min-h-0 overflow-y-auto overscroll-contain">{children}</div>
+              {actionLabel && (
+                <AppButton size="sm" onClick={onActionClick} className="shrink-0">
+                  {actionLabel}
+                </AppButton>
+              )}
+            </header>
+          )}
+          <div className={cn("min-h-0 overflow-y-auto overscroll-contain", contentClassName)}>{children}</div>
         </DialogContent>
       </DialogPortal>
     </Dialog>

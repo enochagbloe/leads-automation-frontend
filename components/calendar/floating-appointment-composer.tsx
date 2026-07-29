@@ -104,11 +104,13 @@ function showAppointmentCreatedNotification(businessId: string, appointment: Cal
 export function FloatingAppointmentComposer({
   open,
   businessId,
+  markedDateKeys,
   onOpenChange,
   onCreated,
 }: {
   open: boolean;
   businessId: string;
+  markedDateKeys?: string[];
   onOpenChange: (open: boolean) => void;
   onCreated: (appointment: CalendarAppointment) => void;
 }) {
@@ -313,6 +315,7 @@ export function FloatingAppointmentComposer({
                 timeError={form.formState.errors.time?.message}
                 availability={availability}
                 checking={checkingAvailability}
+                markedDateKeys={markedDateKeys}
                 onDateChange={(value) => form.setValue("date", value, { shouldDirty: true, shouldValidate: true })}
                 onTimeChange={(value) => form.setValue("time", value, { shouldDirty: true, shouldValidate: true })}
               />
