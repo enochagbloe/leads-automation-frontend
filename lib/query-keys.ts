@@ -4,6 +4,16 @@ export const queryKeys = {
   businesses: { all: ["businesses"] as const },
   plans: { all: ["plans"] as const },
   subscription: { current: ["subscription", "current"] as const },
+  followUp: {
+    all: ["follow-up"] as const,
+    settings: (businessId: string) => ["follow-up", "settings", businessId] as const,
+    rules: (businessId: string) => ["follow-up", "rules", businessId] as const,
+    jobs: (businessId: string) => ["follow-up", "jobs", businessId] as const,
+    contextJobs: (businessId: string, context: unknown) => ["follow-up", "jobs", businessId, context] as const,
+    logs: (businessId: string) => ["follow-up", "logs", businessId] as const,
+    contextLogs: (businessId: string, context: unknown) => ["follow-up", "logs", businessId, context] as const,
+    prompt: (businessId: string) => ["follow-up", "prompt", businessId] as const,
+  },
   whatsapp: {
     all: ["whatsapp"] as const,
     status: (businessId: string) => ["whatsapp", "status", businessId] as const,
