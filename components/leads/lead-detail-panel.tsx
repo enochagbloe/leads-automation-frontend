@@ -26,7 +26,7 @@ import type { CalendarAppointment } from "@/types/appointment";
 import type { AppointmentStatus } from "@/types/appointment";
 import type { Conversation } from "@/types/conversation";
 import type { CustomerIssue } from "@/types/customer-issue";
-import type { LeadActivity, LeadStatus } from "@/types/lead";
+import type { Lead, LeadActivity, LeadStatus } from "@/types/lead";
 import { activityText, assigneeName, formatLeadDateTime, formatLeadShortDate, leadAppointmentPreview, leadInitials, leadLocation, leadReference, leadTitle, leadValue, latestConversation, openIssue } from "./details/lead-details-utils";
 
 const stages: LeadStatus[] = ["NEW", "CONTACTED", "INTERESTED", "QUALIFIED", "APPOINTMENT_SCHEDULED", "WON", "LOST"];
@@ -197,7 +197,17 @@ function ComplaintRow({ issue }: { issue: CustomerIssue }) {
   );
 }
 
-export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function LeadDetailPanel({
+  leadId,
+  open,
+  onOpenChange,
+  fallbackLead,
+}: {
+  leadId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fallbackLead?: Lead | null;
+}) {
   const profile = useCurrentUser();
   const activeBusinessId = profile.data?.activeBusiness?.id;
   const permissions = getWorkspacePermissions(profile.data);
@@ -206,10 +216,11 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
   const appointments = useAppointments(activeBusinessId, { page: 1, limit: 8, leadId: leadId ?? "__none__" }, Boolean(open && leadId));
   const complaints = useCustomerIssues(activeBusinessId, { page: 1, limit: 6, leadId: leadId ?? "__none__" }, Boolean(open && leadId));
   const [tab, setTab] = useState<PanelTab>("activity");
-  const canManageLead = permissions.canViewAllOperationalLeads || permissions.canReassignLeadsToOthers;
+  const canManageLead = permissions.canReassignLeadsToOthers;
 
-  const lead = detail.data?.lead;
+  const lead = detail.data?.lead ?? fallbackLead;
   const activities = detail.data?.activities ?? [];
+  const detailUnavailable = detail.isError && Boolean(fallbackLead);
   const previewAppointment = leadAppointmentPreview(appointments.data?.data ?? []);
   const latest = latestConversation(conversations.data?.data ?? []);
   const issue = openIssue(complaints.data?.data ?? []);
@@ -227,7 +238,7 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
       contentClassName="lg:overflow-hidden"
       hideHeader
     >
-      {detail.isPending ? <LeadPanelSkeleton /> : detail.isError ? (
+      {detail.isPending && !fallbackLead ? <LeadPanelSkeleton /> : detail.isError && !fallbackLead ? (
         <div className="grid min-h-[58vh] place-items-center p-6">
           <AppErrorState
             title={detail.error instanceof ApiError && detail.error.code === "LEAD_NOT_FOUND" ? "Lead not found" : "Could not load lead"}
@@ -249,12 +260,16 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex flex-wrap gap-1.5">
-                  <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-destructive">Hot lead</span>
                   <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-black uppercase text-muted-foreground">{LEAD_SOURCE_LABELS[lead.source]}</span>
                 </div>
                 <p className="mt-3 text-[11px] text-muted-foreground">{leadReference(lead)}</p>
                 <h2 className="mt-1 font-display text-xl font-semibold leading-7">{leadTitle(lead)}</h2>
                 <p className="mt-1 text-xs text-muted-foreground">{leadLocation(lead) ?? "Location not provided"}</p>
+                {detailUnavailable && (
+                  <p className="mt-3 max-w-64 rounded-lg bg-warning/10 px-3 py-2 text-[11px] font-semibold leading-5 text-warning">
+                    Full lead history is temporarily unavailable. Showing the lead record from the current list.
+                  </p>
+                )}
               </div>
               <AppButton size="icon" variant="outline" aria-label="More lead actions"><MoreHorizontal className="size-4" /></AppButton>
             </div>

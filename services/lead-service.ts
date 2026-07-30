@@ -7,6 +7,7 @@ function queryString(query: LeadListQuery) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === "") continue;
+    if (key === "assignedStaffId" && value === "unassigned") continue;
     if (key === "dateFrom") params.set(key, apiDateFrom(String(value)));
     else if (key === "dateTo") params.set(key, apiDateTo(String(value)));
     else params.set(key, String(value));

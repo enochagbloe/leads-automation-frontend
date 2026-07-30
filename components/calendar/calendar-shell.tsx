@@ -1,6 +1,7 @@
 "use client";
 
 import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { systemNotify } from "@/lib/system-notifications";
 import { AppErrorState } from "@/components/app-error-state";
@@ -55,6 +56,8 @@ function appointmentActionError(error: unknown) {
 }
 
 export function CalendarShell() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const profile = useCurrentUser();
   const activeBusinessId = profile.data?.activeBusiness?.id ?? "";
   const role = profile.data?.membership?.role;
@@ -73,6 +76,20 @@ export function CalendarShell() {
   const [assignAppointment, setAssignAppointment] = useState<CalendarAppointment | null>(null);
   const [detailAppointment, setDetailAppointment] = useState<CalendarAppointment | null>(null);
   const [assignStaffId, setAssignStaffId] = useState("");
+  const initialLeadId = searchParams.get("leadId") ?? "";
+  const composerVisible = composerOpen || Boolean(initialLeadId && canCreate);
+
+  const clearComposerLeadParam = () => {
+    if (!initialLeadId) return;
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("leadId");
+    router.replace(`/appointments/calendar${next.size ? `?${next.toString()}` : ""}`);
+  };
+
+  const handleComposerOpenChange = (nextOpen: boolean) => {
+    setComposerOpen(nextOpen);
+    if (!nextOpen) clearComposerLeadParam();
+  };
 
   const query = useMemo<AppointmentCalendarQuery>(() => ({
     dateFrom: format(subDays(selectedDate, 1), "yyyy-MM-dd"),
@@ -213,10 +230,11 @@ export function CalendarShell() {
       </div>
       {activeBusinessId && (
         <FloatingAppointmentComposer
-          open={composerOpen}
+          open={composerVisible}
           businessId={activeBusinessId}
+          initialLeadId={initialLeadId}
           markedDateKeys={markedDateKeys}
-          onOpenChange={setComposerOpen}
+          onOpenChange={handleComposerOpenChange}
           onCreated={handleCreated}
         />
       )}

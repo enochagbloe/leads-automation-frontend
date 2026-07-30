@@ -82,6 +82,8 @@ function filterIssues(query: CustomerIssueListQuery) {
     .filter((issue) => !query.status || issue.status === query.status)
     .filter((issue) => !query.severity || issue.severity === query.severity)
     .filter((issue) => !query.category || issue.category === query.category)
+    .filter((issue) => !query.leadId || issue.leadId === query.leadId || issue.lead?.id === query.leadId)
+    .filter((issue) => !query.conversationId || issue.conversationId === query.conversationId || issue.conversation?.id === query.conversationId)
     .filter((issue) => query.tab !== "assigned-to-me" || issue.responsibleMembershipId === "member_demo")
     .filter((issue) => query.tab !== "unassigned" || !issue.responsibleMembershipId)
     .filter((issue) => query.tab !== "open" || ["OPEN", "ACKNOWLEDGED", "REOPENED"].includes(issue.status))

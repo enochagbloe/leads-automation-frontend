@@ -105,6 +105,7 @@ export function LeadsPage() {
   const claimLead = useClaimLead(activeBusinessId);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const selectedLeadId = searchParams.get("lead");
+  const selectedLead = leads.data?.data.find((lead) => lead.id === selectedLeadId) ?? null;
   const currentMembershipId = profile.data?.membership?.id;
   const staffView = profile.data?.membership?.role === "STAFF" && permissions.canViewOperationalQueues;
   const canClaimLead = permissions.canClaimUnassignedLeads;
@@ -403,7 +404,7 @@ export function LeadsPage() {
           </>
         )}
       </section>
-      <LeadDetailPanel leadId={selectedLeadId} open={Boolean(selectedLeadId)} onOpenChange={(panelOpen) => { if (!panelOpen) closeLead(); }} />
+      <LeadDetailPanel leadId={selectedLeadId} open={Boolean(selectedLeadId)} fallbackLead={selectedLead} onOpenChange={(panelOpen) => { if (!panelOpen) closeLead(); }} />
     </main>
   );
 }

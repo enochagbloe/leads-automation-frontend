@@ -269,6 +269,7 @@ export function ConversationsInbox() {
   const permissions = getWorkspacePermissions(profile.data);
   const canViewConversations = canAccessOperationalPage(profile.data, "conversations");
   const selectedId = canViewConversations ? searchParams.get("conversationId") ?? searchParams.get("conversation") ?? "" : "";
+  const initialLeadId = canViewConversations ? searchParams.get("leadId") ?? "" : "";
   const conversations = useConversations(query, Boolean(profile.data && canViewConversations));
   const detail = useConversation(selectedId);
   const businessSetup = useBusinessSetupStatus(profile.data?.activeBusiness?.id);
@@ -299,6 +300,7 @@ export function ConversationsInbox() {
   const selectedIndex = conversations.data?.data.findIndex((item) => item.id === selectedId) ?? -1;
   const activeStagedKnowledgeAsset = stagedKnowledgeAsset?.conversationId === selectedId ? stagedKnowledgeAsset : null;
   const draft = selectedId ? drafts[selectedId] ?? "" : "";
+  const createDialogOpen = createOpen || Boolean(!selectedId && initialLeadId && canCreateConversation);
 
   const setParams = (updates: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -306,8 +308,16 @@ export function ConversationsInbox() {
       if (value === undefined || value === "") next.delete(key);
       else next.set(key, String(value));
     }
-    if ("conversationId" in updates) next.delete("conversation");
+    if ("conversationId" in updates) {
+      next.delete("conversation");
+      next.delete("leadId");
+    }
     router.push(`/conversations${next.size ? `?${next.toString()}` : ""}`);
+  };
+
+  const setCreateDialogOpen = (nextOpen: boolean) => {
+    setCreateOpen(nextOpen);
+    if (!nextOpen && initialLeadId && !selectedId) setParams({ leadId: undefined });
   };
 
   useEffect(() => {
@@ -476,7 +486,7 @@ export function ConversationsInbox() {
   }
 
   if (!selectedId) {
-    return <><InboxList query={query} activeBusinessId={profile.data?.activeBusiness?.id} currentMembershipId={profile.data?.membership?.id} canCreate={canCreateConversation} canClaim={canClaimConversation} staffView={staffView} onParams={setParams} onCreate={() => setCreateOpen(true)} onSelect={(id) => setParams({ conversationId: id })} /><CreateConversationDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={(id) => setParams({ conversationId: id })} /></>;
+    return <><InboxList query={query} activeBusinessId={profile.data?.activeBusiness?.id} currentMembershipId={profile.data?.membership?.id} canCreate={canCreateConversation} canClaim={canClaimConversation} staffView={staffView} onParams={setParams} onCreate={() => setCreateOpen(true)} onSelect={(id) => setParams({ conversationId: id })} /><CreateConversationDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} onCreated={(id) => setParams({ conversationId: id, leadId: undefined })} initialLeadId={initialLeadId} /></>;
   }
 
   if (detail.isPending) {

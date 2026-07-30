@@ -3,7 +3,7 @@
 import { addDays, format, isSameDay, startOfWeek, subDays } from "date-fns";
 import gsap from "gsap";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
 function visibleWeekDays(selectedDate: Date) {
@@ -20,17 +20,16 @@ export function CalendarDayStrip({
   onDateChange: (date: Date) => void;
   className?: string;
 }) {
-  const [visibleDate, setVisibleDate] = useState(selectedDate);
   const daysRef = useRef<HTMLDivElement | null>(null);
-  const days = visibleWeekDays(visibleDate);
+  const days = visibleWeekDays(selectedDate);
 
   const moveWeek = (direction: "previous" | "next") => {
     const element = daysRef.current;
     const distance = direction === "next" ? -18 : 18;
-    const nextDate = direction === "next" ? addDays(visibleDate, 7) : subDays(visibleDate, 7);
+    const nextDate = direction === "next" ? addDays(selectedDate, 7) : subDays(selectedDate, 7);
 
     if (!element) {
-      setVisibleDate(nextDate);
+      onDateChange(nextDate);
       return;
     }
 
@@ -41,12 +40,14 @@ export function CalendarDayStrip({
       duration: 0.14,
       ease: "power2.in",
       onComplete: () => {
-        setVisibleDate(nextDate);
-        gsap.fromTo(
-          element,
-          { x: -distance, opacity: 0 },
-          { x: 0, opacity: 1, duration: 0.22, ease: "power2.out" },
-        );
+        onDateChange(nextDate);
+        requestAnimationFrame(() => {
+          gsap.fromTo(
+            element,
+            { x: -distance, opacity: 0 },
+            { x: 0, opacity: 1, duration: 0.22, ease: "power2.out" },
+          );
+        });
       },
     });
   };
