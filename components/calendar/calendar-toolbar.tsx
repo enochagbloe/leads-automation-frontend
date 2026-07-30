@@ -32,7 +32,7 @@ export function CalendarToolbar({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <CalendarDateJump selectedDate={selectedDate} markedDateKeys={markedDateKeys} onDateChange={onDateChange} />
-          <CalendarDayStrip key={selectedDate.toDateString()} selectedDate={selectedDate} onDateChange={onDateChange} className="flex-1 justify-start lg:justify-center" />
+          <CalendarDayStrip selectedDate={selectedDate} onDateChange={onDateChange} className="flex-1 justify-start lg:justify-center" />
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <CalendarMissedDayInsight missedCount={missedSelectedDay} />

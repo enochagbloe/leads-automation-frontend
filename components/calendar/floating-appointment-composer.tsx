@@ -17,6 +17,7 @@ import { LocationPicker } from "@/components/calendar/location-picker";
 import { PeopleSelector } from "@/components/calendar/people-selector";
 import { useBusinessServices } from "@/hooks/use-business-services";
 import { useBusinessLeads, useBusinessMembers, useCheckAppointmentAvailability, useCreateAppointment } from "@/hooks/use-calendar-appointments";
+import { useLead } from "@/hooks/use-leads";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import { applyApiFieldErrors } from "@/lib/form-errors";
 import type { AppointmentAvailabilityResponse, AppointmentLocationType, CalendarAppointment } from "@/types/appointment";
@@ -104,12 +105,14 @@ function showAppointmentCreatedNotification(businessId: string, appointment: Cal
 export function FloatingAppointmentComposer({
   open,
   businessId,
+  initialLeadId,
   markedDateKeys,
   onOpenChange,
   onCreated,
 }: {
   open: boolean;
   businessId: string;
+  initialLeadId?: string | null;
   markedDateKeys?: string[];
   onOpenChange: (open: boolean) => void;
   onCreated: (appointment: CalendarAppointment) => void;
@@ -124,11 +127,18 @@ export function FloatingAppointmentComposer({
   const [availabilityState, setAvailabilityState] = useState<{ key: string; result: AppointmentAvailabilityResponse } | null>(null);
   const services = useBusinessServices(businessId, { status: "active", page: 1, limit: 100, sort: "displayOrder", sortOrder: "asc" });
   const leads = useBusinessLeads(businessId);
+  const initialLead = useLead(initialLeadId ?? "");
   const members = useBusinessMembers(businessId);
+  const leadOptions = useMemo(() => {
+    const options = [...(leads.data?.data ?? [])];
+    const lead = initialLead.data?.lead;
+    if (lead && !options.some((option) => option.id === lead.id)) options.unshift(lead);
+    return options;
+  }, [initialLead.data?.lead, leads.data?.data]);
 
   const bookableServices = useMemo(() => (services.data?.items ?? []).filter((service) => service.isActive && !service.isArchived && service.isBookable), [services.data?.items]);
   const selectedService = bookableServices.find((service) => service.id === values.serviceId);
-  const selectedLead = leads.data?.data.find((lead) => lead.id === values.leadId);
+  const selectedLead = leadOptions.find((lead) => lead.id === values.leadId);
   const missingDuration = Boolean(selectedService && !selectedService.durationMinutes);
   const checkingAvailability = availabilityCheck.isPending;
   const availabilityKey = `${values.serviceId ?? ""}:${values.date ?? ""}:${values.time ?? ""}:${values.assignedStaffId ?? ""}:${selectedService?.durationMinutes ?? ""}`;
@@ -153,6 +163,9 @@ export function FloatingAppointmentComposer({
 
   useEffect(() => {
     if (!open) return;
+    if (initialLeadId && form.getValues("leadId") !== initialLeadId) {
+      form.setValue("leadId", initialLeadId, { shouldDirty: true, shouldValidate: true });
+    }
     window.setTimeout(() => titleRef.current?.focus(), 0);
 
     const handleKey = (event: KeyboardEvent) => {
@@ -162,7 +175,7 @@ export function FloatingAppointmentComposer({
     return () => {
       document.removeEventListener("keydown", handleKey);
     };
-  }, [open, requestClose]);
+  }, [form, initialLeadId, open, requestClose]);
 
   useEffect(() => {
     if (!open || !values.date || !values.time || !values.serviceId || missingDuration) {
@@ -286,11 +299,11 @@ export function FloatingAppointmentComposer({
               )} />
 
               <PeopleSelector
-                leads={leads.data?.data ?? []}
+                leads={leadOptions}
                 staff={members.data}
                 leadId={values.leadId ?? ""}
                 staffId={values.assignedStaffId ?? ""}
-                loadingLeads={leads.isPending}
+                loadingLeads={leads.isPending || (Boolean(initialLeadId) && initialLead.isPending)}
                 loadingStaff={members.isPending}
                 leadError={form.formState.errors.leadId?.message}
                 staffError={form.formState.errors.assignedStaffId?.message}
