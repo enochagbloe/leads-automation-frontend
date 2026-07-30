@@ -39,6 +39,7 @@ import { AppSelect, type AppSelectOption } from "@/components/app-select";
 import { IncompleteBusinessNotice } from "@/components/business-setup/incomplete-business-notice";
 import { ConversationComposer, type Macro } from "@/components/conversations/composer/conversation-composer";
 import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
+import { FollowUpContextCard } from "@/components/follow-up/follow-up-context-card";
 import { ConversationKnowledgeDrawer, type StagedKnowledgeAsset } from "@/components/knowledge/conversation-knowledge-drawer";
 import { RealtimeStatusIndicator } from "@/components/conversations/realtime-status-indicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -374,7 +375,7 @@ function SideConversationPanel({ conversation }: { conversation: Conversation })
   );
 }
 
-function LeadProfilePanel({ conversation, leadDetail, assigneeOptions, canManage, statusBusy, assignBusy, onStatus, onAssign }: { conversation: Conversation; leadDetail?: LeadDetailResponse; assigneeOptions: AppSelectOption[]; canManage: boolean; statusBusy: boolean; assignBusy: boolean; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void }) {
+function LeadProfilePanel({ businessId, conversation, leadDetail, assigneeOptions, canManage, statusBusy, assignBusy, onStatus, onAssign }: { businessId?: string | null; conversation: Conversation; leadDetail?: LeadDetailResponse; assigneeOptions: AppSelectOption[]; canManage: boolean; statusBusy: boolean; assignBusy: boolean; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void }) {
   const canUpdateStatus = conversation.status !== "CLOSED" && conversation.status !== "PLAN_LIMIT_BLOCKED" && conversation.permissions?.canUpdateStatus !== false;
   const canAssign = canManage && conversation.status !== "CLOSED" && conversation.status !== "PLAN_LIMIT_BLOCKED" && conversation.permissions?.canAssign !== false;
   const lead = leadDetail?.lead;
@@ -384,6 +385,7 @@ function LeadProfilePanel({ conversation, leadDetail, assigneeOptions, canManage
       <div className="space-y-6 p-5">
         <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Conversation</h4><div className="mt-3 space-y-3"><div><label htmlFor="drawer-status" className="mb-1 block text-xs font-semibold">Status</label>{canUpdateStatus ? <AppSelect id="drawer-status" value={conversation.status} options={ACTIVE_CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))} disabled={statusBusy} onValueChange={(value) => onStatus(value as ConversationStatus)} /> : <ConversationStatusBadge status={conversation.status} />}</div>{canAssign && <div><label htmlFor="drawer-assignee" className="mb-1 block text-xs font-semibold">Assigned staff</label><AppSelect id="drawer-assignee" value={conversation.assignedStaffId ?? "__unassigned"} options={assigneeOptions} disabled={assignBusy} onValueChange={(value) => onAssign(value === "__unassigned" ? null : value)} /></div>}</div></section>
         <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Lead profile</h4><dl className="mt-3 space-y-3 text-sm"><div><dt className="text-xs text-muted-foreground">Phone</dt><dd className="mt-1 font-medium">{conversation.lead.phone}</dd></div><div><dt className="text-xs text-muted-foreground">Email</dt><dd className="mt-1 font-medium">{conversation.lead.email ?? "No email provided"}</dd></div>{lead && <><div><dt className="text-xs text-muted-foreground">Lead status</dt><dd className={cn("mt-1 inline-flex rounded-md px-2 py-1 text-xs font-bold", leadStatusTone(lead.status))}>{LEAD_STATUS_LABELS[lead.status]}</dd></div><div><dt className="text-xs text-muted-foreground">Source</dt><dd className="mt-1 font-medium">{LEAD_SOURCE_LABELS[lead.source]}</dd></div></>}</dl></section>
+        <FollowUpContextCard businessId={businessId} leadId={conversation.leadId} conversationId={conversation.id} compact canManage={canManage} />
         <section><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Tags</h4><div className="mt-3 flex flex-wrap gap-1.5">{lead?.tags.length ? lead.tags.map((tag) => <span key={tag} className="rounded-lg bg-secondary px-2 py-1 text-xs font-semibold text-secondary-foreground">{tag}</span>) : <span className="text-xs text-muted-foreground">No tags</span>}</div></section>
       </div>
     </div>
@@ -408,7 +410,7 @@ function ActivityPanel({ activities }: { activities: LeadActivity[] }) {
   return <div className="h-full overflow-y-auto p-5"><h3 className="font-bold">Recent activity</h3><ol className="mt-5 space-y-5">{activities.length ? activities.map((item) => <li key={item.id} className="relative border-l-2 border-secondary pl-4"><span className="absolute -left-[5px] top-0 size-2 rounded-full bg-primary" /><p className="text-sm font-semibold">{getLeadActivityLabel(item.action)}</p><p className="mt-1 text-xs text-muted-foreground">{item.actor ? `${item.actor.firstName} ${item.actor.lastName} · ` : ""}{formatLeadDate(item.createdAt)}</p></li>) : <li><AppEmptyState className="min-h-52 border-0" icon={Activity} title="No activity yet" description="Lead and conversation events will appear here." /></li>}</ol></div>;
 }
 
-function ConversationContextDrawer({ active, open, onClose, conversation, leadDetail, activities, assigneeOptions, canManage, canStageKnowledgeAssets, knowledgeStageUnavailableReason, statusBusy, assignBusy, notesBusy, onStageKnowledgeAsset, onStatus, onAssign, onNotes }: { active: ContextPanel; open: boolean; onClose: () => void; conversation: Conversation; leadDetail?: LeadDetailResponse; activities: LeadActivity[]; assigneeOptions: AppSelectOption[]; canManage: boolean; canStageKnowledgeAssets: boolean; knowledgeStageUnavailableReason?: string | null; statusBusy: boolean; assignBusy: boolean; notesBusy: boolean; onStageKnowledgeAsset?: (asset: StagedKnowledgeAsset) => void; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void; onNotes: (notes: string | null) => void }) {
+function ConversationContextDrawer({ active, open, onClose, businessId, conversation, leadDetail, activities, assigneeOptions, canManage, canStageKnowledgeAssets, knowledgeStageUnavailableReason, statusBusy, assignBusy, notesBusy, onStageKnowledgeAsset, onStatus, onAssign, onNotes }: { active: ContextPanel; open: boolean; onClose: () => void; businessId?: string | null; conversation: Conversation; leadDetail?: LeadDetailResponse; activities: LeadActivity[]; assigneeOptions: AppSelectOption[]; canManage: boolean; canStageKnowledgeAssets: boolean; knowledgeStageUnavailableReason?: string | null; statusBusy: boolean; assignBusy: boolean; notesBusy: boolean; onStageKnowledgeAsset?: (asset: StagedKnowledgeAsset) => void; onStatus: (status: ConversationStatus) => void; onAssign: (id: string | null) => void; onNotes: (notes: string | null) => void }) {
   const title = RAIL_ITEMS.find((item) => item.id === active)?.label ?? "Context";
   return (
     <aside
@@ -421,7 +423,7 @@ function ConversationContextDrawer({ active, open, onClose, conversation, leadDe
       <div className="flex h-14 shrink-0 items-center justify-between border-b px-4 xl:hidden"><p className="font-bold">{title}</p><AppButton size="icon" variant="ghost" aria-label="Close context panel" onClick={onClose}><X className="size-4" /></AppButton></div>
       <div key={active} className="conversation-context-content min-h-0 flex-1">
         {active === "knowledge" && <ConversationKnowledgeDrawer conversationId={conversation.id} canManage={canManage} canStageAssets={canStageKnowledgeAssets} stageUnavailableReason={knowledgeStageUnavailableReason} onStageAsset={onStageKnowledgeAsset} />}
-        {active === "profile" && <LeadProfilePanel conversation={conversation} leadDetail={leadDetail} assigneeOptions={assigneeOptions} canManage={canManage} statusBusy={statusBusy} assignBusy={assignBusy} onStatus={onStatus} onAssign={onAssign} />}
+        {active === "profile" && <LeadProfilePanel businessId={businessId} conversation={conversation} leadDetail={leadDetail} assigneeOptions={assigneeOptions} canManage={canManage} statusBusy={statusBusy} assignBusy={assignBusy} onStatus={onStatus} onAssign={onAssign} />}
         {active === "internal" && <SideConversationPanel conversation={conversation} />}
         {active === "notes" && <NotesPanel notes={leadDetail?.lead.notes} saving={notesBusy} onSave={onNotes} />}
         {active === "activity" && <ActivityPanel activities={activities} />}
@@ -455,6 +457,7 @@ function ConversationTabs({ active, onChange, activityCount }: { active: Workspa
 }
 
 export function ConversationWorkspace({
+  businessId,
   conversation,
   messages,
   leadDetail,
@@ -496,6 +499,7 @@ export function ConversationWorkspace({
   onNotes,
   onDelete,
 }: {
+  businessId?: string | null;
   conversation: Conversation;
   messages: ConversationMessage[];
   leadDetail?: LeadDetailResponse;
@@ -631,7 +635,7 @@ export function ConversationWorkspace({
           </div>
           <div className={cn("grid h-full min-h-0 shrink-0 overflow-hidden transition-[grid-template-columns] duration-300 ease-out xl:grid", context ? "xl:grid-cols-[340px]" : "xl:grid-cols-[0px]")}>
             <div className="h-full min-h-0 min-w-0 overflow-hidden xl:w-[340px]">
-              <ConversationContextDrawer active={renderedContext} open={Boolean(context)} onClose={() => setContext(null)} conversation={conversation} leadDetail={leadDetail} activities={activities} assigneeOptions={assigneeOptions} canManage={canAssign} canStageKnowledgeAssets={canStageKnowledgeAssets} knowledgeStageUnavailableReason={knowledgeStageUnavailableReason} statusBusy={statusBusy} assignBusy={assignBusy} notesBusy={notesBusy} onStageKnowledgeAsset={onStageKnowledgeAsset} onStatus={onStatus} onAssign={onAssign} onNotes={onNotes} />
+              <ConversationContextDrawer active={renderedContext} open={Boolean(context)} onClose={() => setContext(null)} businessId={businessId} conversation={conversation} leadDetail={leadDetail} activities={activities} assigneeOptions={assigneeOptions} canManage={canAssign} canStageKnowledgeAssets={canStageKnowledgeAssets} knowledgeStageUnavailableReason={knowledgeStageUnavailableReason} statusBusy={statusBusy} assignBusy={assignBusy} notesBusy={notesBusy} onStageKnowledgeAsset={onStageKnowledgeAsset} onStatus={onStatus} onAssign={onAssign} onNotes={onNotes} />
             </div>
           </div>
           <ConversationRightRail active={context} onSelect={toggleContext} />

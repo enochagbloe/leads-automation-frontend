@@ -2,7 +2,7 @@
 
 import { AlertTriangle, BookOpen, Building2, CalendarDays, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserAccountMenu } from "@/components/account/user-account-menu";
 import { AppButton } from "@/components/app-button";
@@ -10,6 +10,7 @@ import { AppErrorState } from "@/components/app-error-state";
 import { AppReadinessBanner } from "@/components/business-setup/app-readiness-banner";
 import { ActionableNotificationHost } from "@/components/notifications/actionable-notification-host";
 import { AppGlobalSearch } from "@/components/search/app-global-search";
+import { SettingsCenterModal, type SettingsSectionKey } from "@/components/settings/settings-center-modal";
 import { RealtimeProvider } from "@/components/providers/realtime-provider";
 import { AppSidebar, type SidebarNavItem } from "@/components/sidebar/app-sidebar";
 import { SidebarProvider, useSidebar } from "@/components/sidebar/sidebar-provider";
@@ -85,6 +86,8 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const notificationCounts = useNotificationCounts(canViewNotifications ? activeBusinessId : null);
   const businessCreation = !subscriptionInactive && subscription.data ? canCreateBusiness(subscription.data) : null;
   const sessionEnded = profile.error instanceof ApiError && profile.error.status === 401;
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionKey>("general");
 
   useEffect(() => {
     if (sessionEnded) router.replace("/login");
@@ -95,7 +98,8 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const recoverBusinessAccess = () => void resetBusinessContext(client);
     const openSubscriptionPage = () => {
-      if (window.location.pathname !== "/settings/billing") router.push("/settings/billing");
+      setSettingsSection("billing");
+      setSettingsOpen(true);
     };
     window.addEventListener(BUSINESS_ACCESS_DENIED_EVENT, recoverBusinessAccess);
     window.addEventListener(SUBSCRIPTION_REQUIRED_EVENT, openSubscriptionPage);
@@ -214,7 +218,18 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
               addAccountDisabledReason={accountCanCreateBusiness && businessCreation && !businessCreation.allowed ? businessCreation.reason : undefined}
               showBillingActions={canManageBilling}
               onMenuAction={(actionId) => {
-                if (actionId === "billing-plan") router.push("/settings/billing");
+                if (actionId === "settings") {
+                  setSettingsSection("general");
+                  setSettingsOpen(true);
+                }
+                if (actionId === "billing-plan") {
+                  setSettingsSection("billing");
+                  setSettingsOpen(true);
+                }
+                if (actionId === "notifications") {
+                  setSettingsSection("notifications");
+                  setSettingsOpen(true);
+                }
               }}
               onLogout={logoutUser}
               loggingOut={logout.isPending}
@@ -229,7 +244,15 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
         />
         {children}
         <SubscriptionWelcomeDialog profile={profile.data} subscription={subscription.data} />
-        {canViewNotifications && <ActionableNotificationHost key={profile.data.activeBusiness?.id ?? "no-active-business"} activeBusinessId={profile.data.activeBusiness?.id} />}
+        <SettingsCenterModal
+          key={`settings-${profile.data.activeBusiness?.id ?? "no-active-business"}`}
+          open={settingsOpen}
+          section={settingsSection}
+          profile={profile.data}
+          onOpenChange={setSettingsOpen}
+          onSectionChange={setSettingsSection}
+        />
+        {canViewNotifications && <ActionableNotificationHost key={`notifications-${profile.data.activeBusiness?.id ?? "no-active-business"}`} activeBusinessId={profile.data.activeBusiness?.id} />}
       </div>
     </div>
     </RealtimeProvider>

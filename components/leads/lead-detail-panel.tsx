@@ -9,6 +9,7 @@ import { APPOINTMENT_STATUS_LABELS } from "@/components/calendar/appointment-sta
 import { ConversationChannelBadge } from "@/components/conversations/conversation-channel-badge";
 import { ConversationStatusBadge } from "@/components/conversations/conversation-status-badge";
 import { DetailSidePanel } from "@/components/detail-side-panel";
+import { FollowUpContextCard } from "@/components/follow-up/follow-up-context-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppointments } from "@/hooks/use-calendar-appointments";
 import { useCurrentUser } from "@/hooks/use-auth";
@@ -319,6 +320,9 @@ export function LeadDetailPanel({ leadId, open, onOpenChange }: { leadId: string
                 {tab === "activity" && (
                   <div>
                   <h3 className="mb-5 font-display text-base font-semibold">Latest Activity</h3>
+                  <div className="mb-8">
+                    <FollowUpContextCard businessId={activeBusinessId} leadId={lead.id} conversationId={latest?.id} canManage={canManageLead} />
+                  </div>
                   <div className="divide-y">
                     {activities.length ? activities.slice(0, 5).map((activity) => <CompactActivity key={activity.id} activity={activity} />) : <p className="text-sm text-muted-foreground">No activity yet.</p>}
                   </div>

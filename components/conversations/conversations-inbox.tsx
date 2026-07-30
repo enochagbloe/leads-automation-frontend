@@ -496,6 +496,7 @@ export function ConversationsInbox() {
 
   return (
     <ConversationWorkspace
+      businessId={profile.data?.activeBusiness?.id}
       conversation={selectedConversation}
       messages={messages}
       leadDetail={leadDetail.data}
