@@ -6,7 +6,7 @@ import {
   MessageCircle,
   Smartphone,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppButton } from "@/components/app-button";
 import { AppErrorState } from "@/components/app-error-state";
 import { AppInput } from "@/components/app-input";
@@ -15,13 +15,29 @@ import { LoadingPage } from "@/components/states/loading-states";
 import { useCurrentUser } from "@/hooks/use-auth";
 import {
   useDeactivateWhatsAppConnection,
+  useCompleteWhatsAppConnection,
   useStartWhatsAppConnection,
   useStartWhatsAppNumberChange,
   useWhatsAppStatus,
 } from "@/hooks/use-whatsapp";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
+import { env } from "@/lib/env";
+import { systemNotify } from "@/lib/system-notifications";
 import { cn } from "@/lib/utils";
 import type { WhatsAppConnectionStatus, WhatsAppProvider, WhatsAppStatus } from "@/types/whatsapp";
+
+declare global {
+  interface Window {
+    FB?: {
+      init: (config: { appId: string; cookie?: boolean; xfbml?: boolean; version: string }) => void;
+      login: (
+        callback: (response: { authResponse?: { code?: string }; status?: string }) => void,
+        options: Record<string, unknown>,
+      ) => void;
+    };
+    fbAsyncInit?: () => void;
+  }
+}
 
 const COUNTRY_CODES = [
   { value: "+233", label: "Ghana +233" },
@@ -54,6 +70,27 @@ const STATUS_LABELS: Record<WhatsAppConnectionStatus, string> = {
   ERROR: "Needs attention",
 };
 
+type ConnectionStage =
+  | "starting"
+  | "authorizing"
+  | "completing"
+  | "refreshing"
+  | "disconnecting";
+
+interface MetaAuthorizationResult {
+  authorizationCode: string;
+  phoneNumberId: string;
+  wabaId: string;
+  displayPhoneNumber?: string;
+  businessAccountId?: string;
+  metadata: Record<string, unknown>;
+}
+
+function connectionDiagnostic(stage: string, details: Record<string, unknown> = {}) {
+  if (process.env.NODE_ENV === "production") return;
+  console.info("[BizReply WhatsApp]", stage, details);
+}
+
 function compactError(error: unknown) {
   if (!(error instanceof ApiError)) return getApiErrorMessage(error);
   const messages: Record<string, string> = {
@@ -72,7 +109,147 @@ function normalizeLocalPhone(value: string) {
 }
 
 function providerForEnvironment(): WhatsAppProvider {
-  return process.env.NODE_ENV === "production" ? "META_WHATSAPP" : "MOCK_WHATSAPP";
+  return "META_WHATSAPP";
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  });
+}
+
+function loadMetaSdk() {
+  if (!env.metaAppId || !env.metaWhatsAppConfigId) {
+    return Promise.reject(new Error("Meta authorization is not configured for this frontend."));
+  }
+  if (typeof window === "undefined") return Promise.reject(new Error("Meta authorization can only run in the browser."));
+  if (window.FB) return Promise.resolve();
+
+  return new Promise<void>((resolve, reject) => {
+    const existingScript = document.getElementById("facebook-jssdk");
+    const timeoutId = window.setTimeout(() => reject(new Error("Meta authorization took too long to load.")), 15000);
+
+    window.fbAsyncInit = () => {
+      window.FB?.init({
+        appId: env.metaAppId!,
+        cookie: true,
+        xfbml: false,
+        version: env.metaGraphVersion,
+      });
+      window.clearTimeout(timeoutId);
+      resolve();
+    };
+
+    if (existingScript) {
+      const intervalId = window.setInterval(() => {
+        if (!window.FB) return;
+        window.clearInterval(intervalId);
+        window.clearTimeout(timeoutId);
+        resolve();
+      }, 100);
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "facebook-jssdk";
+    script.async = true;
+    script.defer = true;
+    script.crossOrigin = "anonymous";
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.onerror = () => {
+      window.clearTimeout(timeoutId);
+      reject(new Error("Could not load Meta authorization. Check your network and try again."));
+    };
+    document.body.appendChild(script);
+  });
+}
+
+function parseMetaMessage(data: unknown): Record<string, unknown> | null {
+  if (typeof data === "string") {
+    try {
+      return JSON.parse(data) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  if (data && typeof data === "object") return data as Record<string, unknown>;
+  return null;
+}
+
+async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
+  await loadMetaSdk();
+  const facebook = window.FB;
+  if (!facebook || !env.metaWhatsAppConfigId) throw new Error("Meta authorization is not available.");
+
+  return withTimeout(new Promise<MetaAuthorizationResult>((resolve, reject) => {
+    let authorizationCode = "";
+    let phoneNumberId = "";
+    let wabaId = "";
+    let displayPhoneNumber: string | undefined;
+    let businessAccountId: string | undefined;
+    let metadata: Record<string, unknown> = {};
+    let settled = false;
+
+    const cleanup = () => window.removeEventListener("message", handleMessage);
+    const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(message));
+    };
+    const finishIfReady = () => {
+      if (settled || !authorizationCode) return;
+      if (!phoneNumberId || !wabaId) return;
+      settled = true;
+      cleanup();
+      resolve({ authorizationCode, phoneNumberId, wabaId, displayPhoneNumber, businessAccountId, metadata });
+    };
+
+    function handleMessage(event: MessageEvent) {
+      if (!event.origin.includes("facebook.com")) return;
+      const payload = parseMetaMessage(event.data);
+      if (payload?.type !== "WA_EMBEDDED_SIGNUP") return;
+
+      metadata = { ...metadata, embeddedSignupEvent: payload.event, embeddedSignupVersion: payload.version };
+      if (payload.event === "FINISH") {
+        const data = (payload.data && typeof payload.data === "object" ? payload.data : {}) as Record<string, unknown>;
+        phoneNumberId = String(data.phone_number_id ?? data.phoneNumberId ?? "");
+        wabaId = String(data.waba_id ?? data.wabaId ?? "");
+        const rawDisplayPhoneNumber = data.display_phone_number ?? data.displayPhoneNumber ?? data.phone_number ?? data.phoneNumber;
+        displayPhoneNumber = rawDisplayPhoneNumber ? String(rawDisplayPhoneNumber) : undefined;
+        const businessId = data.business_id ?? data.businessAccountId;
+        businessAccountId = businessId ? String(businessId) : undefined;
+        metadata = {
+          ...metadata,
+          displayPhoneNumber,
+          hasPhoneNumberId: Boolean(phoneNumberId),
+          hasWabaId: Boolean(wabaId),
+          hasBusinessAccountId: Boolean(businessAccountId),
+        };
+        finishIfReady();
+      }
+      if (payload.event === "CANCEL") fail("Meta authorization was cancelled before the number was connected.");
+      if (payload.event === "ERROR") fail("Meta authorization failed. Please try again.");
+    }
+
+    window.addEventListener("message", handleMessage);
+    facebook.login((response) => {
+      authorizationCode = response.authResponse?.code ?? "";
+      if (!authorizationCode) {
+        fail(response.status === "not_authorized" ? "Meta authorization was not approved." : "Meta authorization was closed before completion.");
+        return;
+      }
+      finishIfReady();
+    }, {
+      config_id: env.metaWhatsAppConfigId,
+      response_type: "code",
+      override_default_response_type: true,
+      extras: { sessionInfoVersion: 3 },
+    });
+  }), 90000, "Meta authorization timed out. Please try again.");
 }
 
 function WhatsAppMark({ connected, busy }: { connected?: boolean; busy?: boolean }) {
@@ -84,9 +261,17 @@ function WhatsAppMark({ connected, busy }: { connected?: boolean; busy?: boolean
   );
 }
 
-function ConnectionLoadingState({ active, mode = "connecting" }: { active: boolean; mode?: "connecting" | "disconnecting" }) {
+function ConnectionLoadingState({ active, mode = "connecting", stage }: { active: boolean; mode?: "connecting" | "disconnecting"; stage?: ConnectionStage | null }) {
   const [step, setStep] = useState(0);
+  const stageSteps: Record<ConnectionStage, string> = {
+    starting: "Starting WhatsApp connection...",
+    authorizing: "Waiting for Meta authorization...",
+    completing: "Almost there... connecting your number",
+    refreshing: "Checking connection status...",
+    disconnecting: "Disconnecting your number...",
+  };
   const steps = mode === "disconnecting" ? DISCONNECTING_STEPS : CONNECTING_STEPS;
+  const title = stage ? stageSteps[stage] : steps[active ? step : 0];
 
   useEffect(() => {
     if (!active) return;
@@ -100,7 +285,7 @@ function ConnectionLoadingState({ active, mode = "connecting" }: { active: boole
     <div className="mx-auto grid min-h-[420px] max-w-md place-items-center text-center">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">{mode === "disconnecting" ? "Disconnecting" : "Connecting"}</p>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{steps[active ? step : 0]}</h1>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {mode === "disconnecting"
             ? "Please keep this page open. Your leads, conversations, and messages will stay available."
@@ -148,6 +333,7 @@ function ConnectedState({
 
 function ConnectAccountFlow({ businessName, status, businessId, canManage, onRefresh }: { businessName: string; status: WhatsAppStatus; businessId: string; canManage: boolean; onRefresh: () => Promise<unknown> }) {
   const start = useStartWhatsAppConnection(businessId);
+  const complete = useCompleteWhatsAppConnection(businessId);
   const change = useStartWhatsAppNumberChange(businessId);
   const deactivate = useDeactivateWhatsAppConnection(businessId);
   const [showForm, setShowForm] = useState(status.status === "CONNECTING" || status.status === "ERROR");
@@ -155,36 +341,123 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
   const [phone, setPhone] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshCountdown, setRefreshCountdown] = useState<number | null>(null);
+  const [stage, setStage] = useState<ConnectionStage | null>(null);
+  const processTimeoutRef = useRef<number | null>(null);
+  const stageRef = useRef<ConnectionStage | null>(null);
   const localPhone = normalizeLocalPhone(phone);
   const fullPhone = `${countryCode}${localPhone}`;
-  const connecting = start.isPending || change.isPending;
+  const connecting = Boolean(stage) || start.isPending || complete.isPending || change.isPending;
   const disconnecting = deactivate.isPending;
   const connected = status.status === "CONNECTED";
-  const showLoadingState = connecting || status.status === "CONNECTING";
+  const hasPendingConnection = status.status === "CONNECTING";
+  const canSubmitConnection = hasPendingConnection || Boolean(localPhone);
+
+  const clearProcessTimeout = useCallback(() => {
+    if (!processTimeoutRef.current) return;
+    window.clearTimeout(processTimeoutRef.current);
+    processTimeoutRef.current = null;
+  }, []);
+
+  const failConnection = useCallback((message: string) => {
+    clearProcessTimeout();
+    stageRef.current = null;
+    setStage(null);
+    setErrorMessage(message);
+    setRefreshCountdown(4);
+  }, [clearProcessTimeout]);
+
+  const beginStage = useCallback((nextStage: ConnectionStage) => {
+    clearProcessTimeout();
+    stageRef.current = nextStage;
+    setStage(nextStage);
+    processTimeoutRef.current = window.setTimeout(() => {
+      failConnection("The WhatsApp connection process took too long. Please try again.");
+    }, 120000);
+  }, [clearProcessTimeout, failConnection]);
 
   useEffect(() => {
     if (refreshCountdown === null) return;
     if (refreshCountdown <= 0) {
+      connectionDiagnostic("STATUS_REFETCH", { businessId, reason: "error-countdown" });
       void onRefresh().finally(() => {
         setRefreshCountdown(null);
-        setErrorMessage(null);
       });
       return;
     }
     const timeout = window.setTimeout(() => setRefreshCountdown((value) => (value ?? 1) - 1), 1000);
     return () => window.clearTimeout(timeout);
-  }, [onRefresh, refreshCountdown]);
+  }, [businessId, onRefresh, refreshCountdown]);
 
-  const connect = async () => {
+  useEffect(() => () => clearProcessTimeout(), [clearProcessTimeout]);
+
+  const finishMetaConnection = useCallback(async (displayPhoneNumber?: string) => {
+    beginStage("authorizing");
+    connectionDiagnostic("META_AUTH_STARTED", { businessId, hasMetaAppId: Boolean(env.metaAppId), hasConfigId: Boolean(env.metaWhatsAppConfigId) });
+    const meta = await runMetaAuthorization();
+    const nextDisplayPhoneNumber = meta.displayPhoneNumber ?? displayPhoneNumber;
+    connectionDiagnostic("META_AUTH_SUCCESS", {
+      businessId,
+      hasPhoneNumberId: Boolean(meta.phoneNumberId),
+      hasWabaId: Boolean(meta.wabaId),
+      hasBusinessAccountId: Boolean(meta.businessAccountId),
+      hasDisplayPhoneNumber: Boolean(nextDisplayPhoneNumber),
+    });
+
+    beginStage("completing");
+    connectionDiagnostic("CONNECTION_COMPLETE_REQUEST", {
+      businessId,
+      hasPhoneNumberId: Boolean(meta.phoneNumberId),
+      hasWabaId: Boolean(meta.wabaId),
+      hasBusinessAccountId: Boolean(meta.businessAccountId),
+      hasDisplayPhoneNumber: Boolean(nextDisplayPhoneNumber),
+    });
+    await complete.mutateAsync({
+      provider: "META_WHATSAPP",
+      phoneNumberId: meta.phoneNumberId,
+      displayPhoneNumber: nextDisplayPhoneNumber,
+      wabaId: meta.wabaId,
+      businessAccountId: meta.businessAccountId,
+      authorizationCode: meta.authorizationCode,
+      metadata: meta.metadata,
+    });
+    connectionDiagnostic("CONNECTION_COMPLETE_SUCCESS", { businessId, status: "CONNECTED" });
+
+    beginStage("refreshing");
+    connectionDiagnostic("STATUS_REFETCH", { businessId, reason: "after-complete" });
+    await onRefresh();
+    clearProcessTimeout();
+    stageRef.current = null;
+    setStage(null);
+    setShowForm(false);
+    systemNotify.success("WhatsApp number connected", { description: "Customer messages can now flow into BizReply." });
+  }, [beginStage, businessId, clearProcessTimeout, complete, onRefresh]);
+
+  const connect = useCallback(async () => {
     setErrorMessage(null);
+    setRefreshCountdown(null);
     try {
+      if (hasPendingConnection) {
+        await finishMetaConnection(status.displayPhoneNumber ?? undefined);
+        return;
+      }
+
+      beginStage("starting");
+      connectionDiagnostic("CONNECTION_START_REQUEST", { businessId, provider: providerForEnvironment(), hasDisplayPhoneNumber: Boolean(fullPhone) });
       await start.mutateAsync({ provider: providerForEnvironment(), displayPhoneNumber: fullPhone });
+      connectionDiagnostic("CONNECTION_START_SUCCESS", { businessId, status: "CONNECTING" });
+      connectionDiagnostic("STATUS_REFETCH", { businessId, reason: "after-start" });
       await onRefresh();
+      await finishMetaConnection(fullPhone);
     } catch (error) {
-      setErrorMessage(compactError(error));
-      setRefreshCountdown(4);
+      const message = compactError(error);
+      const failedStage = stageRef.current;
+      connectionDiagnostic(failedStage === "completing" ? "CONNECTION_COMPLETE_FAILURE" : failedStage === "authorizing" ? "META_AUTH_FAILURE" : "CONNECTION_START_FAILURE", {
+        businessId,
+        message,
+      });
+      failConnection(message);
     }
-  };
+  }, [beginStage, businessId, failConnection, finishMetaConnection, fullPhone, hasPendingConnection, onRefresh, start, status.displayPhoneNumber]);
 
   const changeNumber = async () => {
     setErrorMessage(null);
@@ -211,15 +484,15 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
   };
 
   if (disconnecting) {
-    return <ConnectionLoadingState active={disconnecting} mode="disconnecting" />;
+    return <ConnectionLoadingState active={disconnecting} mode="disconnecting" stage="disconnecting" />;
   }
 
   if (connected) {
     return <ConnectedState status={status} canManage={canManage} onChangeNumber={changeNumber} onDisconnect={disconnectNumber} changing={change.isPending} disconnecting={disconnecting} />;
   }
 
-  if (showLoadingState) {
-    return <ConnectionLoadingState active={showLoadingState} />;
+  if (stage) {
+    return <ConnectionLoadingState active stage={stage} />;
   }
 
   return (
@@ -242,13 +515,19 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
           <div className={cn("grid overflow-hidden transition-all duration-300 ease-out", showForm ? "mt-8 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
             <div className="min-h-0">
               <div className="rounded-3xl border bg-card p-4 text-left shadow-[0_18px_70px_rgba(20,35,27,0.08)] sm:p-5">
+                {status.status === "CONNECTING" && (
+                  <div className="mb-4 rounded-2xl border border-warning/20 bg-warning/5 p-3 text-sm leading-6 text-muted-foreground">
+                    <p className="font-bold text-foreground">Connection pending</p>
+                    <p className="mt-1">The backend has started the connection, but Meta authorization still needs to finish. Continue below or try again.</p>
+                  </div>
+                )}
                 <label htmlFor="whatsapp-local-number" className="text-sm font-bold">WhatsApp number</label>
                 <div className="mt-2 grid gap-2 sm:grid-cols-[170px_1fr]">
                   <AppSelect value={countryCode} onValueChange={setCountryCode} options={COUNTRY_CODES} aria-label="Country code" className="rounded-2xl" />
                   <AppInput id="whatsapp-local-number" type="tel" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="24 123 4567" className="h-11 rounded-2xl" autoComplete="tel-national" />
                 </div>
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">Select your country code, then enter the local number without the country code.</p>
-                <AppButton className="mt-5 w-full rounded-2xl" loading={connecting} loadingText="Connecting your number" disabled={!localPhone || connecting} onClick={connect}>Connect account</AppButton>
+                <AppButton className="mt-5 w-full rounded-2xl" loading={connecting} loadingText="Connecting your number" disabled={!canSubmitConnection || connecting} onClick={connect}>{hasPendingConnection ? "Continue connection" : "Connect account"}</AppButton>
               </div>
             </div>
           </div>
@@ -289,8 +568,14 @@ export function SettingsWhatsAppPage() {
 
   const refreshStatus = useMemo(() => async () => status.refetch(), [status]);
 
-  if (profile.isPending || status.isPending) return <LoadingPage />;
+  useEffect(() => {
+    if (!status.data || !businessId) return;
+    connectionDiagnostic("STATUS_REFETCH", { businessId, reason: "page-load", status: status.data.status, provider: status.data.provider });
+  }, [businessId, status.data]);
+
+  if (profile.isPending) return <LoadingPage />;
   if (profile.isError || !businessId) return <AppErrorState title="No active business" description="Select a business before managing WhatsApp." />;
+  if (status.isPending) return <LoadingPage />;
   if (status.isError) return <main className="mx-auto max-w-3xl p-5 sm:p-8"><AppErrorState title="Could not load WhatsApp connection" description={getApiErrorMessage(status.error)} onRetry={() => status.refetch()} /></main>;
 
   const canManage = profile.data.membership?.role === "BUSINESS_OWNER";
