@@ -1,8 +1,41 @@
 export type KnowledgeArticleStatus = "DRAFT" | "NEEDS_REVIEW" | "PUBLISHED" | "ARCHIVED";
 export type KnowledgeArticleSource = "AI_DRAFT" | "MANUAL" | "IMPORTED";
 export type KnowledgeVisibility = "INTERNAL_ONLY" | "CLIENT_SENDABLE";
-export type KnowledgeDocumentStatus = "ACTIVE" | "ARCHIVED";
+export type KnowledgeDocumentStatus = "ACTIVE" | "ARCHIVED" | "DELETED";
+export type KnowledgeDocumentProcessingStatus = "UPLOADING" | "QUEUED" | "PROCESSING" | "READY" | "NEEDS_REVIEW" | "FAILED";
+export type KnowledgeDocumentAction = "VIEW" | "DOWNLOAD" | "ARCHIVE" | "RESTORE" | "DELETE" | "RETRY_PROCESSING" | "VIEW_VERSIONS";
 export type KnowledgeAssetType = "ARTICLE" | "DOCUMENT";
+
+export interface KnowledgeUserSummary {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+}
+
+export interface KnowledgeMembershipSummary {
+  id: string;
+  role?: string | null;
+  user?: KnowledgeUserSummary | null;
+}
+
+export interface KnowledgeDocumentVersion {
+  id: string;
+  businessId?: string;
+  documentId?: string;
+  versionNumber: number;
+  originalFileName: string;
+  safeFileName?: string | null;
+  fileExtension?: string | null;
+  fileSize: number;
+  mimeType: string;
+  checksum?: string | null;
+  processingStatus: KnowledgeDocumentProcessingStatus;
+  isActive?: boolean;
+  uploadedByUserId?: string | null;
+  uploadedByMembershipId?: string | null;
+  createdAt: string;
+}
 
 export interface KnowledgeArticle {
   id: string;
@@ -42,11 +75,27 @@ export interface KnowledgeDocument {
   relatedServiceIds: string[];
   fileUrl: string;
   fileName: string;
+  originalFileName?: string | null;
+  safeFileName?: string | null;
+  fileExtension?: string | null;
   mimeType: string;
   fileSize: number;
   status: KnowledgeDocumentStatus;
+  processingStatus: KnowledgeDocumentProcessingStatus;
+  processingErrorCode?: string | null;
+  processingErrorMessage?: string | null;
+  processingError?: { code?: string | null; message?: string | null } | null;
   visibility: KnowledgeVisibility;
   uploadedByMembershipId: string;
+  uploadedByUserId?: string | null;
+  uploadedBy?: KnowledgeMembershipSummary | null;
+  activeVersionId?: string | null;
+  activeVersion?: KnowledgeDocumentVersion | null;
+  versions?: KnowledgeDocumentVersion[];
+  _count?: { versions?: number };
+  availableActions?: KnowledgeDocumentAction[];
+  archivedAt?: string | null;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,11 +121,14 @@ export interface KnowledgeSearchResult {
 export interface KnowledgeListQuery {
   search?: string;
   status?: string;
+  processingStatus?: string;
   category?: string;
   visibility?: KnowledgeVisibility;
   source?: KnowledgeArticleSource;
   page?: number;
   limit?: number;
+  sortBy?: "createdAt" | "updatedAt";
+  sortOrder?: "asc" | "desc";
 }
 
 export interface KnowledgeArticleInput {
@@ -153,6 +205,40 @@ export interface KnowledgeDocumentInput {
   tags?: string[];
   relatedServiceIds?: string[];
   visibility?: KnowledgeVisibility;
+}
+
+export interface KnowledgeStats {
+  assetUsage?: { used: number; limit: number };
+  pdfUsage?: { used: number; limit: number };
+  storageUsage?: {
+    usedBytes: number;
+    limitBytes: number;
+    documentVersionBytes?: number;
+    articlePdfBytes?: number;
+  };
+  aiDraftUsage?: { usedThisMonth: number; monthlyLimit: number };
+  businessStorageBreakdown?: Array<{
+    businessId: string;
+    businessName: string;
+    usedBytes: number;
+    documentVersionBytes?: number;
+    articlePdfBytes?: number;
+    activeAssets: number;
+    activePdfCount: number;
+  }>;
+}
+
+export interface KnowledgeDocumentUploadResponse {
+  document: KnowledgeDocument;
+  duplicate?: boolean;
+  duplicateWarning?: { code?: string; existingDocumentId?: string | null } | null;
+  idempotentReplay?: boolean;
+}
+
+export interface KnowledgeDocumentDownloadUrl {
+  url: string;
+  expiresAt?: string | null;
+  authenticated?: boolean;
 }
 
 export interface KnowledgeSendInput {

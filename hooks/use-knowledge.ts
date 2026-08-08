@@ -12,6 +12,7 @@ import type {
   KnowledgeDocumentInput,
   KnowledgeDocumentStatus,
   KnowledgeListQuery,
+  KnowledgeStats,
   KnowledgeSendInput,
   UpdateKnowledgeArticleInput,
 } from "@/types/knowledge";
@@ -28,6 +29,24 @@ export const useKnowledgeDocuments = (businessId?: string | null, query: Knowled
   enabled: Boolean(businessId),
 });
 
+export const useKnowledgeStats = (businessId?: string | null, enabled = true) => useQuery<KnowledgeStats>({
+  queryKey: ["knowledge-stats", businessId ?? ""] as const,
+  queryFn: knowledgeService.stats,
+  enabled: Boolean(businessId && enabled),
+});
+
+export const useKnowledgeDocument = (businessId?: string | null, documentId?: string | null) => useQuery({
+  queryKey: queryKeys.knowledgeDocuments.detail(businessId ?? "", documentId ?? ""),
+  queryFn: () => knowledgeService.documentDetail(documentId ?? ""),
+  enabled: Boolean(businessId && documentId),
+});
+
+export const useKnowledgeDocumentVersions = (businessId?: string | null, documentId?: string | null) => useQuery({
+  queryKey: ["knowledge-document-versions", businessId ?? "", documentId ?? ""] as const,
+  queryFn: () => knowledgeService.documentVersions({ id: documentId ?? "", page: 1, limit: 20 }),
+  enabled: Boolean(businessId && documentId),
+});
+
 export const useKnowledgeSearch = (businessId?: string | null, conversationId?: string, query = "") => useQuery({
   queryKey: queryKeys.knowledgeSearch.results(businessId ?? "", conversationId, query),
   queryFn: () => knowledgeService.search({ query, conversationId }),
@@ -39,6 +58,7 @@ function useInvalidateKnowledge() {
   return async (conversationId?: string) => Promise.all([
     client.invalidateQueries({ queryKey: queryKeys.knowledgeArticles.all }),
     client.invalidateQueries({ queryKey: queryKeys.knowledgeDocuments.all }),
+    client.invalidateQueries({ queryKey: ["knowledge-stats"] }),
     client.invalidateQueries({ queryKey: queryKeys.knowledgeSearch.all }),
     client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
     ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) })] : []),
@@ -88,6 +108,32 @@ export function useUploadKnowledgeDocument() {
 export function useUpdateKnowledgeDocumentStatus() {
   const invalidate = useInvalidateKnowledge();
   return useMutation({ mutationFn: (variables: { id: string; status: KnowledgeDocumentStatus }) => knowledgeService.updateDocumentStatus(variables), onSuccess: () => invalidate() });
+}
+
+export function useArchiveKnowledgeDocument() {
+  const invalidate = useInvalidateKnowledge();
+  return useMutation({ mutationFn: (documentId: string) => knowledgeService.archiveDocument(documentId), onSuccess: () => invalidate() });
+}
+
+export function useRestoreKnowledgeDocument() {
+  const invalidate = useInvalidateKnowledge();
+  return useMutation({ mutationFn: (documentId: string) => knowledgeService.restoreDocument(documentId), onSuccess: () => invalidate() });
+}
+
+export function useDeleteKnowledgeDocument() {
+  const invalidate = useInvalidateKnowledge();
+  return useMutation({ mutationFn: (documentId: string) => knowledgeService.deleteDocument(documentId), onSuccess: () => invalidate() });
+}
+
+export function useRetryKnowledgeProcessing() {
+  const invalidate = useInvalidateKnowledge();
+  return useMutation({ mutationFn: (documentId: string) => knowledgeService.retryDocumentProcessing(documentId), onSuccess: () => invalidate() });
+}
+
+export function useDocumentDownload() {
+  return useMutation({
+    mutationFn: (documentId: string) => knowledgeService.downloadDocument(documentId),
+  });
 }
 
 export function useSendKnowledgeAsset(conversationId: string) {

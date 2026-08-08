@@ -42,4 +42,5 @@ export interface CompleteWhatsAppConnectionInput {
   wabaId: string;
   businessAccountId?: string;
   authorizationCode: string;
+  metadata?: Record<string, unknown>;
 }
