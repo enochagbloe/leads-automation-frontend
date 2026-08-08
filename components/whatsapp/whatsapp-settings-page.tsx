@@ -87,7 +87,7 @@ interface MetaAuthorizationResult {
 }
 
 function connectionDiagnostic(stage: string, details: Record<string, unknown> = {}) {
-  if (process.env.NODE_ENV === "production") return;
+  if (process.env.NODE_ENV === "production" && !env.whatsappDebug) return;
   console.info("[BizReply WhatsApp]", stage, details);
 }
 
@@ -110,16 +110,6 @@ function normalizeLocalPhone(value: string) {
 
 function providerForEnvironment(): WhatsAppProvider {
   return "META_WHATSAPP";
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
-  let timeoutId: number | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
-  });
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timeoutId) window.clearTimeout(timeoutId);
-  });
 }
 
 function loadMetaSdk() {
@@ -167,24 +157,131 @@ function loadMetaSdk() {
   });
 }
 
-function parseMetaMessage(data: unknown): Record<string, unknown> | null {
-  if (typeof data === "string") {
+function inspectMessageData(data: unknown) {
+  const dataType = typeof data;
+  const isJsonString = typeof data === "string";
+  const stringData = typeof data === "string" ? data : "";
+  let jsonParseSucceeded = false;
+  let parsed: unknown = data;
+
+  if (isJsonString) {
     try {
-      return JSON.parse(data) as Record<string, unknown>;
+      parsed = JSON.parse(data);
+      jsonParseSucceeded = true;
     } catch {
-      return null;
+      parsed = null;
     }
   }
-  if (data && typeof data === "object") return data as Record<string, unknown>;
-  return null;
+
+  const payload = objectValue(parsed);
+  const nestedData = objectValue(payload?.data);
+  return {
+    payload,
+    stringData,
+    dataType,
+    isJsonString,
+    jsonParseSucceeded,
+    topLevelKeys: payload ? Object.keys(payload).sort() : [],
+    nestedDataKeys: nestedData ? Object.keys(nestedData).sort() : [],
+    hasEmbeddedSignupSubstring: stringData.includes("WA_EMBEDDED_SIGNUP"),
+    hasFinishSubstring: stringData.includes("FINISH"),
+    hasPhoneNumberIdSubstring: stringData.includes("phone_number_id") || stringData.includes("phoneNumberId"),
+    hasWabaIdSubstring: stringData.includes("waba_id") || stringData.includes("wabaId") || stringData.includes("whatsapp_business_account_id") || stringData.includes("whatsappBusinessAccountId"),
+  };
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function firstString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === "number") return String(value);
+  }
+  return "";
+}
+
+function findNestedString(value: unknown, keys: string[], depth = 0): string {
+  if (depth > 4) return "";
+  const object = objectValue(value);
+  if (!object) return "";
+
+  for (const key of keys) {
+    const found = firstString(object[key]);
+    if (found) return found;
+  }
+
+  for (const nested of Object.values(object)) {
+    const found = findNestedString(nested, keys, depth + 1);
+    if (found) return found;
+  }
+  return "";
+}
+
+function hasNestedValue(value: unknown, expected: string, depth = 0): boolean {
+  if (depth > 4) return false;
+  if (typeof value === "string") return value === expected;
+  const object = objectValue(value);
+  if (!object) return false;
+  return Object.values(object).some((nested) => hasNestedValue(nested, expected, depth + 1));
+}
+
+function findStringPayloadValue(source: string, keys: string[]) {
+  for (const key of keys) {
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = source.match(new RegExp(`["']?${escapedKey}["']?\\s*[:=]\\s*["']([^"'&\\s,}]+)["']`, "i"));
+    if (match?.[1]) return match[1];
+  }
+  return "";
+}
+
+function metaPayloadType(payload: Record<string, unknown> | null) {
+  const data = objectValue(payload?.data);
+  return firstString(payload?.type, payload?.messageType, payload?.event_type, data?.type, data?.messageType, data?.event_type);
+}
+
+function metaPayloadEvent(payload: Record<string, unknown> | null) {
+  const data = objectValue(payload?.data);
+  return firstString(payload?.event, payload?.name, payload?.status, data?.event, data?.name, data?.status).toUpperCase();
+}
+
+function metaCallbackError({
+  hasLoginCallback,
+  hasAuthorizationCode,
+  hasFinishEvent,
+  hasPhoneNumberId,
+  hasWabaId,
+}: {
+  hasLoginCallback: boolean;
+  hasAuthorizationCode: boolean;
+  hasFinishEvent: boolean;
+  hasPhoneNumberId: boolean;
+  hasWabaId: boolean;
+}) {
+  if (!hasLoginCallback) return "Meta authorization did not return a login callback. Please retry the connection.";
+  if (!hasAuthorizationCode) return "Meta authorization completed, but no authorization code was returned. Please retry the connection.";
+  if (!hasFinishEvent) return "Meta authorization completed, but WhatsApp account information was not returned. Please retry the connection.";
+  if (!hasPhoneNumberId) return "Meta authorization completed, but the WhatsApp phone number ID was missing. Please retry the connection.";
+  if (!hasWabaId) return "Meta authorization completed, but the WhatsApp business account ID was missing. Please retry the connection.";
+  return "Meta authorization timed out. Please retry the connection.";
+}
+
+function isHttpsPage() {
+  if (typeof window === "undefined") return false;
+  return window.location.protocol === "https:";
 }
 
 async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
   await loadMetaSdk();
   const facebook = window.FB;
   if (!facebook || !env.metaWhatsAppConfigId) throw new Error("Meta authorization is not available.");
+  if (!isHttpsPage()) {
+    connectionDiagnostic("META_AUTH_FAILURE", { reason: "http_page" });
+    throw new Error("Meta authorization requires HTTPS. Open this page from your HTTPS staging or production URL, then retry the connection.");
+  }
 
-  return withTimeout(new Promise<MetaAuthorizationResult>((resolve, reject) => {
+  return new Promise<MetaAuthorizationResult>((resolve, reject) => {
     let authorizationCode = "";
     let phoneNumberId = "";
     let wabaId = "";
@@ -192,8 +289,23 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
     let businessAccountId: string | undefined;
     let metadata: Record<string, unknown> = {};
     let settled = false;
+    let hasLoginCallback = false;
+    let hasFinishEvent = false;
 
-    const cleanup = () => window.removeEventListener("message", handleMessage);
+    const timeoutId = window.setTimeout(() => {
+      fail(metaCallbackError({
+        hasLoginCallback,
+        hasAuthorizationCode: Boolean(authorizationCode),
+        hasFinishEvent,
+        hasPhoneNumberId: Boolean(phoneNumberId),
+        hasWabaId: Boolean(wabaId),
+      }));
+    }, 90000);
+
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("message", handleMessage);
+    };
     const fail = (message: string) => {
       if (settled) return;
       settled = true;
@@ -203,53 +315,105 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
     const finishIfReady = () => {
       if (settled || !authorizationCode) return;
       if (!phoneNumberId || !wabaId) return;
+      connectionDiagnostic("META_READY_TO_COMPLETE", {
+        hasAuthorizationCode: true,
+        hasPhoneNumberId: true,
+        hasWabaId: true,
+        hasDisplayPhoneNumber: Boolean(displayPhoneNumber),
+        hasBusinessAccountId: Boolean(businessAccountId),
+      });
       settled = true;
       cleanup();
       resolve({ authorizationCode, phoneNumberId, wabaId, displayPhoneNumber, businessAccountId, metadata });
     };
 
     function handleMessage(event: MessageEvent) {
-      if (!event.origin.includes("facebook.com")) return;
-      const payload = parseMetaMessage(event.data);
-      if (payload?.type !== "WA_EMBEDDED_SIGNUP") return;
+      const inspection = inspectMessageData(event.data);
+      const payload = inspection.payload;
+      const payloadType = metaPayloadType(payload);
+      const payloadEvent = metaPayloadEvent(payload);
+      const stringPayloadType = inspection.hasEmbeddedSignupSubstring ? "WA_EMBEDDED_SIGNUP" : "";
+      const stringPayloadEvent = inspection.hasFinishSubstring ? "FINISH" : "";
+      const effectivePayloadType = payloadType || stringPayloadType;
+      const effectivePayloadEvent = payloadEvent || stringPayloadEvent;
+      const safePhoneNumberId = findNestedString(payload, ["phone_number_id", "phoneNumberId"]) || findStringPayloadValue(inspection.stringData, ["phone_number_id", "phoneNumberId"]);
+      const safeWabaId = findNestedString(payload, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"]) || findStringPayloadValue(inspection.stringData, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"]);
+      const hasEmbeddedSignupMarker = hasNestedValue(payload, "WA_EMBEDDED_SIGNUP") || inspection.hasEmbeddedSignupSubstring;
 
-      metadata = { ...metadata, embeddedSignupEvent: payload.event, embeddedSignupVersion: payload.version };
-      if (payload.event === "FINISH") {
-        const data = (payload.data && typeof payload.data === "object" ? payload.data : {}) as Record<string, unknown>;
-        phoneNumberId = String(data.phone_number_id ?? data.phoneNumberId ?? "");
-        wabaId = String(data.waba_id ?? data.wabaId ?? "");
-        const rawDisplayPhoneNumber = data.display_phone_number ?? data.displayPhoneNumber ?? data.phone_number ?? data.phoneNumber;
-        displayPhoneNumber = rawDisplayPhoneNumber ? String(rawDisplayPhoneNumber) : undefined;
-        const businessId = data.business_id ?? data.businessAccountId;
-        businessAccountId = businessId ? String(businessId) : undefined;
+      connectionDiagnostic("MESSAGE_EVENT_RECEIVED", {
+        origin: event.origin,
+        dataType: inspection.dataType,
+        isJsonString: inspection.isJsonString,
+        jsonParseSucceeded: inspection.jsonParseSucceeded,
+        topLevelKeys: inspection.topLevelKeys,
+        nestedDataKeys: inspection.nestedDataKeys,
+        parsedType: effectivePayloadType || null,
+        parsedEvent: effectivePayloadEvent || null,
+        version: firstString(payload?.version) || null,
+        hasEmbeddedSignupSubstring: inspection.hasEmbeddedSignupSubstring,
+        hasFinishSubstring: inspection.hasFinishSubstring,
+        hasPhoneNumberIdSubstring: inspection.hasPhoneNumberIdSubstring,
+        hasWabaIdSubstring: inspection.hasWabaIdSubstring,
+        hasEmbeddedSignupMarker,
+        hasPhoneNumberId: Boolean(safePhoneNumberId),
+        hasWabaId: Boolean(safeWabaId),
+      });
+
+      if (!event.origin.includes("facebook.com")) return;
+      if (effectivePayloadType.toUpperCase() !== "WA_EMBEDDED_SIGNUP" && !hasEmbeddedSignupMarker && !effectivePayloadEvent) return;
+
+      metadata = { ...metadata, embeddedSignupEvent: effectivePayloadEvent || undefined, embeddedSignupVersion: payload?.version };
+      if (effectivePayloadEvent === "FINISH") {
+        hasFinishEvent = true;
+        phoneNumberId = safePhoneNumberId;
+        wabaId = safeWabaId;
+        displayPhoneNumber = findNestedString(payload, ["display_phone_number", "displayPhoneNumber"]) || findStringPayloadValue(inspection.stringData, ["display_phone_number", "displayPhoneNumber"]);
+        businessAccountId = findNestedString(payload, ["business_id", "businessAccountId"]) || findStringPayloadValue(inspection.stringData, ["business_id", "businessAccountId"]);
         metadata = {
           ...metadata,
-          displayPhoneNumber,
+          hasFinishEvent,
           hasPhoneNumberId: Boolean(phoneNumberId),
           hasWabaId: Boolean(wabaId),
           hasBusinessAccountId: Boolean(businessAccountId),
+          hasDisplayPhoneNumber: Boolean(displayPhoneNumber),
         };
+        connectionDiagnostic("META_FINISH_RECEIVED", {
+          hasPhoneNumberId: Boolean(phoneNumberId),
+          hasWabaId: Boolean(wabaId),
+          hasDisplayPhoneNumber: Boolean(displayPhoneNumber),
+          hasBusinessAccountId: Boolean(businessAccountId),
+        });
         finishIfReady();
       }
-      if (payload.event === "CANCEL") fail("Meta authorization was cancelled before the number was connected.");
-      if (payload.event === "ERROR") fail("Meta authorization failed. Please try again.");
+      if (effectivePayloadEvent === "CANCEL") fail("Meta authorization was cancelled before the number was connected.");
+      if (effectivePayloadEvent === "ERROR") fail("Meta authorization failed. Please try again.");
     }
 
     window.addEventListener("message", handleMessage);
-    facebook.login((response) => {
-      authorizationCode = response.authResponse?.code ?? "";
-      if (!authorizationCode) {
-        fail(response.status === "not_authorized" ? "Meta authorization was not approved." : "Meta authorization was closed before completion.");
-        return;
-      }
-      finishIfReady();
-    }, {
-      config_id: env.metaWhatsAppConfigId,
-      response_type: "code",
-      override_default_response_type: true,
-      extras: { sessionInfoVersion: 3 },
-    });
-  }), 90000, "Meta authorization timed out. Please try again.");
+    try {
+      facebook.login((response) => {
+        hasLoginCallback = true;
+        authorizationCode = response.authResponse?.code ?? "";
+        connectionDiagnostic("FB_LOGIN_CALLBACK_RECEIVED", {
+          hasAuthorizationCode: Boolean(authorizationCode),
+          status: response.status ?? null,
+          hasAuthResponse: Boolean(response.authResponse),
+        });
+        if (!authorizationCode) {
+          fail(response.status === "not_authorized" ? "Meta authorization was not approved." : "Meta authorization was closed before completion.");
+          return;
+        }
+        finishIfReady();
+      }, {
+        config_id: env.metaWhatsAppConfigId,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: { sessionInfoVersion: 3 },
+      });
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "Meta authorization could not be started. Please try again.");
+    }
+  });
 }
 
 function WhatsAppMark({ connected, busy }: { connected?: boolean; busy?: boolean }) {
