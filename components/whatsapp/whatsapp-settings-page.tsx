@@ -328,14 +328,8 @@ function metaPayloadEvent(payload: Record<string, unknown> | null) {
   return findNestedString(payload, ["event", "name", "status"]).toUpperCase();
 }
 
-function isTrustedMetaMessageOrigin(origin: string) {
-  try {
-    const url = new URL(origin);
-    return url.protocol === "https:"
-      && (url.hostname === "facebook.com" || url.hostname.endsWith(".facebook.com"));
-  } catch {
-    return false;
-  }
+function isExpectedMetaSessionInfoOrigin(origin: string) {
+  return origin === "https://www.facebook.com";
 }
 
 function metaCallbackError({
@@ -420,7 +414,15 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
     };
 
     function handleMessage(event: MessageEvent) {
-      if (!isTrustedMetaMessageOrigin(event.origin)) return;
+      const isExpectedMetaOrigin = isExpectedMetaSessionInfoOrigin(event.origin);
+      connectionDiagnostic("MESSAGE_EVENT_RECEIVED", {
+        origin: event.origin,
+        dataType: typeof event.data,
+        isExpectedMetaOrigin,
+      });
+
+      if (!isExpectedMetaOrigin) return;
+
       const inspection = inspectMessageData(event.data);
       const payload = inspection.payload;
       const payloadType = metaPayloadType(payload);
@@ -434,16 +436,15 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
       const hasEmbeddedSignupMarker = hasNestedValue(payload, "WA_EMBEDDED_SIGNUP") || inspection.hasEmbeddedSignupSubstring;
       const isEmbeddedSignupMessage = effectivePayloadType.toUpperCase() === "WA_EMBEDDED_SIGNUP" || hasEmbeddedSignupMarker;
 
-      connectionDiagnostic("MESSAGE_EVENT_RECEIVED", {
+      connectionDiagnostic("META_SESSION_INFO_MESSAGE", {
+        origin: event.origin,
         dataType: inspection.dataType,
         isJsonString: inspection.isJsonString,
         jsonParseSucceeded: inspection.jsonParseSucceeded,
-        eventDataKeys: inspection.eventDataKeys,
         topLevelKeys: inspection.topLevelKeys,
-        nestedDataKeys: inspection.nestedDataKeys,
-        keySnapshots: inspection.keySnapshots,
-        parsedType: effectivePayloadType || null,
-        parsedEvent: effectivePayloadEvent || null,
+        dataKeys: inspection.nestedDataKeys,
+        type: effectivePayloadType || null,
+        event: effectivePayloadEvent || null,
         hasPhoneNumberId: hasNestedKey(payload, ["phone_number_id", "phoneNumberId"])
           || inspection.hasPhoneNumberIdSubstring,
         hasWabaId: hasNestedKey(payload, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"])
@@ -692,7 +693,7 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
     setRefreshCountdown(null);
     try {
       if (hasPendingConnection) {
-        await finishMetaConnection(localPhone ? fullPhone : undefined);
+        await finishMetaConnection(localPhone ? fullPhone : status.displayPhoneNumber ?? undefined);
         return;
       }
 
@@ -712,7 +713,7 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
       });
       failConnection(message);
     }
-  }, [beginStage, businessId, failConnection, finishMetaConnection, fullPhone, hasPendingConnection, localPhone, onRefresh, start]);
+  }, [beginStage, businessId, failConnection, finishMetaConnection, fullPhone, hasPendingConnection, localPhone, onRefresh, start, status.displayPhoneNumber]);
 
   const changeNumber = async () => {
     setErrorMessage(null);
