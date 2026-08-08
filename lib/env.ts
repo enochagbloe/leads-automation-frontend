@@ -4,4 +4,5 @@ export const env = {
   metaAppId: process.env.NEXT_PUBLIC_META_APP_ID,
   metaWhatsAppConfigId: process.env.NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID,
   metaGraphVersion: process.env.NEXT_PUBLIC_META_GRAPH_VERSION ?? "v21.0",
+  whatsappDebug: process.env.NEXT_PUBLIC_WHATSAPP_DEBUG === "true",
 } as const;
