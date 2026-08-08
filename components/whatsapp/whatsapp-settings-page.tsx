@@ -166,6 +166,22 @@ function parseQueryPayload(value: string) {
   return Object.fromEntries(entries);
 }
 
+function stringPayloadVariants(value: string) {
+  const variants = new Set([value]);
+  let current = value;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const decoded = decodeURIComponent(current.replace(/\+/g, "%20"));
+      if (decoded === current) break;
+      variants.add(decoded);
+      current = decoded;
+    } catch {
+      break;
+    }
+  }
+  return [...variants];
+}
+
 function keySnapshots(value: unknown, path = "event.data", depth = 0): Array<{ path: string; keys: string[] }> {
   if (depth > 5) return [];
   if (Array.isArray(value)) {
@@ -234,6 +250,25 @@ function firstString(...values: unknown[]) {
 
 function findNestedString(value: unknown, keys: string[], depth = 0): string {
   if (depth > 5) return "";
+  if (typeof value === "string") {
+    for (const variant of stringPayloadVariants(value)) {
+      try {
+        const parsed = JSON.parse(variant) as unknown;
+        if (parsed && typeof parsed === "object") {
+          const found = findNestedString(parsed, keys, depth + 1);
+          if (found) return found;
+        }
+      } catch {
+        // Meta can also wrap session data as a URL-encoded query string.
+      }
+      const queryPayload = parseQueryPayload(variant);
+      if (queryPayload) {
+        const found = findNestedString(queryPayload, keys, depth + 1);
+        if (found) return found;
+      }
+    }
+    return "";
+  }
   if (Array.isArray(value)) {
     for (const nested of value) {
       const found = findNestedString(nested, keys, depth + 1);
@@ -275,10 +310,12 @@ function hasNestedKey(value: unknown, keys: string[], depth = 0): boolean {
 }
 
 function findStringPayloadValue(source: string, keys: string[]) {
-  for (const key of keys) {
-    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = source.match(new RegExp(`["']?${escapedKey}["']?\\s*[:=]\\s*["']([^"'&\\s,}]+)["']`, "i"));
-    if (match?.[1]) return match[1];
+  for (const variant of stringPayloadVariants(source)) {
+    for (const key of keys) {
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = variant.match(new RegExp(`["']?${escapedKey}["']?\\s*[:=]\\s*["']([^"'&\\s,}]+)["']`, "i"));
+      if (match?.[1]) return match[1];
+    }
   }
   return "";
 }
@@ -655,7 +692,7 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
     setRefreshCountdown(null);
     try {
       if (hasPendingConnection) {
-        await finishMetaConnection(status.displayPhoneNumber ?? undefined);
+        await finishMetaConnection(localPhone ? fullPhone : undefined);
         return;
       }
 
@@ -675,7 +712,7 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
       });
       failConnection(message);
     }
-  }, [beginStage, businessId, failConnection, finishMetaConnection, fullPhone, hasPendingConnection, onRefresh, start, status.displayPhoneNumber]);
+  }, [beginStage, businessId, failConnection, finishMetaConnection, fullPhone, hasPendingConnection, localPhone, onRefresh, start]);
 
   const changeNumber = async () => {
     setErrorMessage(null);
