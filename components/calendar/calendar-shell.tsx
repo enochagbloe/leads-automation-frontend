@@ -14,7 +14,6 @@ import { FloatingAppointmentComposer } from "@/components/calendar/floating-appo
 import { useCurrentUser } from "@/hooks/use-auth";
 import {
   useAssignAppointment,
-  useBusinessMembers,
   useCalendarAppointments,
   useCancelAppointment,
   useClaimAppointment,
@@ -25,8 +24,10 @@ import {
   useNoShowAppointment,
   useRescheduleAppointment,
 } from "@/hooks/use-calendar-appointments";
+import { useBusinessMembers } from "@/hooks/use-business-members";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import { appointmentDateKey } from "@/lib/appointment-dates";
+import { appointmentAssigneeOptions } from "@/lib/business-members";
 import { canAccessOperationalPage, getWorkspacePermissions } from "@/lib/workspace-permissions";
 import type { AppointmentAction, AppointmentCalendarQuery, CalendarAppointment } from "@/types/appointment";
 
@@ -105,6 +106,7 @@ export function CalendarShell() {
   const appointments = useCalendarAppointments(activeBusinessId, query, Boolean(profile.data && canViewAppointments));
   const markerAppointments = useCalendarAppointments(activeBusinessId, markerQuery, Boolean(profile.data && canViewAppointments));
   const members = useBusinessMembers(canViewAppointments ? activeBusinessId : null);
+  const staffOptions = useMemo(() => appointmentAssigneeOptions(members.data ?? []), [members.data]);
   const availabilityCheck = useCheckAppointmentAvailability();
   const confirmAppointment = useConfirmAppointment(activeBusinessId, actionAppointment?.id ?? "");
   const rescheduleAppointment = useRescheduleAppointment(activeBusinessId, actionAppointment?.id ?? "");
@@ -185,7 +187,7 @@ export function CalendarShell() {
           <CalendarToolbar
             selectedDate={selectedDate}
             canCreate={canCreate}
-            staff={members.data}
+            staff={staffOptions}
             staffFilter={staffFilter}
             markedDateKeys={markedDateKeys}
             missedSelectedDay={missedSelectedDay}
@@ -319,7 +321,7 @@ export function CalendarShell() {
       />
       <AppointmentAssignmentDialog
         appointment={assignAppointment}
-        staff={members.data}
+        staff={staffOptions}
         value={assignStaffId}
         loading={assignAppointmentMutation.isPending || members.isPending}
         onValueChange={setAssignStaffId}

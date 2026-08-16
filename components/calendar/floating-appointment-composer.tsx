@@ -15,10 +15,12 @@ import { AppCard } from "@/components/app-card";
 import { AvailabilityPicker } from "@/components/calendar/availability-picker";
 import { LocationPicker } from "@/components/calendar/location-picker";
 import { PeopleSelector } from "@/components/calendar/people-selector";
+import { useBusinessMembers } from "@/hooks/use-business-members";
 import { useBusinessServices } from "@/hooks/use-business-services";
-import { useBusinessLeads, useBusinessMembers, useCheckAppointmentAvailability, useCreateAppointment } from "@/hooks/use-calendar-appointments";
+import { useBusinessLeads, useCheckAppointmentAvailability, useCreateAppointment } from "@/hooks/use-calendar-appointments";
 import { useLead } from "@/hooks/use-leads";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
+import { appointmentAssigneeOptions } from "@/lib/business-members";
 import { applyApiFieldErrors } from "@/lib/form-errors";
 import type { AppointmentAvailabilityResponse, AppointmentLocationType, CalendarAppointment } from "@/types/appointment";
 import { ACTIONABLE_NOTIFICATION_CREATED_EVENT, type ActionableNotification } from "@/types/notification";
@@ -129,6 +131,7 @@ export function FloatingAppointmentComposer({
   const leads = useBusinessLeads(businessId);
   const initialLead = useLead(initialLeadId ?? "");
   const members = useBusinessMembers(businessId);
+  const staffOptions = useMemo(() => appointmentAssigneeOptions(members.data ?? []), [members.data]);
   const leadOptions = useMemo(() => {
     const options = [...(leads.data?.data ?? [])];
     const lead = initialLead.data?.lead;
@@ -300,7 +303,7 @@ export function FloatingAppointmentComposer({
 
               <PeopleSelector
                 leads={leadOptions}
-                staff={members.data}
+                staff={staffOptions}
                 leadId={values.leadId ?? ""}
                 staffId={values.assignedStaffId ?? ""}
                 loadingLeads={leads.isPending || (Boolean(initialLeadId) && initialLead.isPending)}

@@ -52,7 +52,7 @@ export function AppointmentAssignmentDialog({
 
           <div className="mt-6 flex justify-end gap-2">
             <AppButton type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</AppButton>
-            <AppButton type="button" onClick={onSubmit} loading={loading} loadingText="Saving" disabled={loading || staff.length === 0}>
+            <AppButton type="button" onClick={onSubmit} loading={loading} loadingText="Saving" disabled={loading}>
               Save assignment
             </AppButton>
           </div>

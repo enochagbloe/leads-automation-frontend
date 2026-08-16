@@ -11,3 +11,12 @@ export function useBusinessMembers(businessId: string | null | undefined, enable
     enabled: Boolean(businessId) && enabled,
   });
 }
+
+export function useBusinessInvitations(businessId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.businessInvitations.list(businessId ?? ""),
+    queryFn: businessService.listInvitations,
+    enabled: Boolean(businessId) && enabled,
+    retry: false,
+  });
+}
