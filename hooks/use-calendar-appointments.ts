@@ -1,15 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { useCurrentUser } from "@/hooks/use-auth";
-import { useLeads } from "@/hooks/use-leads";
 import { queryKeys } from "@/lib/query-keys";
 import { appointmentService } from "@/services/appointment-service";
 import { leadService } from "@/services/lead-service";
 import type {
   AssignAppointmentInput,
-  AppointmentAssigneeOption,
   AppointmentCalendarQuery,
   AppointmentListQuery,
   CancelAppointmentInput,
@@ -195,36 +191,4 @@ export function useBusinessLeads(businessId: string | null | undefined, search =
     queryFn: () => leadService.list({ page: 1, limit: 100, search: search || undefined, sortBy: "updatedAt", sortOrder: "desc" }),
     enabled: Boolean(businessId),
   });
-}
-
-export function useBusinessMembers(businessId: string | null | undefined) {
-  const profile = useCurrentUser();
-  const leads = useLeads({ page: 1, limit: 100, sortBy: "updatedAt", sortOrder: "desc" }, Boolean(businessId));
-
-  return useMemo(() => {
-    const map = new Map<string, AppointmentAssigneeOption>();
-    if (profile.data?.membership) {
-      map.set(profile.data.membership.id, {
-        id: profile.data.membership.id,
-        name: `${profile.data.user.firstName} ${profile.data.user.lastName}`,
-        email: profile.data.user.email,
-        role: profile.data.membership.role,
-      });
-    }
-    for (const lead of leads.data?.data ?? []) {
-      if (!lead.assignedStaff) continue;
-      map.set(lead.assignedStaff.id, {
-        id: lead.assignedStaff.id,
-        name: `${lead.assignedStaff.user.firstName} ${lead.assignedStaff.user.lastName}`,
-        email: lead.assignedStaff.user.email,
-        role: lead.assignedStaff.role,
-      });
-    }
-    return {
-      data: [...map.values()],
-      isPending: profile.isPending || leads.isPending,
-      isError: profile.isError || leads.isError,
-      refetch: leads.refetch,
-    };
-  }, [leads.data?.data, leads.isError, leads.isPending, leads.refetch, profile.data, profile.isError, profile.isPending]);
 }

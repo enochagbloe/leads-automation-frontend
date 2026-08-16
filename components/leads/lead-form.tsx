@@ -15,6 +15,7 @@ import { useBusinessMembers } from "@/hooks/use-business-members";
 import { useCurrentUser } from "@/hooks/use-auth";
 import { useAssignLead, useCreateLead, useUpdateLead } from "@/hooks/use-leads";
 import { ApiError, getApiErrorMessage } from "@/lib/api-client";
+import { assignableBusinessMembers, businessMemberId, businessMemberSelectOption } from "@/lib/business-members";
 import { applyApiFieldErrors } from "@/lib/form-errors";
 import { LEAD_SOURCES, LEAD_SOURCE_LABELS, LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/leads";
 import { getWorkspacePermissions } from "@/lib/workspace-permissions";
@@ -55,15 +56,11 @@ export function LeadForm({ lead }: { lead?: Lead }) {
   const staffEdit = Boolean(lead && profile.data?.membership?.role === "STAFF" && !permissions.canViewAllOperationalLeads);
   const currentMembership = profile.data?.membership;
   const members = useBusinessMembers(profile.data?.activeBusiness?.id, canAssign);
-  const assignableMembers = (members.data ?? []).filter((member) => member.status === "ACTIVE" && member.canReceiveAssignedWork);
+  const assignableMembers = assignableBusinessMembers(members.data ?? []);
   const assigneeOptions = [
     { value: "__unassigned", label: "Unassigned" },
-    ...assignableMembers.map((member) => ({
-      value: member.membershipId || member.id,
-      label: `${member.user.firstName} ${member.user.lastName}`,
-      description: [member.positionTitle, member.user.email].filter(Boolean).join(" · "),
-    })),
-    ...(lead?.assignedStaff && !assignableMembers.some((member) => (member.membershipId || member.id) === lead.assignedStaff?.id)
+    ...assignableMembers.map(businessMemberSelectOption),
+    ...(lead?.assignedStaff && !assignableMembers.some((member) => businessMemberId(member) === lead.assignedStaff?.id)
       ? [{ value: lead.assignedStaff.id, label: `${lead.assignedStaff.user.firstName} ${lead.assignedStaff.user.lastName}`, description: lead.assignedStaff.user.email }]
       : []),
   ];

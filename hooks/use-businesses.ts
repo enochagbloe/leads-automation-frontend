@@ -7,7 +7,18 @@ import { systemNotify } from "@/lib/system-notifications";
 import { businessService } from "@/services/business-service";
 
 export const useBusinesses = () => useQuery({ queryKey: queryKeys.businesses.all, queryFn: businessService.listMemberships });
-export const useInviteMember = () => useMutation({ mutationFn: businessService.inviteMember });
+export function useInviteMember() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: businessService.inviteMember,
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.businessInvitations.all }),
+        client.invalidateQueries({ queryKey: queryKeys.subscription.current }),
+      ]);
+    },
+  });
+}
 export const useAcceptInvitation = () => useMutation({ mutationFn: businessService.acceptInvitation });
 export const useCreateBusiness = () => useMutation({ mutationFn: businessService.create });
 export const useSwitchBusiness = () => useMutation({ mutationFn: businessService.switchBusiness });

@@ -3,7 +3,7 @@ import { businessStore } from "@/lib/business-store";
 import { businessAvailabilityService } from "@/services/business-availability-service";
 import { businessProfileService } from "@/services/business-profile-service";
 import { DAYS_OF_WEEK, type DayOfWeek, type UpdateBusinessAvailabilityInput } from "@/types/business-availability";
-import type { UpdateBusinessProfileInput } from "@/types/business-profile";
+import { BUSINESS_INDUSTRIES, type BusinessIndustry, type UpdateBusinessProfileInput } from "@/types/business-profile";
 import type { BusinessOnboardingInput, BusinessOnboardingResponse } from "@/types/onboarding";
 import type { WorkDay } from "@/types/onboarding";
 
@@ -23,10 +23,30 @@ const WORK_DAY_TO_BACKEND_DAY: Record<WorkDay, DayOfWeek> = {
   Sunday: "SUNDAY",
 };
 
+const INDUSTRY_LABEL_TO_VALUE: Record<string, BusinessIndustry> = {
+  "E-commerce": "ONLINE_STORE",
+  Ecommerce: "ONLINE_STORE",
+  Healthcare: "CLINIC_HEALTHCARE",
+  Hospitality: "HOTEL_HOSPITALITY",
+  "Professional Services": "CONSULTING",
+  "Real Estate": "REAL_ESTATE",
+  Retail: "ONLINE_STORE",
+  "Salon & Beauty": "SALON_BEAUTY",
+  "Clinic & Healthcare": "CLINIC_HEALTHCARE",
+  "Hotel & Hospitality": "HOTEL_HOSPITALITY",
+  "Online Store": "ONLINE_STORE",
+  Other: "OTHER",
+};
+
+function normalizeIndustry(value: string): BusinessIndustry | string {
+  if ((BUSINESS_INDUSTRIES as readonly string[]).includes(value)) return value as BusinessIndustry;
+  return INDUSTRY_LABEL_TO_VALUE[value] ?? value;
+}
+
 function buildProfilePayload(input: BusinessOnboardingInput): UpdateBusinessProfileInput {
   return {
     name: input.businessName,
-    industry: input.industry,
+    industry: normalizeIndustry(input.industry),
     description: input.description,
     city: input.city,
     phone: input.phone,

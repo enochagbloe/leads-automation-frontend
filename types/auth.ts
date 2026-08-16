@@ -208,7 +208,16 @@ export interface SwitchBusinessResponse extends Partial<ActiveBusinessContext> {
   activeMembershipId?: string;
   role?: BusinessRole;
 }
-export interface BusinessInvitation { id: string; email: string; role: "MANAGER" | "STAFF"; status: string; expiresAt: string }
+export interface BusinessInvitation {
+  id: string;
+  email: string;
+  role: "MANAGER" | "STAFF";
+  status: string;
+  expiresAt: string;
+  createdAt?: string;
+  sentAt?: string;
+  updatedAt?: string;
+}
 export interface InviteMemberInput { email: string; role: "MANAGER" | "STAFF" }
 export interface InviteMemberResponse { invitation: BusinessInvitation; emailSent: boolean }
 export interface AcceptInvitationInput { token: string; firstName?: string; lastName?: string; password?: string }

@@ -102,6 +102,28 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if ([
+    "business.member.joined",
+    "business.invite.accepted",
+    "business.team.updated",
+    "business.member.disabled",
+    "business.member.restored",
+    "business.member.removed",
+    "business.member.suspended_by_plan",
+    "business.member.access_changed",
+    "business.member.operational_profile_updated",
+  ].includes(type)) {
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.businessMembers.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessInvitations.all }),
+      client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.subscription.current }),
+      client.invalidateQueries({ queryKey: queryKeys.auth.currentUser }),
+    ]);
+    return;
+  }
+
   if (type === "business.profile.updated") {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.businessProfile.all }),
@@ -238,6 +260,8 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessMembers.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessInvitations.all }),
       client.invalidateQueries({ queryKey: queryKeys.notifications.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),

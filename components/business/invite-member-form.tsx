@@ -5,7 +5,6 @@ import * as Checkbox from "@radix-ui/react-checkbox";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, Clock3, HelpCircle, Mail, MoreHorizontal, ShieldCheck, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { systemNotify } from "@/lib/system-notifications";
 import { z } from "zod";
@@ -19,7 +18,7 @@ import { AppSelect } from "@/components/app-select";
 import { PlanBadge } from "@/components/subscription/plan-badge";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { useCurrentUser } from "@/hooks/use-auth";
-import { useBusinessMembers } from "@/hooks/use-business-members";
+import { useBusinessInvitations, useBusinessMembers } from "@/hooks/use-business-members";
 import { useInviteMember } from "@/hooks/use-businesses";
 import { useCurrentSubscription } from "@/hooks/use-subscription";
 import { applyApiFieldErrors } from "@/lib/form-errors";
@@ -28,26 +27,6 @@ import type { BusinessInvitation, BusinessMemberOption, BusinessRole, Membership
 
 const schema = z.object({ email: z.email("Enter a valid email"), role: z.enum(["MANAGER", "STAFF"]) });
 type Values = z.infer<typeof schema>;
-type VisibleInvitation = BusinessInvitation & { sentAt: string };
-
-function invitationStorageKey(businessId?: string) {
-  return businessId ? `bizreply_invitations_${businessId}` : null;
-}
-
-function readStoredInvitations(businessId?: string): VisibleInvitation[] {
-  const key = invitationStorageKey(businessId);
-  if (!key || typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(key) ?? "[]") as VisibleInvitation[];
-  } catch {
-    return [];
-  }
-}
-
-function persistInvitations(businessId: string | undefined, invitations: VisibleInvitation[]) {
-  const key = invitationStorageKey(businessId);
-  if (key && typeof window !== "undefined") localStorage.setItem(key, JSON.stringify(invitations));
-}
 
 function formatTeamDate(value?: string | null) {
   if (!value) return "Not available";
@@ -63,6 +42,24 @@ function nameFromEmail(email: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ") || email;
+}
+
+function invitationSentDate(invitation: BusinessInvitation) {
+  return invitation.sentAt ?? invitation.createdAt ?? null;
+}
+
+function invitationTiming(invitation: BusinessInvitation) {
+  const sentDate = invitationSentDate(invitation);
+  if (sentDate) return `Sent ${formatTeamDate(sentDate)}`;
+  if (invitation.expiresAt) return `Expires ${formatTeamDate(invitation.expiresAt)}`;
+  return "Invitation date unavailable";
+}
+
+function isPendingInvitation(invitation: BusinessInvitation) {
+  if (invitation.status !== "PENDING") return false;
+  if (!invitation.expiresAt) return true;
+  const expiry = new Date(invitation.expiresAt);
+  return Number.isNaN(expiry.getTime()) || expiry.getTime() > Date.now();
 }
 
 function initials(name: string, email?: string) {
@@ -190,15 +187,15 @@ function TeamDirectoryRowView({ row }: { row: TeamDirectoryRow }) {
   );
 }
 
-function TeamDirectory({ invitations, members, currentMembershipId, loading }: { invitations: VisibleInvitation[]; members: BusinessMemberOption[]; currentMembershipId?: string; loading: boolean }) {
+function TeamDirectory({ invitations, members, currentMembershipId, loading }: { invitations: BusinessInvitation[]; members: BusinessMemberOption[]; currentMembershipId?: string; loading: boolean }) {
   const invitedRows: TeamDirectoryRow[] = invitations.map((invitation) => ({
     id: `invited-${invitation.id}`,
     group: "invited",
     name: nameFromEmail(invitation.email),
-    date: formatTeamDate(invitation.sentAt),
+    date: formatTeamDate(invitationSentDate(invitation)),
     email: invitation.email,
     role: invitation.role === "MANAGER" ? "Manager" : "Member",
-    status: invitation.status === "ACCEPTED" ? "Accepted" : "Pending",
+    status: "Pending",
   }));
 
   const memberRows: TeamDirectoryRow[] = members.map((member) => {
@@ -279,21 +276,17 @@ function TeamDirectory({ invitations, members, currentMembershipId, loading }: {
 export function InviteMemberForm() {
   const profile = useCurrentUser();
   const subscription = useCurrentSubscription();
-  const members = useBusinessMembers(profile.data?.activeBusiness?.id, Boolean(profile.data?.activeBusiness?.id));
+  const activeBusinessId = profile.data?.activeBusiness?.id;
+  const members = useBusinessMembers(activeBusinessId, Boolean(activeBusinessId));
+  const invitationsQuery = useBusinessInvitations(activeBusinessId, Boolean(activeBusinessId));
   const invite = useInviteMember();
-  const [invitations, setInvitations] = useState<VisibleInvitation[]>(() => readStoredInvitations(profile.data?.activeBusiness?.id));
+  const pendingInvitations = (invitationsQuery.data ?? []).filter(isPendingInvitation);
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: "", role: "STAFF" } });
 
   if (profile.data && !profile.data.permissions.includes("members:manage")) return <AppErrorState title="Permission denied" description="Only business owners can invite team members." />;
 
   const handleSubmit = form.handleSubmit((values) => invite.mutate(values, {
-    onSuccess: ({ invitation }) => {
-      const nextInvitation = { ...invitation, sentAt: new Date().toISOString() };
-      setInvitations((current) => {
-        const next = [nextInvitation, ...current.filter((item) => item.id !== invitation.id && item.email !== invitation.email)];
-        persistInvitations(profile.data?.activeBusiness?.id, next);
-        return next;
-      });
+    onSuccess: () => {
       systemNotify.success("Invitation sent");
       form.reset();
     },
@@ -358,35 +351,45 @@ export function InviteMemberForm() {
                 <h2 id="invitations-heading" className="font-bold">Invitations</h2>
                 <p className="mt-1 text-sm text-muted-foreground">People invited to join this workspace.</p>
               </div>
-              {invitations.length > 0 && <span className="text-xs font-semibold text-muted-foreground">{invitations.length} sent</span>}
+              {pendingInvitations.length > 0 && <span className="text-xs font-semibold text-muted-foreground">{pendingInvitations.length} pending</span>}
             </div>
 
-            {invitations.length === 0 ? (
+            {invitationsQuery.isPending ? (
+              <div className="space-y-3 px-5 pb-5 sm:px-6">
+                {Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-14 rounded-xl bg-muted" />)}
+              </div>
+            ) : invitationsQuery.isError ? (
+              <AppErrorState
+                className="m-5 min-h-52 border-0 bg-muted/45 sm:m-6"
+                title="Could not load invitations"
+                description="Pending invitations could not be fetched from the backend."
+                onRetry={() => void invitationsQuery.refetch()}
+              />
+            ) : pendingInvitations.length === 0 ? (
               <AppEmptyState
                 className="m-5 min-h-52 border-0 bg-muted/45 sm:m-6"
                 icon={Mail}
-                title="No invitations sent yet"
-                description="New invitations will appear here with their current status."
+                title="No pending invitations"
+                description="Pending invitations from the backend will appear here until they are accepted, revoked, or expire."
               />
             ) : (
-              <ul className="divide-y" aria-label="Sent invitations">
-                {invitations.map((invitation) => {
-                  const accepted = invitation.status === "ACCEPTED";
+              <ul className="divide-y" aria-label="Pending invitations">
+                {pendingInvitations.map((invitation) => {
                   const initials = invitation.email.slice(0, 2).toUpperCase();
                   return (
                     <li key={invitation.id} className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/35 sm:flex-row sm:items-center sm:px-6">
-                      <span className={cn("grid size-10 shrink-0 place-items-center rounded-full text-xs font-bold ring-1 ring-border", accepted ? "bg-secondary text-secondary-foreground" : "bg-muted text-foreground")} aria-hidden="true">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold text-foreground ring-1 ring-border" aria-hidden="true">
                         {initials}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{invitation.email}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {invitation.role === "MANAGER" ? "Manager" : "Staff"} · Sent {new Intl.DateTimeFormat("en-GH", { dateStyle: "medium" }).format(new Date(invitation.sentAt))}
+                          {invitation.role === "MANAGER" ? "Manager" : "Staff"} · {invitationTiming(invitation)}
                         </p>
                       </div>
-                      <span className={cn("inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold", accepted ? "bg-secondary text-success" : "bg-warning/10 text-warning")}>
-                        {accepted ? <Check className="size-3.5" aria-hidden="true" /> : <Clock3 className="size-3.5" aria-hidden="true" />}
-                        {accepted ? "Invite accepted" : "Invited"}
+                      <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-bold text-warning">
+                        <Clock3 className="size-3.5" aria-hidden="true" />
+                        Pending
                       </span>
                     </li>
                   );
@@ -418,10 +421,10 @@ export function InviteMemberForm() {
         )}
       </div>
       <TeamDirectory
-        invitations={invitations}
+        invitations={pendingInvitations}
         members={members.data ?? []}
         currentMembershipId={profile.data?.membership?.id}
-        loading={members.isPending}
+        loading={members.isPending || invitationsQuery.isPending}
       />
     </main>
   );

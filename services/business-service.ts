@@ -1,7 +1,7 @@
 import { ApiError, apiRequest } from "@/lib/api-client";
 import { businessStore } from "@/lib/business-store";
 import { env } from "@/lib/env";
-import type { AcceptInvitationInput, ApiMessage, Business, BusinessMemberOption, BusinessMembership, BusinessMembershipItem, InviteMemberInput, InviteMemberResponse, SwitchBusinessResponse } from "@/types/auth";
+import type { AcceptInvitationInput, ApiMessage, Business, BusinessInvitation, BusinessMemberOption, BusinessMembership, BusinessMembershipItem, InviteMemberInput, InviteMemberResponse, SwitchBusinessResponse } from "@/types/auth";
 import type { BusinessOnboardingInput } from "@/types/onboarding";
 
 type BusinessMembershipListResponse =
@@ -14,6 +14,7 @@ type BusinessMembershipListResponse =
       memberships?: BusinessMembership[] | BusinessMembershipItem[];
     };
 type BusinessMembersResponse = BusinessMemberOption[] | { data?: BusinessMemberOption[]; members?: BusinessMemberOption[]; memberships?: BusinessMemberOption[] };
+type BusinessInvitationsResponse = BusinessInvitation[] | { data?: BusinessInvitation[]; invitations?: BusinessInvitation[] };
 
 function hasBusiness(value: Business | BusinessMembership | BusinessMembershipItem): value is BusinessMembership {
   return "business" in value;
@@ -116,6 +117,12 @@ function normalizeBusinessMembers(response: BusinessMembersResponse): BusinessMe
   return Array.isArray(list) ? list : [];
 }
 
+function normalizeBusinessInvitations(response: BusinessInvitationsResponse): BusinessInvitation[] {
+  if (Array.isArray(response)) return response;
+  const list = response.invitations ?? response.data ?? [];
+  return Array.isArray(list) ? list : [];
+}
+
 function mockBusinessMembers(): BusinessMemberOption[] {
   return [
     {
@@ -177,7 +184,11 @@ export const businessService = {
     if (env.useMockApi) return mockBusinessMembers();
     return normalizeBusinessMembers(await apiRequest<BusinessMembersResponse>("/business/members"));
   },
+  async listInvitations() {
+    if (env.useMockApi) return [];
+    return normalizeBusinessInvitations(await apiRequest<BusinessInvitationsResponse>("/business/invitations"));
+  },
   create: (input: BusinessOnboardingInput) => apiRequest<{ business: Business; message: string }>("/businesses", { method: "POST", body: JSON.stringify(input) }),
-  inviteMember: (input: InviteMemberInput) => apiRequest<InviteMemberResponse>("/businesses/invitations", { method: "POST", body: JSON.stringify(input) }),
+  inviteMember: (input: InviteMemberInput) => apiRequest<InviteMemberResponse>("/business/invitations", { method: "POST", body: JSON.stringify(input) }),
   acceptInvitation: (input: AcceptInvitationInput) => apiRequest<ApiMessage>("/businesses/invitations/accept", { method: "POST", body: JSON.stringify(input) }),
 };
