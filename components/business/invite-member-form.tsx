@@ -44,8 +44,15 @@ function nameFromEmail(email: string) {
     .join(" ") || email;
 }
 
-function invitationDate(invitation: BusinessInvitation) {
-  return invitation.sentAt ?? invitation.createdAt ?? invitation.expiresAt ?? null;
+function invitationSentDate(invitation: BusinessInvitation) {
+  return invitation.sentAt ?? invitation.createdAt ?? null;
+}
+
+function invitationTiming(invitation: BusinessInvitation) {
+  const sentDate = invitationSentDate(invitation);
+  if (sentDate) return `Sent ${formatTeamDate(sentDate)}`;
+  if (invitation.expiresAt) return `Expires ${formatTeamDate(invitation.expiresAt)}`;
+  return "Invitation date unavailable";
 }
 
 function isPendingInvitation(invitation: BusinessInvitation) {
@@ -185,7 +192,7 @@ function TeamDirectory({ invitations, members, currentMembershipId, loading }: {
     id: `invited-${invitation.id}`,
     group: "invited",
     name: nameFromEmail(invitation.email),
-    date: formatTeamDate(invitationDate(invitation)),
+    date: formatTeamDate(invitationSentDate(invitation)),
     email: invitation.email,
     role: invitation.role === "MANAGER" ? "Manager" : "Member",
     status: "Pending",
@@ -377,7 +384,7 @@ export function InviteMemberForm() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{invitation.email}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {invitation.role === "MANAGER" ? "Manager" : "Staff"} · Sent {formatTeamDate(invitationDate(invitation))}
+                          {invitation.role === "MANAGER" ? "Manager" : "Staff"} · {invitationTiming(invitation)}
                         </p>
                       </div>
                       <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-bold text-warning">
@@ -415,7 +422,7 @@ export function InviteMemberForm() {
       </div>
       <TeamDirectory
         invitations={pendingInvitations}
-        members={(members.data ?? []).filter((member) => member.status === "ACTIVE")}
+        members={members.data ?? []}
         currentMembershipId={profile.data?.membership?.id}
         loading={members.isPending || invitationsQuery.isPending}
       />
