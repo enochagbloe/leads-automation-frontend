@@ -5,6 +5,9 @@ import type {
   KnowledgeArticleInput,
   KnowledgeDocument,
   KnowledgeDocumentInput,
+  KnowledgeDocumentReviewDetails,
+  KnowledgeDocumentDownloadUrl,
+  KnowledgeDocumentVersion,
   KnowledgeListQuery,
   KnowledgeListResponse,
   KnowledgeSearchResult,
@@ -66,8 +69,27 @@ let documents: KnowledgeDocument[] = [
     mimeType: "application/pdf",
     fileSize: 842_100,
     status: "ACTIVE",
+    processingStatus: "READY",
     visibility: "CLIENT_SENDABLE",
     uploadedByMembershipId: "member_demo",
+    uploadedBy: {
+      id: "member_demo",
+      role: "BUSINESS_OWNER",
+      user: { id: "user_demo", firstName: "Enoch", lastName: "Agbloe" },
+    },
+    activeVersionId: "kb_doc_company_profile_v1",
+    activeVersion: {
+      id: "kb_doc_company_profile_v1",
+      documentId: "kb_doc_company_profile",
+      versionNumber: 1,
+      originalFileName: "company-profile.pdf",
+      fileSize: 842_100,
+      mimeType: "application/pdf",
+      processingStatus: "READY",
+      isActive: true,
+      createdAt: now,
+    },
+    availableActions: ["VIEW", "DOWNLOAD", "ARCHIVE", "DELETE", "VIEW_VERSIONS"],
     createdAt: now,
     updatedAt: now,
   },
@@ -80,6 +102,7 @@ function listFilter<T extends { title: string; category?: string | null; status:
     const haystack = `${item.title} ${item.category ?? ""} ${item.tags.join(" ")}`.toLowerCase();
     if (query.search && !haystack.includes(query.search.toLowerCase())) return false;
     if (query.status && item.status !== query.status) return false;
+    if (query.processingStatus && "processingStatus" in item && item.processingStatus !== query.processingStatus) return false;
     if (query.category && item.category !== query.category) return false;
     if (query.visibility && item.visibility !== query.visibility) return false;
     return true;
@@ -126,6 +149,18 @@ function toSearchResult(asset: KnowledgeArticle | KnowledgeDocument): KnowledgeS
 }
 
 export const mockKnowledgeService = {
+  async stats() {
+    await delay(180);
+    const activeDocuments = documents.filter((document) => document.status === "ACTIVE");
+    const usedBytes = documents.reduce((total, document) => total + document.fileSize, 0);
+    return {
+      assetUsage: { used: articles.filter((article) => article.status !== "ARCHIVED").length + activeDocuments.length, limit: 25 },
+      pdfUsage: { used: activeDocuments.length, limit: 10 },
+      storageUsage: { usedBytes, limitBytes: 25 * 1024 * 1024, documentVersionBytes: usedBytes, articlePdfBytes: 0 },
+      aiDraftUsage: { usedThisMonth: articles.filter((article) => article.source === "AI_DRAFT").length, monthlyLimit: 20 },
+      businessStorageBreakdown: [],
+    };
+  },
   async articles(query: KnowledgeListQuery): Promise<KnowledgeListResponse<KnowledgeArticle>> {
     await delay();
     const filtered = listFilter(articles, query).filter((article) => !query.source || article.source === query.source);
@@ -134,6 +169,72 @@ export const mockKnowledgeService = {
   async documents(query: KnowledgeListQuery): Promise<KnowledgeListResponse<KnowledgeDocument>> {
     await delay();
     return paged(listFilter(documents, query), query);
+  },
+  async documentDetail(id: string): Promise<KnowledgeDocument> {
+    await delay();
+    const document = documents.find((item) => item.id === id);
+    if (!document) throw new Error("Document not found.");
+    return {
+      ...document,
+      versions: [
+        document.activeVersion ?? {
+          id: `${id}_v1`,
+          documentId: id,
+          versionNumber: 1,
+          originalFileName: document.fileName,
+          fileSize: document.fileSize,
+          mimeType: document.mimeType,
+          processingStatus: document.processingStatus,
+          isActive: true,
+          createdAt: document.createdAt,
+        },
+      ],
+    };
+  },
+  async documentVersions(id: string, query: { page?: number; limit?: number }): Promise<KnowledgeListResponse<KnowledgeDocumentVersion>> {
+    const document = await this.documentDetail(id);
+    return paged(document.versions ?? [], query);
+  },
+  async documentReviews(id: string): Promise<KnowledgeDocumentReviewDetails> {
+    const document = await this.documentDetail(id);
+    const versionId = document.activeVersion?.id ?? document.activeVersionId ?? `${id}_v1`;
+    return {
+      document: {
+        id: document.id,
+        title: document.title,
+        status: document.status,
+        processingStatus: document.processingStatus,
+        governanceStatus: document.governanceStatus ?? (document.processingStatus === "NEEDS_REVIEW" ? "REVIEW_REQUIRED" : "APPROVED"),
+        activeVersionId: versionId,
+      },
+      versionId,
+      summary: { total: 0, unresolved: 0, stale: 0 },
+      reviews: [],
+    };
+  },
+  async approveDocumentReview(id: string, input: { versionId: string; note?: string | null }) {
+    await delay();
+    const existing = documents.find((document) => document.id === id);
+    if (!existing) throw new Error("Document not found.");
+    if ((existing.activeVersion?.id ?? existing.activeVersionId) !== input.versionId) throw new Error("The document version changed. Refresh and review it again.");
+    const next = { ...existing, processingStatus: "READY" as const, governanceStatus: "APPROVED" as const, updatedAt: new Date().toISOString() };
+    documents = documents.map((document) => document.id === id ? next : document);
+    return next;
+  },
+  async rejectDocumentReview(id: string, input: { versionId: string; reason: string }) {
+    await delay();
+    const existing = documents.find((document) => document.id === id);
+    if (!existing) throw new Error("Document not found.");
+    if ((existing.activeVersion?.id ?? existing.activeVersionId) !== input.versionId) throw new Error("The document version changed. Refresh and review it again.");
+    const next = { ...existing, status: "ARCHIVED" as const, governanceStatus: "ARCHIVED" as const, archiveReason: input.reason, archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    documents = documents.map((document) => document.id === id ? next : document);
+    return next;
+  },
+  async documentDownloadUrl(id: string): Promise<KnowledgeDocumentDownloadUrl> {
+    await delay(120);
+    const document = documents.find((item) => item.id === id);
+    if (!document) throw new Error("Document not found.");
+    return { url: document.fileUrl, expiresAt: null, authenticated: false };
   },
   async search(query: string): Promise<KnowledgeSearchResult[]> {
     await delay(220);
@@ -240,8 +341,26 @@ export const mockKnowledgeService = {
       mimeType: input.file?.type ?? "application/pdf",
       fileSize: input.file?.size ?? 0,
       status: "ACTIVE",
+      processingStatus: "QUEUED",
       visibility: input.visibility ?? "CLIENT_SENDABLE",
       uploadedByMembershipId: "member_demo",
+      uploadedBy: {
+        id: "member_demo",
+        role: "BUSINESS_OWNER",
+        user: { id: "user_demo", firstName: "Enoch", lastName: "Agbloe" },
+      },
+      activeVersionId: `kb_doc_${Date.now()}_v1`,
+      activeVersion: {
+        id: `kb_doc_${Date.now()}_v1`,
+        versionNumber: 1,
+        originalFileName: input.file?.name ?? "uploaded-document.pdf",
+        fileSize: input.file?.size ?? 0,
+        mimeType: input.file?.type ?? "application/pdf",
+        processingStatus: "QUEUED",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      },
+      availableActions: ["VIEW", "DOWNLOAD", "ARCHIVE", "DELETE", "VIEW_VERSIONS"],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -253,6 +372,21 @@ export const mockKnowledgeService = {
     const existing = documents.find((document) => document.id === id);
     if (!existing) throw new Error("Document not found.");
     const next = { ...existing, status, updatedAt: new Date().toISOString() };
+    documents = documents.map((document) => document.id === id ? next : document);
+    return next;
+  },
+  async deleteDocument(id: string): Promise<KnowledgeDocument> {
+    await delay();
+    const existing = documents.find((document) => document.id === id);
+    if (!existing) throw new Error("Document not found.");
+    documents = documents.filter((document) => document.id !== id);
+    return { ...existing, status: "DELETED", deletedAt: new Date().toISOString() };
+  },
+  async retryDocumentProcessing(id: string): Promise<KnowledgeDocument> {
+    await delay();
+    const existing = documents.find((document) => document.id === id);
+    if (!existing) throw new Error("Document not found.");
+    const next = { ...existing, processingStatus: "QUEUED" as const, processingErrorCode: null, processingErrorMessage: null, updatedAt: new Date().toISOString() };
     documents = documents.map((document) => document.id === id ? next : document);
     return next;
   },

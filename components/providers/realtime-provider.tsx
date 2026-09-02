@@ -102,6 +102,28 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     return;
   }
 
+  if ([
+    "business.member.joined",
+    "business.invite.accepted",
+    "business.team.updated",
+    "business.member.disabled",
+    "business.member.restored",
+    "business.member.removed",
+    "business.member.suspended_by_plan",
+    "business.member.access_changed",
+    "business.member.operational_profile_updated",
+  ].includes(type)) {
+    void Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.businessMembers.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessInvitations.all }),
+      client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.subscription.current }),
+      client.invalidateQueries({ queryKey: queryKeys.auth.currentUser }),
+    ]);
+    return;
+  }
+
   if (type === "business.profile.updated") {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.businessProfile.all }),
@@ -155,14 +177,26 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     "business.knowledge.document.updated",
     "business.knowledge.document.status_updated",
     "business.knowledge.document.deleted",
+    "knowledge.document.uploaded",
+    "knowledge.document.queued",
+    "knowledge.document.processing",
+    "knowledge.document.ready",
+    "knowledge.document.needs_review",
+    "knowledge.document.failed",
+    "knowledge.document.archived",
+    "knowledge.document.restored",
+    "knowledge.document.deleted",
     "business.knowledge.asset.sent",
   ].includes(type)) {
+    const documentId = typeof payload.documentId === "string" ? payload.documentId : undefined;
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.knowledgeArticles.all }),
       client.invalidateQueries({ queryKey: queryKeys.knowledgeDocuments.all }),
+      client.invalidateQueries({ queryKey: ["knowledge-stats"] }),
       client.invalidateQueries({ queryKey: queryKeys.knowledgeSearch.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
+      ...(documentId ? [client.invalidateQueries({ queryKey: queryKeys.knowledgeDocuments.detail(event.businessId, documentId) })] : []),
       ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) })] : []),
       ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.lists })] : []),
       ...(conversationId ? [client.invalidateQueries({ queryKey: queryKeys.conversations.stats })] : []),
@@ -226,6 +260,8 @@ function applyEvent(client: QueryClient, event: RealtimeEvent) {
     void Promise.all([
       client.invalidateQueries({ queryKey: queryKeys.calendarAppointments.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessAppointments.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessMembers.all }),
+      client.invalidateQueries({ queryKey: queryKeys.businessInvitations.all }),
       client.invalidateQueries({ queryKey: queryKeys.notifications.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessSetup.all }),
       client.invalidateQueries({ queryKey: queryKeys.businessKnowledge.all }),

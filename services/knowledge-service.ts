@@ -12,10 +12,17 @@ import type {
   KnowledgeArticleInput,
   KnowledgeArticleStatus,
   KnowledgeDocument,
+  KnowledgeDocumentDownloadUrl,
   KnowledgeDocumentInput,
+  KnowledgeDocumentReviewDecisionInput,
+  KnowledgeDocumentReviewDetails,
+  KnowledgeDocumentReviewRejectionInput,
+  KnowledgeDocumentUploadResponse,
+  KnowledgeDocumentVersion,
   KnowledgeDocumentStatus,
   KnowledgeListQuery,
   KnowledgeListResponse,
+  KnowledgeStats,
   KnowledgeSearchResult,
   KnowledgeSendInput,
   KnowledgeSendResponse,
@@ -51,6 +58,23 @@ function listItems<T>(value: unknown): T[] {
     if (Array.isArray(record.documents)) return record.documents as T[];
   }
   return [];
+}
+
+function pagination(value: unknown) {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as { pagination?: unknown; data?: unknown };
+  if (record.pagination && typeof record.pagination === "object") {
+    return record.pagination as KnowledgeListResponse<unknown>["pagination"];
+  }
+  if (record.data && typeof record.data === "object") return pagination(record.data);
+  return undefined;
+}
+
+function normalizeListResponse<T>(value: unknown): KnowledgeListResponse<T> {
+  return {
+    items: listItems<T>(value),
+    pagination: pagination(value),
+  };
 }
 
 function articleSearchResult(article: KnowledgeArticle): KnowledgeSearchResult {
@@ -104,6 +128,19 @@ function normalizeSearchResponse(value: unknown): KnowledgeSearchResult[] {
   return listItems<unknown>(value).map(normalizeSearchResult).filter(Boolean) as KnowledgeSearchResult[];
 }
 
+function unwrapDocument(value: unknown): KnowledgeDocument {
+  if (value && typeof value === "object") {
+    const record = value as { document?: unknown; data?: unknown };
+    if (record.document && typeof record.document === "object") return record.document as KnowledgeDocument;
+    if (record.data && typeof record.data === "object") return unwrapDocument(record.data);
+  }
+  return value as KnowledgeDocument;
+}
+
+function unwrapUploadDocument(value: unknown): KnowledgeDocument {
+  return unwrapDocument(value);
+}
+
 async function defaultKnowledgeAssets() {
   const [articles, documents] = await Promise.all([
     apiRequest<unknown>(`/business/knowledge/articles?${queryString({ status: "PUBLISHED", visibility: "CLIENT_SENDABLE", limit: 8 })}`),
@@ -141,6 +178,12 @@ function knowledgeFetch(path: string, init: RequestInit) {
     ...init,
     headers: authHeaders(init.headers),
   });
+}
+
+function apiPath(pathOrUrl: string) {
+  if (pathOrUrl.startsWith(env.apiUrl)) return pathOrUrl.slice(env.apiUrl.length) || "/";
+  if (pathOrUrl.startsWith("/api/")) return pathOrUrl.slice(4);
+  return pathOrUrl;
 }
 
 async function authenticatedKnowledgeFetch(path: string, init: RequestInit, allowRefresh = true): Promise<Response> {
@@ -273,18 +316,65 @@ function documentForm(input: KnowledgeDocumentInput & { file: File }) {
   if (input.description) form.set("description", input.description);
   if (input.category) form.set("category", input.category);
   form.set("visibility", input.visibility ?? "INTERNAL_ONLY");
-  for (const tag of input.tags ?? []) form.append("tags[]", tag);
-  for (const serviceId of input.relatedServiceIds ?? []) form.append("relatedServiceIds[]", serviceId);
+  form.set("tags", JSON.stringify(input.tags ?? []));
+  form.set("relatedServiceIds", JSON.stringify(input.relatedServiceIds ?? []));
   return form;
 }
 
 export const knowledgeService = {
+  stats: () => env.useMockApi
+    ? mockKnowledgeService.stats()
+    : apiRequest<KnowledgeStats>("/business/knowledge/stats"),
   articles: (query: KnowledgeListQuery = {}) => env.useMockApi
     ? mockKnowledgeService.articles(query)
-    : apiRequest<KnowledgeListResponse<KnowledgeArticle>>(`/business/knowledge/articles?${queryString(query)}`),
+    : apiRequest<unknown>(`/business/knowledge/articles?${queryString(query)}`).then(normalizeListResponse<KnowledgeArticle>),
   documents: (query: KnowledgeListQuery = {}) => env.useMockApi
     ? mockKnowledgeService.documents(query)
-    : apiRequest<KnowledgeListResponse<KnowledgeDocument>>(`/business/knowledge/documents?${queryString(query)}`),
+    : apiRequest<unknown>(`/business/knowledge/documents?${queryString(query)}`).then(normalizeListResponse<KnowledgeDocument>),
+  documentDetail: (id: string) => env.useMockApi
+    ? mockKnowledgeService.documentDetail(id)
+    : apiRequest<unknown>(`/business/knowledge/documents/${id}`).then(unwrapDocument),
+  documentVersions: ({ id, page = 1, limit = 20 }: { id: string; page?: number; limit?: number }) => env.useMockApi
+    ? mockKnowledgeService.documentVersions(id, { page, limit })
+    : apiRequest<unknown>(`/business/knowledge/documents/${id}/versions?${queryString({ page, limit })}`).then(normalizeListResponse<KnowledgeDocumentVersion>),
+  documentReviews: (id: string) => env.useMockApi
+    ? mockKnowledgeService.documentReviews(id)
+    : apiRequest<KnowledgeDocumentReviewDetails>(`/business/knowledge/documents/${id}/reviews`),
+  approveDocumentReview: ({ documentId, versionId, note }: KnowledgeDocumentReviewDecisionInput) => env.useMockApi
+    ? mockKnowledgeService.approveDocumentReview(documentId, { versionId, note })
+    : apiRequest<unknown>(`/business/knowledge/documents/${documentId}/review/approve`, {
+      method: "POST",
+      body: JSON.stringify({ versionId, ...(note?.trim() ? { note: note.trim() } : {}) }),
+    }),
+  rejectDocumentReview: ({ documentId, versionId, reason }: KnowledgeDocumentReviewRejectionInput) => env.useMockApi
+    ? mockKnowledgeService.rejectDocumentReview(documentId, { versionId, reason })
+    : apiRequest<unknown>(`/business/knowledge/documents/${documentId}/review/reject`, {
+      method: "POST",
+      body: JSON.stringify({ versionId, reason: reason.trim() }),
+    }),
+  documentDownloadUrl: (id: string) => env.useMockApi
+    ? mockKnowledgeService.documentDownloadUrl(id)
+    : apiRequest<KnowledgeDocumentDownloadUrl>(`/business/knowledge/documents/${id}/download-url`),
+  downloadDocument: async (id: string) => {
+    const result = env.useMockApi
+      ? await mockKnowledgeService.documentDownloadUrl(id)
+      : await apiRequest<KnowledgeDocumentDownloadUrl>(`/business/knowledge/documents/${id}/download-url`);
+    if (typeof window === "undefined") return result;
+    if (!result.authenticated) {
+      window.open(result.url, "_blank", "noopener,noreferrer");
+      return result;
+    }
+    const response = await authenticatedKnowledgeFetch(apiPath(result.url), { method: "GET" });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw parseErrorBody(body, { code: "DOWNLOAD_FAILED", message: "Could not download document. Please try again.", status: response.status });
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
+    return result;
+  },
   search: ({ query, conversationId }: { query: string; conversationId?: string }) => env.useMockApi
     ? mockKnowledgeService.search(query)
     : query.trim()
@@ -309,10 +399,22 @@ export const knowledgeService = {
   streamDraftArticle,
   uploadDocument: (input: KnowledgeDocumentInput & { file: File }) => env.useMockApi
     ? mockKnowledgeService.uploadDocument(input)
-    : uploadMultipart<KnowledgeDocument>("/business/knowledge/documents/upload", documentForm(input)),
+    : uploadMultipart<KnowledgeDocumentUploadResponse>("/business/knowledge/documents/upload", documentForm(input)).then(unwrapUploadDocument),
   updateDocumentStatus: ({ id, status }: { id: string; status: KnowledgeDocumentStatus }) => env.useMockApi
     ? mockKnowledgeService.updateDocumentStatus(id, status)
-    : apiRequest<KnowledgeDocument>(`/business/knowledge/documents/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    : apiRequest<unknown>(`/business/knowledge/documents/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }).then(unwrapDocument),
+  archiveDocument: (id: string) => env.useMockApi
+    ? mockKnowledgeService.updateDocumentStatus(id, "ARCHIVED")
+    : apiRequest<unknown>(`/business/knowledge/documents/${id}/archive`, { method: "POST" }).then(unwrapDocument),
+  restoreDocument: (id: string) => env.useMockApi
+    ? mockKnowledgeService.updateDocumentStatus(id, "ACTIVE")
+    : apiRequest<unknown>(`/business/knowledge/documents/${id}/restore`, { method: "POST" }).then(unwrapDocument),
+  deleteDocument: (id: string) => env.useMockApi
+    ? mockKnowledgeService.deleteDocument(id)
+    : apiRequest<unknown>(`/business/knowledge/documents/${id}`, { method: "DELETE" }).then(unwrapDocument),
+  retryDocumentProcessing: (id: string) => env.useMockApi
+    ? mockKnowledgeService.retryDocumentProcessing(id)
+    : apiRequest<unknown>(`/business/knowledge/documents/${id}/retry-processing`, { method: "POST" }).then(unwrapDocument),
   send: ({ conversationId, input }: { conversationId: string; input: KnowledgeSendInput }) => env.useMockApi
     ? mockKnowledgeService.send(conversationId, input)
     : apiRequest<KnowledgeSendResponse>(`/business/conversations/${conversationId}/knowledge/send`, { method: "POST", body: JSON.stringify(knowledgeSendBody(input)) }),

@@ -26,9 +26,25 @@ import { cn } from "@/lib/utils";
 import { canCreateBusiness } from "@/lib/subscription";
 import { UpgradePrompt } from "@/components/subscription/upgrade-prompt";
 import { onboardingSchema, type OnboardingValues } from "@/schemas/onboarding";
+import { BUSINESS_INDUSTRIES, type BusinessIndustry } from "@/types/business-profile";
 import { WORK_DAYS } from "@/types/onboarding";
 
-const industries = ["E-commerce", "Healthcare", "Hospitality", "Professional Services", "Real Estate", "Retail", "Other"];
+const INDUSTRY_LABELS: Record<BusinessIndustry, string> = {
+  REAL_ESTATE: "Real Estate",
+  CONSTRUCTION: "Construction",
+  ARCHITECTURE: "Architecture",
+  CONSULTING: "Consulting",
+  SALON_BEAUTY: "Salon & Beauty",
+  CLINIC_HEALTHCARE: "Clinic & Healthcare",
+  HOTEL_HOSPITALITY: "Hotel & Hospitality",
+  ONLINE_STORE: "Online Store",
+  EDUCATION: "Education",
+  LEGAL: "Legal",
+  FINANCE: "Finance",
+  OTHER: "Other",
+};
+
+const industryOptions = BUSINESS_INDUSTRIES.map((industry) => ({ value: industry, label: INDUSTRY_LABELS[industry] }));
 const steps: { title: string; description: string; fields: Path<OnboardingValues>[] }[] = [
   { title: "What is your business name?", description: "Use the name your customers know you by.", fields: ["businessName"] },
   { title: "What industry are you in?", description: "This helps us shape your workspace around your business.", fields: ["industry"] },
@@ -116,7 +132,7 @@ export function OnboardingFlow({ mode = "onboarding" }: { mode?: "onboarding" | 
         <div className="mt-10 rounded-2xl border bg-card p-6 shadow-sm sm:p-10">
           <OnboardingStep eyebrow={mode === "create-business" ? "New business" : "Business setup"} title={current.title} description={current.description} stepKey={step}>
             {step === 0 && <AppFormField id="businessName" label="Business name" error={errors.businessName?.message} required><AppInput id="businessName" autoComplete="organization" autoFocus {...form.register("businessName")} /></AppFormField>}
-            {step === 1 && <Controller control={form.control} name="industry" render={({ field }) => <AppFormField id="industry" label="Industry" error={errors.industry?.message} required><AppSelect id="industry" name={field.name} value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} options={industries.map((industry) => ({ value: industry, label: industry }))} placeholder="Select your industry" size="large" error={Boolean(errors.industry)} autoFocus required /></AppFormField>} />}
+            {step === 1 && <Controller control={form.control} name="industry" render={({ field }) => <AppFormField id="industry" label="Industry" error={errors.industry?.message} required><AppSelect id="industry" name={field.name} value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} options={industryOptions} placeholder="Select your industry" size="large" error={Boolean(errors.industry)} autoFocus required /></AppFormField>} />}
             {step === 2 && <AppFormField id="description" label="Business description" error={errors.description?.message} hint="15–500 characters" required><textarea id="description" autoFocus rows={5} className="w-full resize-none rounded-lg border border-input bg-card px-3 py-3 text-base outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20" {...form.register("description")} /></AppFormField>}
             {step === 3 && <AppFormField id="city" label="City" error={errors.city?.message} required><AppInput id="city" autoComplete="address-level2" autoFocus {...form.register("city")} /></AppFormField>}
             {step === 4 && <AppFormField id="phone" label="Business phone number" error={errors.phone?.message} required><AppInput id="phone" type="tel" autoComplete="tel" autoFocus placeholder="+233 24 000 0000" {...form.register("phone")} /></AppFormField>}

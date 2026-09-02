@@ -19,8 +19,13 @@ export function useSignupFromInvite(token: string) {
     mutationFn: (input: SignupFromInviteInput) => inviteService.signup(token, input),
     onSuccess: async () => {
       await resetBusinessContext(client);
-      await client.invalidateQueries({ queryKey: queryKeys.businesses.all });
-      await client.invalidateQueries({ queryKey: queryKeys.invites.detail(token) });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.businesses.all }),
+        client.invalidateQueries({ queryKey: queryKeys.businessMembers.all }),
+        client.invalidateQueries({ queryKey: queryKeys.businessInvitations.all }),
+        client.invalidateQueries({ queryKey: queryKeys.subscription.current }),
+        client.invalidateQueries({ queryKey: queryKeys.invites.detail(token) }),
+      ]);
     },
   });
 }
@@ -31,8 +36,13 @@ export function useAcceptInvite(token: string) {
     mutationFn: () => inviteService.accept(token),
     onSuccess: async () => {
       await resetBusinessContext(client);
-      await client.invalidateQueries({ queryKey: queryKeys.businesses.all });
-      await client.invalidateQueries({ queryKey: queryKeys.invites.detail(token) });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.businesses.all }),
+        client.invalidateQueries({ queryKey: queryKeys.businessMembers.all }),
+        client.invalidateQueries({ queryKey: queryKeys.businessInvitations.all }),
+        client.invalidateQueries({ queryKey: queryKeys.subscription.current }),
+        client.invalidateQueries({ queryKey: queryKeys.invites.detail(token) }),
+      ]);
     },
   });
 }

@@ -1,6 +1,10 @@
 export const queryKeys = {
   auth: { currentUser: ["auth", "current-user"] as const },
   invites: { detail: (token: string) => ["invites", token] as const },
+  businessInvitations: {
+    all: ["business-invitations"] as const,
+    list: (businessId: string) => ["business-invitations", businessId] as const,
+  },
   businesses: { all: ["businesses"] as const },
   plans: { all: ["plans"] as const },
   subscription: { current: ["subscription", "current"] as const },
@@ -52,6 +56,8 @@ export const queryKeys = {
     all: ["knowledge-documents"] as const,
     list: (businessId: string, query: unknown) => ["knowledge-documents", businessId, query] as const,
     detail: (businessId: string, documentId: string) => ["knowledge-documents", businessId, documentId] as const,
+    versions: (businessId: string, documentId: string) => ["knowledge-documents", businessId, documentId, "versions"] as const,
+    reviews: (businessId: string, documentId: string) => ["knowledge-documents", businessId, documentId, "reviews"] as const,
   },
   knowledgeArticles: {
     all: ["knowledge-articles"] as const,
