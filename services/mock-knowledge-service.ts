@@ -5,6 +5,7 @@ import type {
   KnowledgeArticleInput,
   KnowledgeDocument,
   KnowledgeDocumentInput,
+  KnowledgeDocumentReviewDetails,
   KnowledgeDocumentDownloadUrl,
   KnowledgeDocumentVersion,
   KnowledgeListQuery,
@@ -193,6 +194,41 @@ export const mockKnowledgeService = {
   async documentVersions(id: string, query: { page?: number; limit?: number }): Promise<KnowledgeListResponse<KnowledgeDocumentVersion>> {
     const document = await this.documentDetail(id);
     return paged(document.versions ?? [], query);
+  },
+  async documentReviews(id: string): Promise<KnowledgeDocumentReviewDetails> {
+    const document = await this.documentDetail(id);
+    const versionId = document.activeVersion?.id ?? document.activeVersionId ?? `${id}_v1`;
+    return {
+      document: {
+        id: document.id,
+        title: document.title,
+        status: document.status,
+        processingStatus: document.processingStatus,
+        governanceStatus: document.governanceStatus ?? (document.processingStatus === "NEEDS_REVIEW" ? "REVIEW_REQUIRED" : "APPROVED"),
+        activeVersionId: versionId,
+      },
+      versionId,
+      summary: { total: 0, unresolved: 0, stale: 0 },
+      reviews: [],
+    };
+  },
+  async approveDocumentReview(id: string, input: { versionId: string; note?: string | null }) {
+    await delay();
+    const existing = documents.find((document) => document.id === id);
+    if (!existing) throw new Error("Document not found.");
+    if ((existing.activeVersion?.id ?? existing.activeVersionId) !== input.versionId) throw new Error("The document version changed. Refresh and review it again.");
+    const next = { ...existing, processingStatus: "READY" as const, governanceStatus: "APPROVED" as const, updatedAt: new Date().toISOString() };
+    documents = documents.map((document) => document.id === id ? next : document);
+    return next;
+  },
+  async rejectDocumentReview(id: string, input: { versionId: string; reason: string }) {
+    await delay();
+    const existing = documents.find((document) => document.id === id);
+    if (!existing) throw new Error("Document not found.");
+    if ((existing.activeVersion?.id ?? existing.activeVersionId) !== input.versionId) throw new Error("The document version changed. Refresh and review it again.");
+    const next = { ...existing, status: "ARCHIVED" as const, governanceStatus: "ARCHIVED" as const, archiveReason: input.reason, archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    documents = documents.map((document) => document.id === id ? next : document);
+    return next;
   },
   async documentDownloadUrl(id: string): Promise<KnowledgeDocumentDownloadUrl> {
     await delay(120);

@@ -4,8 +4,9 @@ import { AlertTriangle, Download, History, RefreshCcw, X } from "lucide-react";
 import { AppButton } from "@/components/app-button";
 import { AppErrorState } from "@/components/app-error-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { KnowledgeDocument, KnowledgeDocumentVersion } from "@/types/knowledge";
-import { DocumentLifecycleStatusBadge, DocumentProcessingStatusBadge } from "./document-status-badge";
+import type { KnowledgeDocument, KnowledgeDocumentReviewDetails, KnowledgeDocumentVersion } from "@/types/knowledge";
+import { DocumentReviewPanel } from "./document-review-panel";
+import { DocumentStatusBadge, knowledgeDocumentDisplayStatus } from "./document-status-badge";
 import { formatBytes, formatKnowledgeDate, hasDocumentAction, titleCase, uploadedByName, versionNumber } from "./knowledge-hub-utils";
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -39,12 +40,20 @@ export function DocumentDetailsPanel({
   loading,
   error,
   versions,
+  review,
+  reviewLoading,
+  reviewError,
   onClose,
   onDownload,
   onArchive,
   onRestore,
   onDelete,
   onRetry,
+  onRetryReview,
+  onApproveReview,
+  onRejectReview,
+  approvingReview,
+  rejectingReview,
   pendingAction,
 }: {
   open: boolean;
@@ -52,16 +61,25 @@ export function DocumentDetailsPanel({
   loading?: boolean;
   error?: unknown;
   versions: KnowledgeDocumentVersion[];
+  review?: KnowledgeDocumentReviewDetails;
+  reviewLoading?: boolean;
+  reviewError?: unknown;
   onClose: () => void;
   onDownload: () => void;
   onArchive: () => void;
   onRestore: () => void;
   onDelete: () => void;
   onRetry: () => void;
+  onRetryReview: () => void;
+  onApproveReview: (note?: string) => void;
+  onRejectReview: (reason: string) => void;
+  approvingReview?: boolean;
+  rejectingReview?: boolean;
   pendingAction?: string | null;
 }) {
   if (!open) return null;
   const errorDescription = error instanceof Error ? error.message : "Try opening this document again.";
+  const displayStatus = document ? knowledgeDocumentDisplayStatus(document) : null;
 
   return (
     <div className="fixed inset-0 z-[75] animate-[detail-overlay-in_160ms_ease-out] bg-foreground/25 backdrop-blur-[2px]" role="presentation">
@@ -89,9 +107,12 @@ export function DocumentDetailsPanel({
             <div className="space-y-6">
               <section>
                 <div className="flex flex-wrap gap-2">
-                  <DocumentProcessingStatusBadge status={document.processingStatus} />
-                  <DocumentLifecycleStatusBadge status={document.status} />
+                  <DocumentStatusBadge document={document} />
                 </div>
+                {displayStatus === "PROCESSING" && <p className="mt-3 text-sm text-muted-foreground">BizReply is analyzing this document. Review actions will become available after processing finishes.</p>}
+                {displayStatus === "OUTDATED" && <p className="mt-3 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">This document may no longer match current business information. Detailed reconciliation will be available in a later review workflow.</p>}
+                {displayStatus === "ARCHIVED" && <p className="mt-3 text-sm text-muted-foreground">This document is kept for historical reference and is not currently active knowledge.</p>}
+                {displayStatus === "APPROVED" && <p className="mt-3 text-sm text-muted-foreground">Human review is complete and this document is approved business knowledge.</p>}
                 {document.description && <p className="mt-4 rounded-2xl bg-muted/45 p-4 text-sm leading-6 text-muted-foreground">{document.description}</p>}
                 {(document.processingError || document.processingErrorMessage) && (
                   <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
@@ -101,6 +122,19 @@ export function DocumentDetailsPanel({
                 )}
               </section>
 
+              <DocumentReviewPanel
+                key={`${document.id}:${document.activeVersion?.id ?? document.activeVersionId ?? "current"}:${document.processingStatus}`}
+                document={document}
+                review={review}
+                loading={reviewLoading}
+                error={reviewError}
+                approving={approvingReview}
+                rejecting={rejectingReview}
+                onRetry={onRetryReview}
+                onApprove={onApproveReview}
+                onReject={onRejectReview}
+              />
+
               <section>
                 <h3 className="text-sm font-bold">File information</h3>
                 <dl className="mt-2 divide-y rounded-2xl border px-4">
@@ -109,6 +143,9 @@ export function DocumentDetailsPanel({
                   <DetailRow label="File size" value={formatBytes(document.fileSize)} />
                   <DetailRow label="Version" value={`v${versionNumber(document)}`} />
                   <DetailRow label="Visibility" value={titleCase(document.visibility)} />
+                  {document.category && <DetailRow label="Category" value={document.category} />}
+                  <DetailRow label="Processing" value={titleCase(document.processingStatus)} />
+                  {document.governanceStatus && <DetailRow label="Governance" value={titleCase(document.governanceStatus)} />}
                 </dl>
               </section>
 

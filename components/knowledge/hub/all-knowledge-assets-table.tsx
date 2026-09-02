@@ -9,7 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { KnowledgeArticle, KnowledgeDocument } from "@/types/knowledge";
-import { formatKnowledgeDate, titleCase } from "./knowledge-hub-utils";
+import { DocumentStatusBadge } from "./document-status-badge";
+import { formatKnowledgeDate, hasDocumentAction, titleCase } from "./knowledge-hub-utils";
 
 export type KnowledgeAssetRow =
   | { kind: "document"; item: KnowledgeDocument }
@@ -31,13 +32,6 @@ function rowSource(row: KnowledgeAssetRow) {
   }
   if (row.item.originalFileName?.toLowerCase().endsWith(".pdf") || row.item.fileName.toLowerCase().endsWith(".pdf")) return "PDF";
   return row.item.fileExtension ? row.item.fileExtension.toUpperCase() : "Upload";
-}
-
-function rowStatus(row: KnowledgeAssetRow) {
-  if (row.kind === "article") return row.item.status;
-  if (row.item.processingStatus === "NEEDS_REVIEW") return "NEEDS_REVIEW";
-  if (row.item.processingStatus === "FAILED") return "FAILED";
-  return row.item.status;
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -104,7 +98,7 @@ function AssetActions({
         <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-muted" onClick={() => runAction(onOpen)}>
           {row.kind === "article" ? "Open editor" : "View details"}
         </button>
-        {row.kind === "document" && (
+        {row.kind === "document" && hasDocumentAction(row.item, "DOWNLOAD") && (
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-muted" onClick={() => runAction(onDownload)}>Download</button>
         )}
         {canManage && row.kind === "article" && row.item.status !== "PUBLISHED" && row.item.status !== "ARCHIVED" && (
@@ -113,10 +107,10 @@ function AssetActions({
         {canManage && row.kind === "article" && row.item.status !== "ARCHIVED" && (
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-muted" onClick={() => runAction(onArchiveArticle)}>Archive</button>
         )}
-        {canManage && row.kind === "document" && row.item.processingStatus === "FAILED" && (
+        {row.kind === "document" && hasDocumentAction(row.item, "RETRY_PROCESSING") && (
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-muted" onClick={() => runAction(onRetry)}>Retry processing</button>
         )}
-        {canManage && row.kind === "document" && row.item.status !== "ARCHIVED" && (
+        {row.kind === "document" && hasDocumentAction(row.item, "ARCHIVE") && (
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-muted" onClick={() => runAction(onArchiveDocument)}>Archive</button>
         )}
       </PopoverContent>
@@ -193,7 +187,7 @@ export function AllKnowledgeAssetsTable({
               <SourceBadge row={row} />
               <span className="text-xs font-semibold">{formatKnowledgeDate(rowDate(row)).split(",")[0]}</span>
               <span className="text-xs text-muted-foreground">{formatKnowledgeDate(rowUpdated(row)).split(",").slice(1).join(",").trim() || "Recently"}</span>
-              <StatusPill status={rowStatus(row)} />
+              {article ? <StatusPill status={article.status} /> : document ? <DocumentStatusBadge document={document} /> : null}
               <AssetActions
                 row={row}
                 canManage={canManage}

@@ -56,6 +56,8 @@ export const queryKeys = {
     all: ["knowledge-documents"] as const,
     list: (businessId: string, query: unknown) => ["knowledge-documents", businessId, query] as const,
     detail: (businessId: string, documentId: string) => ["knowledge-documents", businessId, documentId] as const,
+    versions: (businessId: string, documentId: string) => ["knowledge-documents", businessId, documentId, "versions"] as const,
+    reviews: (businessId: string, documentId: string) => ["knowledge-documents", businessId, documentId, "reviews"] as const,
   },
   knowledgeArticles: {
     all: ["knowledge-articles"] as const,

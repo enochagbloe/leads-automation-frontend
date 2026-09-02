@@ -10,6 +10,8 @@ import type {
   KnowledgeArticleInput,
   KnowledgeArticleStatus,
   KnowledgeDocumentInput,
+  KnowledgeDocumentReviewDecisionInput,
+  KnowledgeDocumentReviewRejectionInput,
   KnowledgeDocumentStatus,
   KnowledgeListQuery,
   KnowledgeStats,
@@ -42,9 +44,16 @@ export const useKnowledgeDocument = (businessId?: string | null, documentId?: st
 });
 
 export const useKnowledgeDocumentVersions = (businessId?: string | null, documentId?: string | null) => useQuery({
-  queryKey: ["knowledge-document-versions", businessId ?? "", documentId ?? ""] as const,
+  queryKey: queryKeys.knowledgeDocuments.versions(businessId ?? "", documentId ?? ""),
   queryFn: () => knowledgeService.documentVersions({ id: documentId ?? "", page: 1, limit: 20 }),
   enabled: Boolean(businessId && documentId),
+});
+
+export const useKnowledgeDocumentReviews = (businessId?: string | null, documentId?: string | null, enabled = true) => useQuery({
+  queryKey: queryKeys.knowledgeDocuments.reviews(businessId ?? "", documentId ?? ""),
+  queryFn: () => knowledgeService.documentReviews(documentId ?? ""),
+  enabled: Boolean(businessId && documentId && enabled),
+  retry: (failureCount, error) => !(error && typeof error === "object" && "status" in error && error.status === 403) && failureCount < 2,
 });
 
 export const useKnowledgeSearch = (businessId?: string | null, conversationId?: string, query = "") => useQuery({
@@ -128,6 +137,16 @@ export function useDeleteKnowledgeDocument() {
 export function useRetryKnowledgeProcessing() {
   const invalidate = useInvalidateKnowledge();
   return useMutation({ mutationFn: (documentId: string) => knowledgeService.retryDocumentProcessing(documentId), onSuccess: () => invalidate() });
+}
+
+export function useApproveKnowledgeDocumentReview() {
+  const invalidate = useInvalidateKnowledge();
+  return useMutation({ mutationFn: (input: KnowledgeDocumentReviewDecisionInput) => knowledgeService.approveDocumentReview(input), onSuccess: () => invalidate() });
+}
+
+export function useRejectKnowledgeDocumentReview() {
+  const invalidate = useInvalidateKnowledge();
+  return useMutation({ mutationFn: (input: KnowledgeDocumentReviewRejectionInput) => knowledgeService.rejectDocumentReview(input), onSuccess: () => invalidate() });
 }
 
 export function useDocumentDownload() {

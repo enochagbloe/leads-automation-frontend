@@ -3,7 +3,13 @@ export type KnowledgeArticleSource = "AI_DRAFT" | "MANUAL" | "IMPORTED";
 export type KnowledgeVisibility = "INTERNAL_ONLY" | "CLIENT_SENDABLE";
 export type KnowledgeDocumentStatus = "ACTIVE" | "ARCHIVED" | "DELETED";
 export type KnowledgeDocumentProcessingStatus = "UPLOADING" | "QUEUED" | "PROCESSING" | "READY" | "NEEDS_REVIEW" | "FAILED";
-export type KnowledgeDocumentAction = "VIEW" | "DOWNLOAD" | "ARCHIVE" | "RESTORE" | "DELETE" | "RETRY_PROCESSING" | "VIEW_VERSIONS";
+export type KnowledgeDocumentGovernanceStatus = "REVIEW_REQUIRED" | "APPROVED" | "OUTDATED" | "ARCHIVED";
+export type KnowledgeDocumentAction = "VIEW" | "DOWNLOAD" | "ARCHIVE" | "RESTORE" | "DELETE" | "RETRY_PROCESSING" | "VIEW_VERSIONS" | "APPROVE_REVIEW" | "REJECT_REVIEW";
+export type KnowledgeExtractionStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "UNSUPPORTED" | "FAILED";
+export type KnowledgeAnalysisStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+export type KnowledgeReviewStatus = "PENDING_REVIEW" | "APPLYING" | "RESOLVED";
+export type KnowledgeReviewPriority = "CRITICAL" | "HIGH" | "NORMAL";
+export type KnowledgeReviewComparisonType = "MATCH" | "CONFLICT" | "MISSING_IN_SETTINGS" | "MISSING_IN_DOCUMENT" | "POTENTIAL_REPLACEMENT" | "SETTINGS_CHANGED";
 export type KnowledgeAssetType = "ARTICLE" | "DOCUMENT";
 
 export interface KnowledgeUserSummary {
@@ -31,10 +37,125 @@ export interface KnowledgeDocumentVersion {
   mimeType: string;
   checksum?: string | null;
   processingStatus: KnowledgeDocumentProcessingStatus;
+  governanceStatus?: KnowledgeDocumentGovernanceStatus;
+  extraction?: KnowledgeDocumentExtraction | null;
+  analysis?: KnowledgeDocumentAnalysis | null;
   isActive?: boolean;
   uploadedByUserId?: string | null;
   uploadedByMembershipId?: string | null;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface KnowledgeDocumentExtraction {
+  status: KnowledgeExtractionStatus;
+  language?: string | null;
+  characterCount?: number | null;
+  wordCount?: number | null;
+  pageCount?: number | null;
+  sheetCount?: number | null;
+  slideCount?: number | null;
+  warnings?: string[] | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  extractedAt?: string | null;
+}
+
+export interface KnowledgeDocumentFact {
+  id: string;
+  factType?: string | null;
+  label?: string | null;
+  valueText?: string | null;
+  currency?: string | null;
+  numericValue?: number | string | null;
+  sourceKind?: string | null;
+  sourceLabel?: string | null;
+  pageNumber?: number | null;
+  sheetName?: string | null;
+  slideNumber?: number | null;
+  paragraphIndex?: number | null;
+  rowNumber?: number | null;
+  confidence?: number | null;
+  sourceExcerpt?: string | null;
+  governanceStatus?: KnowledgeDocumentGovernanceStatus | string | null;
+  canonicalEntityType?: string | null;
+  canonicalEntityId?: string | null;
+  canonicalField?: string | null;
+  reviewedByMembershipId?: string | null;
+  governedAt?: string | null;
+}
+
+export interface KnowledgeDocumentAnalysis {
+  status: KnowledgeAnalysisStatus;
+  suggestedTitle?: string | null;
+  detectedDocumentType?: string | null;
+  shortSummary?: string | null;
+  detectedPurpose?: string | null;
+  likelyAudience?: string | null;
+  recommendedClassification?: string | null;
+  classificationReason?: string | null;
+  classificationConfidence?: number | null;
+  analysisConfidence?: number | null;
+  requiresHumanReview?: boolean | null;
+  topics?: string[] | null;
+  relatedServiceSuggestions?: unknown[] | null;
+  warnings?: string[] | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  analyzedAt?: string | null;
+  facts?: KnowledgeDocumentFact[];
+}
+
+export interface KnowledgeDocumentReviewItem {
+  id: string;
+  factId?: string | null;
+  comparisonType: KnowledgeReviewComparisonType;
+  priority: KnowledgeReviewPriority;
+  reviewStatus: KnowledgeReviewStatus;
+  canonicalEntityType?: string | null;
+  canonicalEntityId?: string | null;
+  canonicalField?: string | null;
+  comparisonSnapshot?: unknown;
+  proposedValue?: unknown;
+  normalizedComparedValue?: unknown;
+  currentCanonicalValueNormalized?: unknown;
+  stale?: boolean;
+  requiresHumanReview?: boolean;
+  blocksAiUse?: boolean;
+  relatedDocumentId?: string | null;
+  relatedVersionId?: string | null;
+  resolutionAction?: string | null;
+  resolutionReason?: string | null;
+  detectedAt?: string | null;
+  reviewedAt?: string | null;
+  fact?: KnowledgeDocumentFact | null;
+  allowedResolutionActions?: string[];
+}
+
+export interface KnowledgeDocumentReviewDetails {
+  document: {
+    id: string;
+    title: string;
+    status: KnowledgeDocumentStatus;
+    processingStatus: KnowledgeDocumentProcessingStatus;
+    governanceStatus: KnowledgeDocumentGovernanceStatus;
+    activeVersionId?: string | null;
+  };
+  versionId: string;
+  summary: { total: number; unresolved: number; stale: number };
+  reviews: KnowledgeDocumentReviewItem[];
+}
+
+export interface KnowledgeDocumentReviewDecisionInput {
+  documentId: string;
+  versionId: string;
+  note?: string | null;
+}
+
+export interface KnowledgeDocumentReviewRejectionInput {
+  documentId: string;
+  versionId: string;
+  reason: string;
 }
 
 export interface KnowledgeArticle {
@@ -82,6 +203,7 @@ export interface KnowledgeDocument {
   fileSize: number;
   status: KnowledgeDocumentStatus;
   processingStatus: KnowledgeDocumentProcessingStatus;
+  governanceStatus?: KnowledgeDocumentGovernanceStatus;
   processingErrorCode?: string | null;
   processingErrorMessage?: string | null;
   processingError?: { code?: string | null; message?: string | null } | null;
@@ -95,6 +217,9 @@ export interface KnowledgeDocument {
   _count?: { versions?: number };
   availableActions?: KnowledgeDocumentAction[];
   archivedAt?: string | null;
+  archiveReason?: string | null;
+  replacesDocumentId?: string | null;
+  supersededByDocumentId?: string | null;
   deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
