@@ -500,7 +500,10 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
         config_id: env.metaWhatsAppConfigId,
         response_type: "code",
         override_default_response_type: true,
-        extras: { sessionInfoVersion: 3 },
+        extras: {
+          setup: {},
+          sessionInfoVersion: "3",
+        },
       });
     } catch (error) {
       fail(error instanceof Error ? error.message : "Meta authorization could not be started. Please try again.");
