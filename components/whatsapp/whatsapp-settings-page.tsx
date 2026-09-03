@@ -329,7 +329,7 @@ function metaPayloadEvent(payload: Record<string, unknown> | null) {
 }
 
 function isExpectedMetaSessionInfoOrigin(origin: string) {
-  return origin === "https://www.facebook.com";
+  return origin === "https://www.facebook.com" || origin === "https://web.facebook.com";
 }
 
 function metaCallbackError({
@@ -500,7 +500,7 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
         config_id: env.metaWhatsAppConfigId,
         response_type: "code",
         override_default_response_type: true,
-        extras: { sessionInfoVersion: 3 },
+        extras: {\n          setup: {},\n          sessionInfoVersion: "3",\n        },
       });
     } catch (error) {
       fail(error instanceof Error ? error.message : "Meta authorization could not be started. Please try again.");
