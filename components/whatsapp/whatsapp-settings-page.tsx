@@ -329,7 +329,7 @@ function metaPayloadEvent(payload: Record<string, unknown> | null) {
 }
 
 function isExpectedMetaSessionInfoOrigin(origin: string) {
-  return origin === "https://www.facebook.com";
+  return origin === "https://www.facebook.com" || origin === "https://web.facebook.com";
 }
 
 function metaCallbackError({
