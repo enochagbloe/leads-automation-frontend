@@ -19,15 +19,18 @@ import { useCurrentUser } from "@/hooks/use-auth";
 import { useBusinessServices } from "@/hooks/use-business-services";
 import {
   useArchiveKnowledgeDocument,
+  useApproveKnowledgeDocumentReview,
   useCreateKnowledgeArticle,
   useDeleteKnowledgeDocument,
   useDocumentDownload,
   useGenerateStarterArticles,
   useKnowledgeArticles,
   useKnowledgeDocument,
+  useKnowledgeDocumentReviews,
   useKnowledgeDocuments,
   useKnowledgeDocumentVersions,
   useRestoreKnowledgeDocument,
+  useRejectKnowledgeDocumentReview,
   useRetryKnowledgeProcessing,
   useStreamDraftKnowledgeArticle,
   useUpdateKnowledgeArticle,
@@ -110,6 +113,8 @@ export function KnowledgeBasePage() {
   const services = useBusinessServices(businessId, { status: "active", page: 1, limit: 100, sort: "displayOrder", sortOrder: "asc" });
   const detail = useKnowledgeDocument(businessId, selectedDocumentId);
   const versions = useKnowledgeDocumentVersions(businessId, selectedDocumentId);
+  const shouldLoadReview = Boolean(canManage && detail.data && (detail.data.processingStatus === "NEEDS_REVIEW" || detail.data.governanceStatus === "REVIEW_REQUIRED"));
+  const review = useKnowledgeDocumentReviews(businessId, selectedDocumentId, shouldLoadReview);
   const createArticle = useCreateKnowledgeArticle();
   const updateArticle = useUpdateKnowledgeArticle();
   const updateArticleStatus = useUpdateKnowledgeArticleStatus();
@@ -120,6 +125,8 @@ export function KnowledgeBasePage() {
   const restoreDocument = useRestoreKnowledgeDocument();
   const deleteDocument = useDeleteKnowledgeDocument();
   const retryProcessing = useRetryKnowledgeProcessing();
+  const approveReview = useApproveKnowledgeDocumentReview();
+  const rejectReview = useRejectKnowledgeDocumentReview();
   const downloadDocument = useDocumentDownload();
 
   const updateQuery = (nextQuery: KnowledgeListQuery) => {
@@ -319,6 +326,51 @@ export function KnowledgeBasePage() {
       onError: (error) => systemNotify.error("Could not download document", { description: getApiErrorMessage(error) }),
       onSettled: () => setPendingAction(null),
     });
+  };
+
+  const currentReviewVersionId = () => detail.data?.activeVersion?.id ?? detail.data?.activeVersionId ?? null;
+  const refreshReviewState = async () => {
+    await Promise.all([detail.refetch(), versions.refetch(), ...(shouldLoadReview ? [review.refetch()] : [])]);
+  };
+  const handleReviewError = async (error: unknown, action: "approve" | "reject") => {
+    if (error instanceof ApiError && error.status === 409) {
+      await refreshReviewState();
+      systemNotify.error("Document version changed", { description: "This document was updated while you were reviewing it. The latest version has been loaded; please review it again." });
+      return;
+    }
+    systemNotify.error(action === "approve" ? "Could not approve document" : "Could not reject document", { description: knowledgeErrorMessage(error) });
+  };
+  const approveCurrentReview = (note?: string) => {
+    if (!detail.data) return;
+    const versionId = currentReviewVersionId();
+    if (!versionId || (review.data?.versionId && review.data.versionId !== versionId)) {
+      void refreshReviewState();
+      systemNotify.error("Review is no longer current", { description: "The latest document version is being loaded. Review it again before approving." });
+      return;
+    }
+    approveReview.mutate(
+      { documentId: detail.data.id, versionId, note },
+      {
+        onSuccess: () => systemNotify.success("Document approved.", { description: "The current version is ready for use." }),
+        onError: (error) => { void handleReviewError(error, "approve"); },
+      },
+    );
+  };
+  const rejectCurrentReview = (reason: string) => {
+    if (!detail.data || reason.trim().length < 3) return;
+    const versionId = currentReviewVersionId();
+    if (!versionId || (review.data?.versionId && review.data.versionId !== versionId)) {
+      void refreshReviewState();
+      systemNotify.error("Review is no longer current", { description: "The latest document version is being loaded. Review it again before rejecting." });
+      return;
+    }
+    rejectReview.mutate(
+      { documentId: detail.data.id, versionId, reason: reason.trim() },
+      {
+        onSuccess: () => systemNotify.success("Document rejected and archived.", { description: "It has not been deleted and remains available in archive history." }),
+        onError: (error) => { void handleReviewError(error, "reject"); },
+      },
+    );
   };
 
   if (profile.isPending) {
@@ -553,6 +605,9 @@ export function KnowledgeBasePage() {
         loading={detail.isPending}
         error={detail.error}
         versions={versions.data?.items ?? []}
+        review={review.data}
+        reviewLoading={review.isPending && shouldLoadReview}
+        reviewError={review.error}
         pendingAction={pendingAction}
         onClose={() => setSelectedDocument(null)}
         onDownload={() => detail.data && download(detail.data)}
@@ -560,6 +615,11 @@ export function KnowledgeBasePage() {
         onRestore={() => detail.data && requestConfirmation("restore", detail.data)}
         onDelete={() => detail.data && requestConfirmation("delete", detail.data)}
         onRetry={() => detail.data && requestConfirmation("retry", detail.data)}
+        onRetryReview={() => { void review.refetch(); }}
+        onApproveReview={approveCurrentReview}
+        onRejectReview={rejectCurrentReview}
+        approvingReview={approveReview.isPending}
+        rejectingReview={rejectReview.isPending}
       />
 
       <DocumentConfirmationDialog

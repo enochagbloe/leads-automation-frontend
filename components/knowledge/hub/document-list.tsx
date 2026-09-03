@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { KnowledgeDocument } from "@/types/knowledge";
 import { DocumentActionsMenu } from "./document-actions-menu";
-import { DocumentLifecycleStatusBadge, DocumentProcessingStatusBadge } from "./document-status-badge";
+import { DocumentStatusBadge } from "./document-status-badge";
 import { formatBytes, formatKnowledgeDate, titleCase, uploadedByName, versionNumber } from "./knowledge-hub-utils";
 
 function FileIcon({ mimeType, fileName }: { mimeType?: string | null; fileName?: string | null }) {
@@ -59,9 +59,8 @@ export function DocumentList({
 
   return (
     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="hidden grid-cols-[minmax(260px,1.4fr)_140px_135px_130px_130px_56px] gap-4 border-b bg-muted/35 px-4 py-3 text-xs font-bold text-muted-foreground lg:grid">
+      <div className="hidden grid-cols-[minmax(260px,1.4fr)_160px_150px_130px_56px] gap-4 border-b bg-muted/35 px-4 py-3 text-xs font-bold text-muted-foreground lg:grid">
         <span>Name</span>
-        <span>Processing</span>
         <span>Status</span>
         <span>Uploaded by</span>
         <span>Updated</span>
@@ -71,7 +70,7 @@ export function DocumentList({
         {documents.map((document) => (
           <article
             key={document.id}
-            className={cn("grid gap-4 p-4 transition-colors hover:bg-muted/30 lg:grid-cols-[minmax(260px,1.4fr)_140px_135px_130px_130px_56px] lg:items-center")}
+            className={cn("grid gap-4 p-4 transition-colors hover:bg-muted/30 lg:grid-cols-[minmax(260px,1.4fr)_160px_150px_130px_56px] lg:items-center")}
           >
             <button type="button" onClick={() => onSelect(document)} className="flex min-w-0 cursor-pointer items-start gap-3 text-left">
               <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
@@ -89,8 +88,7 @@ export function DocumentList({
               </span>
             </button>
 
-            <div><DocumentProcessingStatusBadge status={document.processingStatus} /></div>
-            <div><DocumentLifecycleStatusBadge status={document.status} /></div>
+            <div><DocumentStatusBadge document={document} /></div>
             <div className="text-xs font-semibold text-muted-foreground">{uploadedByName(document)}</div>
             <div className="text-xs text-muted-foreground">{formatKnowledgeDate(document.updatedAt)}</div>
             <div className="flex justify-end">

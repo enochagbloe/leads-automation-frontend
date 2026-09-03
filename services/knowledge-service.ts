@@ -14,6 +14,9 @@ import type {
   KnowledgeDocument,
   KnowledgeDocumentDownloadUrl,
   KnowledgeDocumentInput,
+  KnowledgeDocumentReviewDecisionInput,
+  KnowledgeDocumentReviewDetails,
+  KnowledgeDocumentReviewRejectionInput,
   KnowledgeDocumentUploadResponse,
   KnowledgeDocumentVersion,
   KnowledgeDocumentStatus,
@@ -334,6 +337,21 @@ export const knowledgeService = {
   documentVersions: ({ id, page = 1, limit = 20 }: { id: string; page?: number; limit?: number }) => env.useMockApi
     ? mockKnowledgeService.documentVersions(id, { page, limit })
     : apiRequest<unknown>(`/business/knowledge/documents/${id}/versions?${queryString({ page, limit })}`).then(normalizeListResponse<KnowledgeDocumentVersion>),
+  documentReviews: (id: string) => env.useMockApi
+    ? mockKnowledgeService.documentReviews(id)
+    : apiRequest<KnowledgeDocumentReviewDetails>(`/business/knowledge/documents/${id}/reviews`),
+  approveDocumentReview: ({ documentId, versionId, note }: KnowledgeDocumentReviewDecisionInput) => env.useMockApi
+    ? mockKnowledgeService.approveDocumentReview(documentId, { versionId, note })
+    : apiRequest<unknown>(`/business/knowledge/documents/${documentId}/review/approve`, {
+      method: "POST",
+      body: JSON.stringify({ versionId, ...(note?.trim() ? { note: note.trim() } : {}) }),
+    }),
+  rejectDocumentReview: ({ documentId, versionId, reason }: KnowledgeDocumentReviewRejectionInput) => env.useMockApi
+    ? mockKnowledgeService.rejectDocumentReview(documentId, { versionId, reason })
+    : apiRequest<unknown>(`/business/knowledge/documents/${documentId}/review/reject`, {
+      method: "POST",
+      body: JSON.stringify({ versionId, reason: reason.trim() }),
+    }),
   documentDownloadUrl: (id: string) => env.useMockApi
     ? mockKnowledgeService.documentDownloadUrl(id)
     : apiRequest<KnowledgeDocumentDownloadUrl>(`/business/knowledge/documents/${id}/download-url`),
