@@ -157,10 +157,51 @@ function loadMetaSdk() {
   });
 }
 
+function parseQueryPayload(value: string) {
+  if (!value.includes("=")) return null;
+  const normalized = value.startsWith("?") || value.startsWith("#") ? value.slice(1) : value;
+  const params = new URLSearchParams(normalized);
+  const entries = Array.from(params.entries());
+  if (!entries.length) return null;
+  return Object.fromEntries(entries);
+}
+
+function stringPayloadVariants(value: string) {
+  const variants = new Set([value]);
+  let current = value;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const decoded = decodeURIComponent(current.replace(/\+/g, "%20"));
+      if (decoded === current) break;
+      variants.add(decoded);
+      current = decoded;
+    } catch {
+      break;
+    }
+  }
+  return [...variants];
+}
+
+function keySnapshots(value: unknown, path = "event.data", depth = 0): Array<{ path: string; keys: string[] }> {
+  if (depth > 5) return [];
+  if (Array.isArray(value)) {
+    return value.slice(0, 10).flatMap((item, index) => keySnapshots(item, `${path}[${index}]`, depth + 1));
+  }
+  const object = objectValue(value);
+  if (!object) return [];
+  const keys = Object.keys(object).sort().slice(0, 100);
+  return [
+    { path, keys },
+    ...keys.flatMap((key) => keySnapshots(object[key], `${path}.${key}`, depth + 1)),
+  ].slice(0, 50);
+}
+
 function inspectMessageData(data: unknown) {
   const dataType = typeof data;
   const isJsonString = typeof data === "string";
+  const stringData = typeof data === "string" ? data : "";
   let jsonParseSucceeded = false;
+  let queryStringParseSucceeded = false;
   let parsed: unknown = data;
 
   if (isJsonString) {
@@ -168,19 +209,30 @@ function inspectMessageData(data: unknown) {
       parsed = JSON.parse(data);
       jsonParseSucceeded = true;
     } catch {
-      parsed = null;
+      parsed = parseQueryPayload(data);
+      queryStringParseSucceeded = Boolean(parsed);
     }
   }
 
   const payload = objectValue(parsed);
   const nestedData = objectValue(payload?.data);
+  const dataObject = objectValue(data);
+  const snapshots = keySnapshots(parsed);
   return {
     payload,
+    stringData,
     dataType,
     isJsonString,
     jsonParseSucceeded,
+    queryStringParseSucceeded,
+    eventDataKeys: dataObject ? Object.keys(dataObject).sort() : [],
     topLevelKeys: payload ? Object.keys(payload).sort() : [],
     nestedDataKeys: nestedData ? Object.keys(nestedData).sort() : [],
+    keySnapshots: snapshots.slice(0, 50),
+    hasEmbeddedSignupSubstring: stringData.includes("WA_EMBEDDED_SIGNUP"),
+    hasFinishSubstring: stringData.includes("FINISH"),
+    hasPhoneNumberIdSubstring: stringData.includes("phone_number_id") || stringData.includes("phoneNumberId"),
+    hasWabaIdSubstring: stringData.includes("waba_id") || stringData.includes("wabaId") || stringData.includes("whatsapp_business_account_id") || stringData.includes("whatsappBusinessAccountId"),
   };
 }
 
@@ -198,6 +250,25 @@ function firstString(...values: unknown[]) {
 
 function findNestedString(value: unknown, keys: string[], depth = 0): string {
   if (depth > 5) return "";
+  if (typeof value === "string") {
+    for (const variant of stringPayloadVariants(value)) {
+      try {
+        const parsed = JSON.parse(variant) as unknown;
+        if (parsed && typeof parsed === "object") {
+          const found = findNestedString(parsed, keys, depth + 1);
+          if (found) return found;
+        }
+      } catch {
+        // Meta can also wrap session data as a URL-encoded query string.
+      }
+      const queryPayload = parseQueryPayload(variant);
+      if (queryPayload) {
+        const found = findNestedString(queryPayload, keys, depth + 1);
+        if (found) return found;
+      }
+    }
+    return "";
+  }
   if (Array.isArray(value)) {
     for (const nested of value) {
       const found = findNestedString(nested, keys, depth + 1);
@@ -220,27 +291,41 @@ function findNestedString(value: unknown, keys: string[], depth = 0): string {
   return "";
 }
 
-function findEmbeddedSignupPayload(value: unknown, depth = 0): Record<string, unknown> | null {
-  if (depth > 4) return null;
+function hasNestedValue(value: unknown, expected: string, depth = 0): boolean {
+  if (depth > 5) return false;
+  if (typeof value === "string") return value === expected;
+  if (Array.isArray(value)) return value.some((nested) => hasNestedValue(nested, expected, depth + 1));
   const object = objectValue(value);
-  if (!object) return null;
-  const type = firstString(object.type, object.messageType, object.event_type).toUpperCase();
-  if (type === "WA_EMBEDDED_SIGNUP") return object;
-  for (const key of ["data", "payload", "message", "detail"]) {
-    const nested = findEmbeddedSignupPayload(object[key], depth + 1);
-    if (nested) return nested;
-  }
-  return null;
+  if (!object) return false;
+  return Object.values(object).some((nested) => hasNestedValue(nested, expected, depth + 1));
 }
 
-function embeddedSignupEvent(payload: Record<string, unknown>) {
-  const nestedData = objectValue(payload.data);
-  return firstString(
-    payload.event,
-    payload.name,
-    nestedData?.event,
-    nestedData?.name,
-  ).toUpperCase();
+function hasNestedKey(value: unknown, keys: string[], depth = 0): boolean {
+  if (depth > 5) return false;
+  if (Array.isArray(value)) return value.some((nested) => hasNestedKey(nested, keys, depth + 1));
+  const object = objectValue(value);
+  if (!object) return false;
+  if (keys.some((key) => Object.prototype.hasOwnProperty.call(object, key))) return true;
+  return Object.values(object).some((nested) => hasNestedKey(nested, keys, depth + 1));
+}
+
+function findStringPayloadValue(source: string, keys: string[]) {
+  for (const variant of stringPayloadVariants(source)) {
+    for (const key of keys) {
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = variant.match(new RegExp(`["']?${escapedKey}["']?\\s*[:=]\\s*["']([^"'&\\s,}]+)["']`, "i"));
+      if (match?.[1]) return match[1];
+    }
+  }
+  return "";
+}
+
+function metaPayloadType(payload: Record<string, unknown> | null) {
+  return findNestedString(payload, ["type", "messageType", "event_type"]);
+}
+
+function metaPayloadEvent(payload: Record<string, unknown> | null) {
+  return findNestedString(payload, ["event", "name", "status"]).toUpperCase();
 }
 
 function isExpectedMetaSessionInfoOrigin(origin: string) {
@@ -346,54 +431,66 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
       }
 
       const inspection = inspectMessageData(event.data);
-      if (!inspection.payload) {
-        connectionDiagnostic("META_MESSAGE_IGNORED", {
-          origin: event.origin,
-          dataType: inspection.dataType,
-          isJsonString: inspection.isJsonString,
-          jsonParseSucceeded: inspection.jsonParseSucceeded,
-          reason: inspection.isJsonString ? "invalid_json" : "not_an_object",
-        });
-        return;
-      }
+      const payload = inspection.payload;
+      const payloadType = metaPayloadType(payload);
+      const payloadEvent = metaPayloadEvent(payload);
+      const stringPayloadType = inspection.hasEmbeddedSignupSubstring ? "WA_EMBEDDED_SIGNUP" : "";
+      const stringPayloadEvent = inspection.hasFinishSubstring ? "FINISH" : "";
+      const effectivePayloadType = payloadType || stringPayloadType;
+      const effectivePayloadEvent = payloadEvent || stringPayloadEvent;
+      const safePhoneNumberId = findNestedString(payload, ["phone_number_id", "phoneNumberId"]) || findStringPayloadValue(inspection.stringData, ["phone_number_id", "phoneNumberId"]);
+      const safeWabaId = findNestedString(payload, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"]) || findStringPayloadValue(inspection.stringData, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"]);
+      const hasEmbeddedSignupMarker = hasNestedValue(payload, "WA_EMBEDDED_SIGNUP") || inspection.hasEmbeddedSignupSubstring;
+      const isEmbeddedSignupMessage = effectivePayloadType.toUpperCase() === "WA_EMBEDDED_SIGNUP" || hasEmbeddedSignupMarker;
 
-      const embeddedSignupPayload = findEmbeddedSignupPayload(inspection.payload);
-      if (!embeddedSignupPayload) {
+      connectionDiagnostic("META_SESSION_INFO_MESSAGE", {
+        origin: event.origin,
+        dataType: inspection.dataType,
+        isJsonString: inspection.isJsonString,
+        jsonParseSucceeded: inspection.jsonParseSucceeded,
+        topLevelKeys: inspection.topLevelKeys,
+        dataKeys: inspection.nestedDataKeys,
+        type: effectivePayloadType || null,
+        event: effectivePayloadEvent || null,
+        hasPhoneNumberId: hasNestedKey(payload, ["phone_number_id", "phoneNumberId"])
+          || inspection.hasPhoneNumberIdSubstring,
+        hasWabaId: hasNestedKey(payload, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"])
+          || inspection.hasWabaIdSubstring,
+      });
+
+      if (!isEmbeddedSignupMessage) {
         connectionDiagnostic("META_MESSAGE_IGNORED", {
           origin: event.origin,
           dataType: inspection.dataType,
           isJsonString: inspection.isJsonString,
           jsonParseSucceeded: inspection.jsonParseSucceeded,
+          queryStringParseSucceeded: inspection.queryStringParseSucceeded,
           topLevelKeys: inspection.topLevelKeys,
-          dataKeys: inspection.nestedDataKeys,
           reason: "not_embedded_signup",
         });
         return;
       }
 
-      const payloadEvent = embeddedSignupEvent(embeddedSignupPayload);
-      const safePhoneNumberId = findNestedString(embeddedSignupPayload, ["phone_number_id", "phoneNumberId"]);
-      const safeWabaId = findNestedString(embeddedSignupPayload, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"]);
       connectionDiagnostic("META_EMBEDDED_SIGNUP_MESSAGE", {
         origin: event.origin,
         dataType: inspection.dataType,
         isJsonString: inspection.isJsonString,
         jsonParseSucceeded: inspection.jsonParseSucceeded,
-        type: "WA_EMBEDDED_SIGNUP",
-        event: payloadEvent || null,
-        topLevelKeys: Object.keys(embeddedSignupPayload).sort(),
-        dataKeys: Object.keys(objectValue(embeddedSignupPayload.data) ?? {}).sort(),
+        queryStringParseSucceeded: inspection.queryStringParseSucceeded,
+        type: effectivePayloadType || null,
+        event: effectivePayloadEvent || null,
         hasPhoneNumberId: Boolean(safePhoneNumberId),
         hasWabaId: Boolean(safeWabaId),
       });
 
-      metadata = { ...metadata, embeddedSignupEvent: payloadEvent || undefined, embeddedSignupVersion: embeddedSignupPayload.version };
-      if (payloadEvent === "FINISH") {
+      metadata = { ...metadata, embeddedSignupEvent: effectivePayloadEvent || undefined, embeddedSignupVersion: payload?.version };
+      if (effectivePayloadEvent === "FINISH") {
         hasFinishEvent = true;
         phoneNumberId = safePhoneNumberId;
         wabaId = safeWabaId;
-        displayPhoneNumber = findNestedString(embeddedSignupPayload, ["display_phone_number", "displayPhoneNumber", "phone_number", "phoneNumber"]);
-        businessAccountId = findNestedString(embeddedSignupPayload, ["business_id", "businessAccountId"]);
+        displayPhoneNumber = findNestedString(payload, ["display_phone_number", "displayPhoneNumber", "phone_number", "phoneNumber"])
+          || findStringPayloadValue(inspection.stringData, ["display_phone_number", "displayPhoneNumber", "phone_number", "phoneNumber"]);
+        businessAccountId = findNestedString(payload, ["business_id", "businessAccountId"]) || findStringPayloadValue(inspection.stringData, ["business_id", "businessAccountId"]);
         metadata = {
           ...metadata,
           hasFinishEvent,
@@ -410,8 +507,8 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
         });
         finishIfReady();
       }
-      if (payloadEvent === "CANCEL") fail("Meta authorization was cancelled before the number was connected.");
-      if (payloadEvent === "ERROR") fail("Meta authorization failed. Please try again.");
+      if (effectivePayloadEvent === "CANCEL") fail("Meta authorization was cancelled before the number was connected.");
+      if (effectivePayloadEvent === "ERROR") fail("Meta authorization failed. Please try again.");
     }
 
     window.addEventListener("message", handleMessage);
@@ -607,31 +704,15 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
       hasBusinessAccountId: Boolean(meta.businessAccountId),
       hasDisplayPhoneNumber: Boolean(nextDisplayPhoneNumber),
     });
-    connectionDiagnostic("META_COMPLETE_REQUEST", {
-      businessId,
-      hasAuthorizationCode: Boolean(meta.authorizationCode),
-      hasPhoneNumberId: Boolean(meta.phoneNumberId),
-      hasWabaId: Boolean(meta.wabaId),
+    await complete.mutateAsync({
+      provider: "META_WHATSAPP",
+      phoneNumberId: meta.phoneNumberId,
+      displayPhoneNumber: nextDisplayPhoneNumber,
+      wabaId: meta.wabaId,
+      businessAccountId: meta.businessAccountId,
+      authorizationCode: meta.authorizationCode,
+      metadata: meta.metadata,
     });
-    try {
-      await complete.mutateAsync({
-        provider: "META_WHATSAPP",
-        phoneNumberId: meta.phoneNumberId,
-        displayPhoneNumber: nextDisplayPhoneNumber,
-        wabaId: meta.wabaId,
-        businessAccountId: meta.businessAccountId,
-        authorizationCode: meta.authorizationCode,
-        metadata: meta.metadata,
-      });
-      connectionDiagnostic("META_COMPLETE_SUCCESS", { businessId, status: "CONNECTED" });
-    } catch (error) {
-      connectionDiagnostic("META_COMPLETE_FAILURE", {
-        businessId,
-        code: error instanceof ApiError ? error.code : null,
-        status: error instanceof ApiError ? error.status : null,
-      });
-      throw error;
-    }
     connectionDiagnostic("CONNECTION_COMPLETE_SUCCESS", { businessId, status: "CONNECTED" });
 
     beginStage("refreshing");
