@@ -169,7 +169,7 @@ function parseQueryPayload(value: string) {
 function stringPayloadVariants(value: string) {
   const variants = new Set([value]);
   let current = value;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const decoded = decodeURIComponent(current.replace(/\+/g, "%20"));
       if (decoded === current) break;
@@ -180,6 +180,34 @@ function stringPayloadVariants(value: string) {
     }
   }
   return [...variants];
+}
+
+function parseStringPayload(value: string) {
+  const variants = stringPayloadVariants(value);
+
+  for (const variant of variants) {
+    try {
+      const parsed = JSON.parse(variant) as unknown;
+      if (parsed && typeof parsed === "object") {
+        return { parsed, parsedAs: variant === value ? "json" : "decoded_json", variants };
+      }
+      if (typeof parsed === "string" && parsed !== variant) {
+        const nested = parseStringPayload(parsed);
+        if (nested.parsed) return { ...nested, parsedAs: `nested_${nested.parsedAs}` };
+      }
+    } catch {
+      // Not JSON; Meta also emits URL/query-string encoded messages.
+    }
+  }
+
+  for (const variant of variants) {
+    const queryPayload = parseQueryPayload(variant);
+    if (queryPayload) {
+      return { parsed: queryPayload, parsedAs: variant === value ? "query" : "decoded_query", variants };
+    }
+  }
+
+  return { parsed: null, parsedAs: "unparsed", variants };
 }
 
 function keySnapshots(value: unknown, path = "event.data", depth = 0): Array<{ path: string; keys: string[] }> {
@@ -202,22 +230,24 @@ function inspectMessageData(data: unknown) {
   const stringData = typeof data === "string" ? data : "";
   let jsonParseSucceeded = false;
   let queryStringParseSucceeded = false;
+  let parsedAs = typeof data === "object" && data !== null ? "object" : "unparsed";
   let parsed: unknown = data;
+  let variants = typeof data === "string" ? stringPayloadVariants(data) : [];
 
   if (isJsonString) {
-    try {
-      parsed = JSON.parse(data);
-      jsonParseSucceeded = true;
-    } catch {
-      parsed = parseQueryPayload(data);
-      queryStringParseSucceeded = Boolean(parsed);
-    }
+    const result = parseStringPayload(data);
+    parsed = result.parsed;
+    parsedAs = result.parsedAs;
+    variants = result.variants;
+    jsonParseSucceeded = parsedAs.includes("json");
+    queryStringParseSucceeded = parsedAs.includes("query");
   }
 
   const payload = objectValue(parsed);
   const nestedData = objectValue(payload?.data);
   const dataObject = objectValue(data);
   const snapshots = keySnapshots(parsed);
+  const normalizedStrings = variants.map((variant) => variant.toUpperCase());
   return {
     payload,
     stringData,
@@ -225,14 +255,15 @@ function inspectMessageData(data: unknown) {
     isJsonString,
     jsonParseSucceeded,
     queryStringParseSucceeded,
+    parsedAs,
     eventDataKeys: dataObject ? Object.keys(dataObject).sort() : [],
     topLevelKeys: payload ? Object.keys(payload).sort() : [],
     nestedDataKeys: nestedData ? Object.keys(nestedData).sort() : [],
     keySnapshots: snapshots.slice(0, 50),
-    hasEmbeddedSignupSubstring: stringData.includes("WA_EMBEDDED_SIGNUP"),
-    hasFinishSubstring: stringData.includes("FINISH"),
-    hasPhoneNumberIdSubstring: stringData.includes("phone_number_id") || stringData.includes("phoneNumberId"),
-    hasWabaIdSubstring: stringData.includes("waba_id") || stringData.includes("wabaId") || stringData.includes("whatsapp_business_account_id") || stringData.includes("whatsappBusinessAccountId"),
+    hasEmbeddedSignupSubstring: normalizedStrings.some((variant) => variant.includes("WA_EMBEDDED_SIGNUP")),
+    hasFinishSubstring: normalizedStrings.some((variant) => variant.includes("FINISH")),
+    hasPhoneNumberIdSubstring: normalizedStrings.some((variant) => variant.includes("PHONE_NUMBER_ID") || variant.includes("PHONENUMBERID")),
+    hasWabaIdSubstring: normalizedStrings.some((variant) => variant.includes("WABA_ID") || variant.includes("WABAID") || variant.includes("WHATSAPP_BUSINESS_ACCOUNT_ID") || variant.includes("WHATSAPPBUSINESSACCOUNTID")),
   };
 }
 
@@ -249,7 +280,7 @@ function firstString(...values: unknown[]) {
 }
 
 function findNestedString(value: unknown, keys: string[], depth = 0): string {
-  if (depth > 5) return "";
+  if (depth > 6) return "";
   if (typeof value === "string") {
     for (const variant of stringPayloadVariants(value)) {
       try {
@@ -292,8 +323,22 @@ function findNestedString(value: unknown, keys: string[], depth = 0): string {
 }
 
 function hasNestedValue(value: unknown, expected: string, depth = 0): boolean {
-  if (depth > 5) return false;
-  if (typeof value === "string") return value === expected;
+  if (depth > 6) return false;
+  if (typeof value === "string") {
+    if (value.toUpperCase() === expected.toUpperCase()) return true;
+    for (const variant of stringPayloadVariants(value)) {
+      if (variant.toUpperCase().includes(expected.toUpperCase())) return true;
+      try {
+        const parsed = JSON.parse(variant) as unknown;
+        if (hasNestedValue(parsed, expected, depth + 1)) return true;
+      } catch {
+        // Ignore and try query-string parsing.
+      }
+      const queryPayload = parseQueryPayload(variant);
+      if (queryPayload && hasNestedValue(queryPayload, expected, depth + 1)) return true;
+    }
+    return false;
+  }
   if (Array.isArray(value)) return value.some((nested) => hasNestedValue(nested, expected, depth + 1));
   const object = objectValue(value);
   if (!object) return false;
@@ -301,7 +346,19 @@ function hasNestedValue(value: unknown, expected: string, depth = 0): boolean {
 }
 
 function hasNestedKey(value: unknown, keys: string[], depth = 0): boolean {
-  if (depth > 5) return false;
+  if (depth > 6) return false;
+  if (typeof value === "string") {
+    return keys.some((key) => value.includes(key)) || stringPayloadVariants(value).some((variant) => {
+      try {
+        const parsed = JSON.parse(variant) as unknown;
+        if (hasNestedKey(parsed, keys, depth + 1)) return true;
+      } catch {
+        // Ignore and try query-string parsing.
+      }
+      const queryPayload = parseQueryPayload(variant);
+      return Boolean(queryPayload && hasNestedKey(queryPayload, keys, depth + 1));
+    });
+  }
   if (Array.isArray(value)) return value.some((nested) => hasNestedKey(nested, keys, depth + 1));
   const object = objectValue(value);
   if (!object) return false;
@@ -313,8 +370,10 @@ function findStringPayloadValue(source: string, keys: string[]) {
   for (const variant of stringPayloadVariants(source)) {
     for (const key of keys) {
       const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const match = variant.match(new RegExp(`["']?${escapedKey}["']?\\s*[:=]\\s*["']([^"'&\\s,}]+)["']`, "i"));
-      if (match?.[1]) return match[1];
+      const quotedMatch = variant.match(new RegExp(`["']?${escapedKey}["']?\\s*[:=]\\s*["']([^"'&\\s,}]+)["']`, "i"));
+      if (quotedMatch?.[1]) return quotedMatch[1];
+      const plainMatch = variant.match(new RegExp(`["']?${escapedKey}["']?\\s*[:=]\\s*([^&\\s,}\"']+)`, "i"));
+      if (plainMatch?.[1]) return plainMatch[1];
     }
   }
   return "";
@@ -438,16 +497,31 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
       const stringPayloadEvent = inspection.hasFinishSubstring ? "FINISH" : "";
       const effectivePayloadType = payloadType || stringPayloadType;
       const effectivePayloadEvent = payloadEvent || stringPayloadEvent;
-      const safePhoneNumberId = findNestedString(payload, ["phone_number_id", "phoneNumberId"]) || findStringPayloadValue(inspection.stringData, ["phone_number_id", "phoneNumberId"]);
-      const safeWabaId = findNestedString(payload, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"]) || findStringPayloadValue(inspection.stringData, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"]);
+      const safePhoneNumberId = findNestedString(payload, ["phone_number_id", "phoneNumberId"])
+        || findStringPayloadValue(inspection.stringData, ["phone_number_id", "phoneNumberId"]);
+      const safeWabaId = findNestedString(payload, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"])
+        || findStringPayloadValue(inspection.stringData, ["waba_id", "wabaId", "whatsapp_business_account_id", "whatsappBusinessAccountId"]);
       const hasEmbeddedSignupMarker = hasNestedValue(payload, "WA_EMBEDDED_SIGNUP") || inspection.hasEmbeddedSignupSubstring;
       const isEmbeddedSignupMessage = effectivePayloadType.toUpperCase() === "WA_EMBEDDED_SIGNUP" || hasEmbeddedSignupMarker;
+
+      connectionDiagnostic("META_SESSION_PARSE_RESULT", {
+        origin: event.origin,
+        originalType: inspection.dataType,
+        parsedAs: inspection.parsedAs,
+        topLevelKeys: inspection.topLevelKeys,
+        detectedEmbeddedSignup: isEmbeddedSignupMessage,
+        event: effectivePayloadEvent || null,
+        hasPhoneNumberId: Boolean(safePhoneNumberId),
+        hasWabaId: Boolean(safeWabaId),
+      });
 
       connectionDiagnostic("META_SESSION_INFO_MESSAGE", {
         origin: event.origin,
         dataType: inspection.dataType,
         isJsonString: inspection.isJsonString,
         jsonParseSucceeded: inspection.jsonParseSucceeded,
+        queryStringParseSucceeded: inspection.queryStringParseSucceeded,
+        parsedAs: inspection.parsedAs,
         topLevelKeys: inspection.topLevelKeys,
         dataKeys: inspection.nestedDataKeys,
         type: effectivePayloadType || null,
@@ -465,6 +539,7 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
           isJsonString: inspection.isJsonString,
           jsonParseSucceeded: inspection.jsonParseSucceeded,
           queryStringParseSucceeded: inspection.queryStringParseSucceeded,
+          parsedAs: inspection.parsedAs,
           topLevelKeys: inspection.topLevelKeys,
           reason: "not_embedded_signup",
         });
@@ -477,6 +552,7 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
         isJsonString: inspection.isJsonString,
         jsonParseSucceeded: inspection.jsonParseSucceeded,
         queryStringParseSucceeded: inspection.queryStringParseSucceeded,
+        parsedAs: inspection.parsedAs,
         type: effectivePayloadType || null,
         event: effectivePayloadEvent || null,
         hasPhoneNumberId: Boolean(safePhoneNumberId),
@@ -490,7 +566,8 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
         wabaId = safeWabaId;
         displayPhoneNumber = findNestedString(payload, ["display_phone_number", "displayPhoneNumber", "phone_number", "phoneNumber"])
           || findStringPayloadValue(inspection.stringData, ["display_phone_number", "displayPhoneNumber", "phone_number", "phoneNumber"]);
-        businessAccountId = findNestedString(payload, ["business_id", "businessAccountId"]) || findStringPayloadValue(inspection.stringData, ["business_id", "businessAccountId"]);
+        businessAccountId = findNestedString(payload, ["business_id", "businessAccountId"])
+          || findStringPayloadValue(inspection.stringData, ["business_id", "businessAccountId"]);
         metadata = {
           ...metadata,
           hasFinishEvent,
