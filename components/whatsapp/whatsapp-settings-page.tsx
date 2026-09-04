@@ -526,6 +526,7 @@ async function runMetaAuthorization(): Promise<MetaAuthorizationResult> {
           status: response.status ?? null,
         });
         if (!authorizationCode) {
+          fail(response.status === "not_authorized" ? "Meta authorization was not approved." : "Meta authorization was closed before completion.");
           return;
         }
         finishIfReady();
