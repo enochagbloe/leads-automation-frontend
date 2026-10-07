@@ -140,11 +140,11 @@ export function LeadsPage() {
     void leads.refetch();
   };
 
-  if (profile.isPending) return <main className="w-full space-y-5 p-4 sm:p-6  lg:p-page"><LoadingCard className="min-h-96" /></main>;
+  if (profile.isPending) return <main className="w-full space-y-5 p-4 sm:p-6 lg:p-8"><LoadingCard className="min-h-96" /></main>;
 
   if (!canViewLeads) {
     return (
-      <main className="grid min-h-[calc(100dvh-var(--app-header-height))] place-items-center p-6 lg:p-page">
+      <main className="grid min-h-[calc(100dvh-4rem)] place-items-center p-6">
         <AppErrorState
           title="You do not have permission to access this area."
           description="Switch workspace or ask an owner or manager to update your access."
@@ -154,11 +154,11 @@ export function LeadsPage() {
   }
 
   return (
-    <main className="w-full space-y-5 p-4 sm:p-6  lg:p-page">
+    <main className="w-full space-y-5 p-4 sm:p-6 lg:p-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">CRM workspace</p>
-          <h1 className="mt-1.5 text-2xl font-bold tracking-tight sm:text-3xl lg:text-page-title">Leads</h1>
+          <h1 className="mt-1.5 text-2xl font-bold tracking-tight sm:text-3xl">Leads</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">Track opportunities and keep every follow-up moving.</p>
         </div>
         <div className="flex flex-wrap gap-2">

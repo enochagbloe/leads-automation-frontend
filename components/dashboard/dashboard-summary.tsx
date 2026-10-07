@@ -21,7 +21,7 @@ export function DashboardSummary() {
   const workspacePermissions = getWorkspacePermissions(profile.data);
   if (!workspacePermissions.canViewDashboard) {
     return (
-      <main className="grid min-h-[calc(100dvh-var(--app-header-height))] place-items-center p-6 lg:p-page">
+      <main className="grid min-h-[calc(100dvh-4rem)] place-items-center p-6">
         <AppErrorState
           title="You do not have permission to access this area."
           description="Switch workspace or ask an owner or manager to update your access."
@@ -32,14 +32,14 @@ export function DashboardSummary() {
   const showBillingContext = canManageBilling(profile.data);
   if (!plan || !subscription) {
     return (
-      <main className="mx-auto max-w-5xl p-5 sm:p-8 lg:p-page">
+      <main className="mx-auto max-w-5xl p-5 sm:p-8">
         <AppCard className="border-warning/25 bg-warning/10 shadow-none">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-3">
               <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-warning/15 text-warning"><AlertTriangle className="size-5" /></span>
               <div>
                 <p className="text-sm font-medium text-primary">{account.name} · {accountUsage.businessesCount} {accountUsage.businessesCount === 1 ? "business" : "businesses"}</p>
-                <h1 className="mt-2 text-2xl font-bold tracking-tight lg:text-page-title">Your subscription is inactive</h1>
+                <h1 className="mt-2 text-2xl font-bold tracking-tight">Your subscription is inactive</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">You can still access billing and business profile settings, but workspace features are unavailable until a plan is active.</p>
               </div>
             </div>
@@ -57,8 +57,8 @@ export function DashboardSummary() {
     ["Priority support", features.allowPrioritySupport],
   ] as const;
 
-  return <main className="mx-auto max-w-6xl space-y-8 p-5 sm:p-8 lg:p-page lg:space-y-section">
-    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">{account.name} · {accountUsage.businessesCount} {accountUsage.businessesCount === 1 ? "business" : "businesses"}</p><h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl lg:text-page-title">Workspace overview</h1><p className="mt-2 text-sm text-muted-foreground">Viewing active-business activity for {activeBusiness.name}.</p></div>{showBillingContext && <div className="flex items-center gap-2"><PlanBadge plan={plan.code} /><SubscriptionStatusBadge status={subscription.status} /></div>}</header>
+  return <main className="mx-auto max-w-6xl space-y-8 p-5 sm:p-8">
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary">{account.name} · {accountUsage.businessesCount} {accountUsage.businessesCount === 1 ? "business" : "businesses"}</p><h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Workspace overview</h1><p className="mt-2 text-sm text-muted-foreground">Viewing active-business activity for {activeBusiness.name}.</p></div>{showBillingContext && <div className="flex items-center gap-2"><PlanBadge plan={plan.code} /><SubscriptionStatusBadge status={subscription.status} /></div>}</header>
     {conversationQuotaReached && (
       <AppCard className="border-warning/25 bg-warning/10 shadow-none">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -82,12 +82,12 @@ export function DashboardSummary() {
     )}
     {showBillingContext && (
     <div className="grid gap-5 lg:grid-cols-[1.4fr_.6fr]">
-      <AppCard><h2 className="font-bold">Workspace usage</h2><p className="mt-1 text-sm text-muted-foreground">Shared across every business under this account.</p><div className="mt-6 space-y-6 lg:space-y-section"><UsageMeter label="Businesses" value={accountUsage.businessesCount} limit={limits.maxBusinesses} /><UsageMeter label="Staff" value={accountUsage.staffCount} limit={limits.maxStaff} /><UsageMeter label="Services" value={accountUsage.servicesCount} limit={limits.maxServices} /><UsageMeter label="Appointments / month" value={accountUsage.appointmentsUsed} limit={limits.maxAppointmentsPerMonth} /></div></AppCard>
+      <AppCard><h2 className="font-bold">Workspace usage</h2><p className="mt-1 text-sm text-muted-foreground">Shared across every business under this account.</p><div className="mt-6 space-y-6"><UsageMeter label="Businesses" value={accountUsage.businessesCount} limit={limits.maxBusinesses} /><UsageMeter label="Staff" value={accountUsage.staffCount} limit={limits.maxStaff} /><UsageMeter label="Services" value={accountUsage.servicesCount} limit={limits.maxServices} /><UsageMeter label="Appointments / month" value={accountUsage.appointmentsUsed} limit={limits.maxAppointmentsPerMonth} /></div></AppCard>
       <AppCard><h2 className="font-bold">Business access</h2><dl className="mt-5 space-y-4 text-sm"><div><dt className="text-muted-foreground">Role</dt><dd className="mt-1 font-semibold">{membership.role.replaceAll("_", " ")}</dd></div><div><dt className="text-muted-foreground">Industry</dt><dd className="mt-1 font-semibold">{activeBusiness.industry}</dd></div><div><dt className="text-muted-foreground">Permissions</dt><dd className="mt-1 font-semibold">{permissions.length} enabled</dd></div></dl></AppCard>
     </div>
     )}
     <div className="grid gap-5 md:grid-cols-2">
-      <AppCard><div className="flex items-center gap-2"><BarChart3 className="size-4 text-primary" /><h2 className="font-bold">{activeBusiness.name} activity</h2></div><div className="mt-6 space-y-6 lg:space-y-section"><UsageMeter label="Conversations / month" value={businessUsage.conversationsUsed} limit={limits.maxConversationsPerMonth} /><UsageMeter label="AI replies / month" value={businessUsage.aiRepliesUsed} limit={limits.maxAiRepliesPerMonth} /><UsageMeter label="Appointments / month" value={businessUsage.appointmentsUsed} limit={limits.maxAppointmentsPerMonth} /></div><p className="mt-5 text-xs text-muted-foreground">{businessUsage.leadsCreated} leads created in this business.</p></AppCard>
+      <AppCard><div className="flex items-center gap-2"><BarChart3 className="size-4 text-primary" /><h2 className="font-bold">{activeBusiness.name} activity</h2></div><div className="mt-6 space-y-6"><UsageMeter label="Conversations / month" value={businessUsage.conversationsUsed} limit={limits.maxConversationsPerMonth} /><UsageMeter label="AI replies / month" value={businessUsage.aiRepliesUsed} limit={limits.maxAiRepliesPerMonth} /><UsageMeter label="Appointments / month" value={businessUsage.appointmentsUsed} limit={limits.maxAppointmentsPerMonth} /></div><p className="mt-5 text-xs text-muted-foreground">{businessUsage.leadsCreated} leads created in this business.</p></AppCard>
       {showBillingContext ? <AppCard><h2 className="font-bold">Plan features</h2><ul className="mt-5 space-y-4">{featureRows.map(([label, enabled]) => <li key={label} className="flex items-center justify-between gap-4 text-sm"><span>{label}</span><span className={enabled ? "text-success" : "text-muted-foreground"}>{enabled ? <Check className="size-4" /> : <Minus className="size-4" />}</span></li>)}</ul></AppCard> : <AppCard><h2 className="font-bold">Business access</h2><dl className="mt-5 space-y-4 text-sm"><div><dt className="text-muted-foreground">Role</dt><dd className="mt-1 font-semibold">{membership.role.replaceAll("_", " ")}</dd></div><div><dt className="text-muted-foreground">Position</dt><dd className="mt-1 font-semibold">{membership.positionTitle ?? "Team member"}</dd></div><div><dt className="text-muted-foreground">Permissions</dt><dd className="mt-1 font-semibold">{permissions.length} enabled</dd></div></dl></AppCard>}
     </div>
   </main>;

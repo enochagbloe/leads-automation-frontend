@@ -128,7 +128,7 @@ function BusinessSwitcher({ expanded, businesses, activeBusinessId, activeBusine
           {showCreateBusiness && (
             <>
               <DropdownMenu.Separator className="my-1 h-px bg-border" />
-              <DropdownMenu.Item disabled={!canCreateBusiness} onSelect={onCreateBusiness} className="flex min-h-control cursor-pointer select-none items-center gap-3 rounded-xl px-2 text-sm font-semibold outline-none data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50">
+              <DropdownMenu.Item disabled={!canCreateBusiness} onSelect={onCreateBusiness} className="flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-xl px-2 text-sm font-semibold outline-none data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50">
                 <span className="grid size-7 place-items-center rounded-lg border bg-card"><Plus className="size-4" /></span>Create new business
               </DropdownMenu.Item>
               {!canCreateBusiness && createBusinessReason && <p className="px-2 py-1 text-xs leading-5 text-muted-foreground">{createBusinessReason}</p>}
@@ -150,7 +150,7 @@ export function AppSidebar(props: AppSidebarProps) {
 
   const sidebarContent = (expanded: boolean, mobile = false) => (
     <>
-      <div className="flex h-shell-header shrink-0 items-center justify-between gap-2 border-b px-4">
+      <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
         <div className="flex min-w-0 items-center overflow-hidden">
           <AppLogo linked={false} compact className="shrink-0" />
           <span className={cn("ml-2.5 whitespace-nowrap text-lg font-bold tracking-tight transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>BizReply <span className="text-primary">AI</span></span>
@@ -162,15 +162,15 @@ export function AppSidebar(props: AppSidebarProps) {
         )}
       </div>
       <div className="px-3 pt-3"><BusinessSwitcher expanded={expanded} {...props} /></div>
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4 lg:py-3" aria-label="Primary navigation">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
         {groups.map((group) => (
-          <section key={group.id} className="mb-5 lg:mb-4">
+          <section key={group.id} className="mb-5">
             <p className={cn("mb-2 h-4 whitespace-nowrap px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>{group.label}</p>
             <div className="space-y-1">
               {group.items.map((item) => {
                 const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
                 const Icon = item.icon;
-                return <Link key={item.href} href={item.href} onClick={() => mobile && setMobileOpen(false)} aria-current={active ? "page" : undefined} title={!expanded ? item.label : undefined} className={cn("flex min-h-control items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-5 shrink-0" /><span className={cn("whitespace-nowrap transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}>{item.label}</span></Link>;
+                return <Link key={item.href} href={item.href} onClick={() => mobile && setMobileOpen(false)} aria-current={active ? "page" : undefined} title={!expanded ? item.label : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-5 shrink-0" /><span className={cn("whitespace-nowrap transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}>{item.label}</span></Link>;
               })}
             </div>
           </section>
@@ -189,7 +189,7 @@ export function AppSidebar(props: AppSidebarProps) {
 
   return (
     <>
-      <aside onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} className={cn("fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden border-r bg-card shadow-sm transition-[width] duration-[250ms] ease-out lg:flex", desktopExpanded ? "w-sidebar" : "w-sidebar-rail")} aria-label="Application sidebar">{sidebarContent(desktopExpanded)}</aside>
+      <aside onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} className={cn("fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden border-r bg-card shadow-sm transition-[width] duration-[250ms] ease-out lg:flex", desktopExpanded ? "w-[280px]" : "w-[72px]")} aria-label="Application sidebar">{sidebarContent(desktopExpanded)}</aside>
       <button type="button" aria-label="Close navigation" onClick={() => setMobileOpen(false)} className={cn("fixed inset-0 z-40 bg-foreground/35 backdrop-blur-[2px] transition-opacity duration-200 lg:hidden", mobileOpen ? "opacity-100" : "pointer-events-none opacity-0")} />
       <aside inert={!mobileOpen} className={cn("fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col overflow-hidden border-r bg-card shadow-2xl transition-transform duration-[250ms] ease-out lg:hidden", mobileOpen ? "translate-x-0" : "-translate-x-full")} aria-label="Mobile navigation" aria-hidden={!mobileOpen}>{sidebarContent(true, true)}</aside>
     </>

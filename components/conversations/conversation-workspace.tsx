@@ -581,7 +581,7 @@ export function ConversationWorkspace({
   };
 
   return (
-    <main className="flex h-[calc(100dvh-var(--app-header-height))] min-h-[620px] overflow-hidden bg-background">
+    <main className="flex h-[calc(100dvh-4rem)] min-h-[620px] overflow-hidden bg-background">
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="flex min-h-16 shrink-0 items-center gap-2 border-b bg-card px-3 sm:px-4">
           <AppButton size="icon" variant="ghost" aria-label="Back to inbox" title="Back to inbox" onClick={onBack}><ArrowLeft className="size-4" /></AppButton>

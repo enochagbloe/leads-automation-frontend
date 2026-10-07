@@ -72,7 +72,7 @@ export function AppSelect({
         onBlur={onBlur}
         className={cn(
           "flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-input bg-card px-3 text-left text-base text-foreground outline-none transition-[border-color,box-shadow,background-color] duration-200 data-[placeholder]:text-muted-foreground hover:bg-muted/45 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-          size === "large" ? "h-control-lg" : "h-control",
+          size === "large" ? "h-12" : "h-11",
           error && "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/20",
           className,
         )}
@@ -109,7 +109,7 @@ export function AppSelect({
                 key={option.value}
                 value={option.value}
                 disabled={option.disabled}
-                className="relative flex min-h-menu-row cursor-pointer select-none items-center gap-2.5 rounded-lg py-2 pl-3 pr-9 text-sm outline-none transition-colors duration-150 data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-muted data-[highlighted]:text-foreground data-[state=checked]:bg-secondary data-[state=checked]:text-secondary-foreground"
+                className="relative flex min-h-11 cursor-pointer select-none items-center gap-2.5 rounded-lg py-2 pl-3 pr-9 text-sm outline-none transition-colors duration-150 data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-muted data-[highlighted]:text-foreground data-[state=checked]:bg-secondary data-[state=checked]:text-secondary-foreground"
               >
                 {option.icon && <span className="grid size-5 shrink-0 place-items-center text-muted-foreground" aria-hidden="true">{option.icon}</span>}
                 <Select.ItemText>

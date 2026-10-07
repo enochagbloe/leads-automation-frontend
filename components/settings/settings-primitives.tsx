@@ -20,10 +20,10 @@ export function SettingsSectionHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-4 border-b px-5 py-5 sm:flex-row sm:items-start sm:justify-between lg:px-page", className)}>
+    <div className={cn("flex flex-col gap-4 border-b px-5 py-5 sm:flex-row sm:items-start sm:justify-between lg:px-7", className)}>
       <div className="max-w-2xl">
         {eyebrow && <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>}
-        <h2 className="mt-1 font-sora text-2xl lg:text-section-title font-bold tracking-[-0.03em] text-foreground">{title}</h2>
+        <h2 className="mt-1 font-sora text-2xl font-bold tracking-[-0.03em] text-foreground">{title}</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
       {action}
@@ -32,7 +32,7 @@ export function SettingsSectionHeader({
 }
 
 export function SettingsPanel({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("space-y-4 px-5 py-5 lg:px-page", className)}>{children}</div>;
+  return <div className={cn("space-y-4 px-5 py-5 lg:px-7", className)}>{children}</div>;
 }
 
 export function SettingsCard({ children, className }: { children: ReactNode; className?: string }) {
@@ -51,7 +51,7 @@ export function SettingRow({
   locked?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-3 border-b border-border/70 py-4 lg:py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-b border-border/70 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold text-foreground">{title}</p>

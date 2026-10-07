@@ -87,7 +87,7 @@ function updatePayload(values: BusinessProfileValues, dirtyFields: Partial<Recor
 }
 
 function ProfileLoading() {
-  return <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6  lg:p-page"><Skeleton className="h-9 w-56" /><Skeleton className="mt-3 h-4 w-96 max-w-full" /><Skeleton className="mt-6 h-28 w-full rounded-xl" /><div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]"><Skeleton className="h-[780px] rounded-xl" /><div className="space-y-5"><Skeleton className="h-96 rounded-xl" /><Skeleton className="h-40 rounded-xl" /></div></div></main>;
+  return <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8"><Skeleton className="h-9 w-56" /><Skeleton className="mt-3 h-4 w-96 max-w-full" /><Skeleton className="mt-6 h-28 w-full rounded-xl" /><div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]"><Skeleton className="h-[780px] rounded-xl" /><div className="space-y-5"><Skeleton className="h-96 rounded-xl" /><Skeleton className="h-40 rounded-xl" /></div></div></main>;
 }
 
 function SetupProgress({ status }: { status: BusinessSetupStatus }) {
@@ -148,7 +148,7 @@ export function BusinessProfilePage() {
   } : null, [profile.data]);
 
   if (profile.isPending || auth.isPending) return <ProfileLoading />;
-  if (profile.isError || !profile.data || !selectOptions) return <main className="p-6 lg:p-page"><AppErrorState title="Could not load business profile" description={getApiErrorMessage(profile.error)} onRetry={() => void profile.refetch()} /></main>;
+  if (profile.isError || !profile.data || !selectOptions) return <main className="p-6"><AppErrorState title="Could not load business profile" description={getApiErrorMessage(profile.error)} onRetry={() => void profile.refetch()} /></main>;
 
   const disabled = (field: keyof BusinessProfileValues) => !canEdit || (manager && !MANAGER_FIELDS.has(field));
   const submit = form.handleSubmit(async (values) => {
@@ -166,13 +166,13 @@ export function BusinessProfilePage() {
   });
 
   return <form onSubmit={submit} noValidate className="pb-24">
-    <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6  lg:p-page">
-      <div><h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-page-title">Business profile</h1><p className="mt-1.5 text-sm text-muted-foreground">Set up your business details so BizReply can automate replies accurately.</p></div>
+    <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
+      <div><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Business profile</h1><p className="mt-1.5 text-sm text-muted-foreground">Set up your business details so BizReply can automate replies accurately.</p></div>
       <BusinessSetupTabs activeKey="business-profile" className="mt-5" />
       {setup.data ? <SetupProgress status={setup.data} /> : <Skeleton className="mt-6 h-28 rounded-xl" />}
       <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
         <AppCard className="shadow-none"><h2 className="text-base font-bold">Business information</h2><p className="mt-1 text-xs text-muted-foreground">{canEdit ? "Keep customer-facing details accurate and current." : "You can view this profile, but only an owner or manager can update it."}</p>
-          <section className="mt-6 grid gap-6 lg:gap-content border-b pb-6 lg:grid-cols-[420px_minmax(0,1fr)]">
+          <section className="mt-6 grid gap-6 border-b pb-6 lg:grid-cols-[420px_minmax(0,1fr)]">
             <div><p className="text-sm font-semibold">Business logo</p><p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">Upload your business logo for future emails, forms, and chat replies.</p><div className="mt-4 flex items-center gap-4"><span className="grid size-20 shrink-0 place-items-center rounded-full bg-secondary text-2xl font-bold text-primary">{profile.data.name.slice(0, 2).toUpperCase()}</span><button type="button" disabled className="flex min-h-20 flex-1 cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/30 px-4 text-left opacity-75"><CloudUpload className="size-5 text-primary" /><span><span className="block text-sm font-semibold">Logo upload coming soon</span><span className="mt-0.5 block text-xs text-muted-foreground">PNG, JPG, SVG up to 2MB</span></span></button></div></div>
             <div className="grid gap-5"><Field name="name" label="Business name" required disabled={disabled("name")} form={form} /><Controller control={form.control} name="industry" render={({ field }) => <Field name="industry" label="Industry" required form={form}><AppSelect id="industry" value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} disabled={disabled("industry")} options={selectOptions.industries} error={Boolean(form.formState.errors.industry)} /></Field>} /></div>
           </section>

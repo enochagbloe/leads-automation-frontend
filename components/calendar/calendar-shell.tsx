@@ -176,12 +176,12 @@ export function CalendarShell() {
     setDialogAction(action);
   };
 
-  if (profile.isPending) return <main className="min-h-[calc(100dvh-var(--app-header-height))] bg-background px-4 py-5 sm:px-6 lg:p-page"><AppErrorState title="Loading calendar access" description="Checking your workspace permissions." /></main>;
+  if (profile.isPending) return <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6"><AppErrorState title="Loading calendar access" description="Checking your workspace permissions." /></main>;
   if (!activeBusinessId) return <AppErrorState title="No active business" description="Select a business before viewing the calendar." />;
-  if (!canViewAppointments) return <main className="grid min-h-[calc(100dvh-var(--app-header-height))] place-items-center bg-background p-6 lg:p-page"><AppErrorState title="You do not have permission to access this area." description="Switch workspace or ask an owner or manager to update your access." /></main>;
+  if (!canViewAppointments) return <main className="grid min-h-[calc(100dvh-4rem)] place-items-center bg-background p-6"><AppErrorState title="You do not have permission to access this area." description="Switch workspace or ask an owner or manager to update your access." /></main>;
 
   return (
-    <main className="min-h-[calc(100dvh-var(--app-header-height))] bg-background px-4 py-5 sm:px-6 lg:p-page">
+    <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6">
       <div className="mx-auto max-w-6xl">
         <section className="min-w-0 space-y-5">
           <CalendarToolbar

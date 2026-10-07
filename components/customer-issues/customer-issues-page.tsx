@@ -179,7 +179,7 @@ function timelineItems(issue: CustomerIssue) {
 
 function UpgradeState({ showBillingAction }: { showBillingAction: boolean }) {
   return (
-    <main className="grid min-h-[calc(100dvh-var(--app-header-height))] place-items-center p-6">
+    <main className="grid min-h-[calc(100dvh-4rem)] place-items-center p-6">
       <AppCard className="max-w-xl text-center">
         <span className="mx-auto grid size-12 place-items-center rounded-xl bg-secondary text-primary"><CircleAlert className="size-5" /></span>
         <h1 className="mt-5 text-xl font-bold">Customer issue tracking is available on Plus and Premium plans.</h1>
@@ -471,7 +471,7 @@ export function CustomerIssuesPage() {
   if (!activeBusinessId) return <AppErrorState title="No active business" description="Select a business before viewing customer issues." />;
   if (!canAccess) {
     return (
-      <main className="grid min-h-[calc(100dvh-var(--app-header-height))] place-items-center p-6">
+      <main className="grid min-h-[calc(100dvh-4rem)] place-items-center p-6">
         <AppErrorState title="You do not have permission to access this area." description="Switch workspace or ask an owner or manager to update your access." />
       </main>
     );
@@ -481,7 +481,7 @@ export function CustomerIssuesPage() {
   const totalPages = issues.data?.pagination?.totalPages ?? 1;
 
   return (
-    <main className="relative min-h-[calc(100dvh-var(--app-header-height))] space-y-5 p-4 sm:p-6 lg:p-8">
+    <main className="relative min-h-[calc(100dvh-4rem)] space-y-5 p-4 sm:p-6 lg:p-8">
       <header>
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">AI complaint routing</p>

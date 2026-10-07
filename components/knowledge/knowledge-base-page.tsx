@@ -374,16 +374,16 @@ export function KnowledgeBasePage() {
   };
 
   if (profile.isPending) {
-    return <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:p-page"><Skeleton className="h-[680px] rounded-2xl" /></main>;
+    return <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8"><Skeleton className="h-[680px] rounded-2xl" /></main>;
   }
 
   if (!businessId) {
-    return <main className="p-6 lg:p-page"><AppErrorState title="No active business" description="Select a business to manage Knowledge Hub documents." /></main>;
+    return <main className="p-6"><AppErrorState title="No active business" description="Select a business to manage Knowledge Hub documents." /></main>;
   }
 
   return (
     <main
-      className="relative h-[calc(100dvh-var(--app-header-height))] overflow-hidden bg-background"
+      className="relative h-[calc(100dvh-4.5rem)] overflow-hidden bg-background"
       onDragOver={(event) => {
         if (!canManage) return;
         event.preventDefault();
@@ -405,8 +405,8 @@ export function KnowledgeBasePage() {
           agentOpen && agentExpanded && "lg:grid-cols-[minmax(0,1fr)_540px] xl:grid-cols-[minmax(0,1fr)_600px] 2xl:grid-cols-[minmax(0,1fr)_660px]",
         )}
       >
-        <section className="min-h-0 min-w-0 overflow-y-auto px-4 py-6 [scrollbar-width:none] sm:px-6 lg:px-page [&::-webkit-scrollbar]:hidden">
-          <div className="mx-auto w-full max-w-[1040px] space-y-8 lg:space-y-section">
+        <section className="min-h-0 min-w-0 overflow-y-auto px-4 py-6 [scrollbar-width:none] sm:px-6 lg:px-8 [&::-webkit-scrollbar]:hidden">
+          <div className="mx-auto w-full max-w-[1040px] space-y-8">
             <header className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-xl font-bold tracking-tight text-foreground">Knowledge Base</h1>
