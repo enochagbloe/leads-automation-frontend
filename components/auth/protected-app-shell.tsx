@@ -192,8 +192,8 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
         onOpenBilling={() => router.push("/settings/billing")}
       />
 
-      <div className={cn("min-h-dvh transition-[margin-left] duration-[250ms] ease-out", mode === "EXPANDED" ? "lg:ml-[280px]" : "lg:ml-[72px]")}>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/85 px-4 backdrop-blur-xl sm:px-6" aria-label="Application top bar">
+      <div className={cn("min-h-dvh transition-[margin-left] duration-[250ms] ease-out", mode === "EXPANDED" ? "lg:ml-sidebar" : "lg:ml-sidebar-rail")}>
+        <header className="sticky top-0 z-30 flex h-shell-header items-center justify-between border-b bg-background/85 px-4 backdrop-blur-xl sm:px-6" aria-label="Application top bar">
           <div className="flex min-w-0 items-center gap-3">
             <AppButton size="icon" variant="ghost" className="lg:hidden" aria-label="Open navigation" onClick={toggleMobile}><Menu className="size-5" /></AppButton>
             <div className="min-w-0">

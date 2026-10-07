@@ -168,10 +168,10 @@ function InboxList({
   };
 
   return (
-    <main className="min-h-[calc(100dvh-4rem)] bg-background px-4 py-5 sm:px-6">
+    <main className="min-h-[calc(100dvh-var(--app-header-height))] bg-background px-4 py-5 sm:px-6 lg:p-page">
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-wrap items-end justify-between gap-4">
-          <div><div className="flex items-center gap-2"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Communication center</p><RealtimeStatusIndicator /></div><h1 className="mt-1 text-2xl font-bold">Inbox</h1><p className="mt-1 text-sm text-muted-foreground">Review stored customer conversations and team follow-up.</p></div>
+          <div><div className="flex items-center gap-2"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Communication center</p><RealtimeStatusIndicator /></div><h1 className="mt-1 text-2xl font-bold lg:text-page-title">Inbox</h1><p className="mt-1 text-sm text-muted-foreground">Review stored customer conversations and team follow-up.</p></div>
           {canCreate && <AppButton onClick={onCreate}><MessageSquarePlus className="size-4" />New conversation</AppButton>}
         </header>
         {((stats.data?.locked ?? 0) > 0 || conversations.data?.data.some((conversation) => conversation.status === "PLAN_LIMIT_BLOCKED" || conversation.accessBlocked)) && (
@@ -187,9 +187,9 @@ function InboxList({
         )}
 
         <section className="mt-6 rounded-2xl border bg-card">
-          <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center">
-            <label className="relative min-w-0 flex-1"><span className="sr-only">Search conversations</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><AppInput className="pl-9" placeholder="Search conversations" value={query.search ?? ""} onChange={(event) => onParams({ search: event.target.value || undefined, page: 1 })} /></label>
-            <div className="grid grid-cols-2 gap-2 lg:w-[860px] lg:grid-cols-5">
+          <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:flex-wrap lg:items-center">
+            <label className="relative min-w-0 flex-1 lg:basis-48"><span className="sr-only">Search conversations</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><AppInput className="pl-9" placeholder="Search conversations" value={query.search ?? ""} onChange={(event) => onParams({ search: event.target.value || undefined, page: 1 })} /></label>
+            <div className="grid grid-cols-2 gap-2 lg:min-w-0 lg:flex-[3_1_36rem] lg:grid-cols-5">
               <AppSelect aria-label="Filter conversation status" value={query.status ?? "ALL"} options={[{ value: "ALL", label: "All statuses" }, ...CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))]} onValueChange={(value) => onParams({ status: value === "ALL" ? undefined : value, page: 1 })} />
               <AppSelect aria-label="Filter conversation channel" value={query.channel ?? "ALL"} options={[{ value: "ALL", label: "All channels" }, ...CONVERSATION_CHANNELS.map((channel) => ({ value: channel, label: CONVERSATION_CHANNEL_LABELS[channel] }))]} onValueChange={(value) => onParams({ channel: value === "ALL" ? undefined : value, page: 1 })} />
               <AppSelect aria-label="Filter conversation priority" value={query.priority ?? "ALL"} options={[{ value: "ALL", label: "All priorities" }, ...CONVERSATION_PRIORITIES.map((priority) => ({ value: priority, label: CONVERSATION_PRIORITY_LABELS[priority] }))]} onValueChange={(value) => onParams({ priority: value === "ALL" ? undefined : value, page: 1 })} />
@@ -478,11 +478,11 @@ export function ConversationsInbox() {
   ] : [];
 
   if (profile.isPending) {
-    return <main className="grid h-[calc(100dvh-4rem)] place-items-center bg-background"><div className="w-full max-w-2xl space-y-4 px-6"><Skeleton className="h-16 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-[420px] w-full" /></div></main>;
+    return <main className="grid h-[calc(100dvh-var(--app-header-height))] place-items-center bg-background"><div className="w-full max-w-2xl space-y-4 px-6"><Skeleton className="h-16 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-[420px] w-full" /></div></main>;
   }
 
   if (!canViewConversations) {
-    return <main className="grid h-[calc(100dvh-4rem)] place-items-center bg-background p-6"><AppErrorState className="w-full max-w-2xl" title="You do not have permission to access this area." description="Switch workspace or ask an owner or manager to update your access." /></main>;
+    return <main className="grid h-[calc(100dvh-var(--app-header-height))] place-items-center bg-background p-6 lg:p-page"><AppErrorState className="w-full max-w-2xl" title="You do not have permission to access this area." description="Switch workspace or ask an owner or manager to update your access." /></main>;
   }
 
   if (!selectedId) {
@@ -490,14 +490,14 @@ export function ConversationsInbox() {
   }
 
   if (detail.isPending) {
-    return <main className="grid h-[calc(100dvh-4rem)] place-items-center bg-background"><div className="w-full max-w-2xl space-y-4 px-6"><Skeleton className="h-16 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-[420px] w-full" /><Skeleton className="h-36 w-full" /></div></main>;
+    return <main className="grid h-[calc(100dvh-var(--app-header-height))] place-items-center bg-background"><div className="w-full max-w-2xl space-y-4 px-6"><Skeleton className="h-16 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-[420px] w-full" /><Skeleton className="h-36 w-full" /></div></main>;
   }
 
   if (detail.isError) {
     const forbidden = detail.error instanceof ApiError && detail.error.code === "FORBIDDEN";
     const blocked = detail.error instanceof ApiError && ["PLAN_LIMIT_REACHED", "CONVERSATION_ACCESS_BLOCKED", "PAYMENT_REQUIRED", "SUBSCRIPTION_INACTIVE"].includes(detail.error.code);
     const closed = detail.error instanceof ApiError && ["CONVERSATION_CLOSED", "REOPEN_REQUIRES_MESSAGE_ACTIVITY"].includes(detail.error.code);
-    return <main className="grid h-[calc(100dvh-4rem)] place-items-center bg-background p-6"><AppErrorState className="w-full max-w-2xl" title={forbidden ? "You do not have access to this conversation" : blocked ? "Conversation is locked" : closed ? "Conversation is closed" : detail.error instanceof ApiError && detail.error.code === "CONVERSATION_NOT_FOUND" ? "Conversation not found" : "Could not load conversation"} description={conversationActionError(detail.error)} onRetry={() => detail.refetch()} /></main>;
+    return <main className="grid h-[calc(100dvh-var(--app-header-height))] place-items-center bg-background p-6 lg:p-page"><AppErrorState className="w-full max-w-2xl" title={forbidden ? "You do not have access to this conversation" : blocked ? "Conversation is locked" : closed ? "Conversation is closed" : detail.error instanceof ApiError && detail.error.code === "CONVERSATION_NOT_FOUND" ? "Conversation not found" : "Could not load conversation"} description={conversationActionError(detail.error)} onRetry={() => detail.refetch()} /></main>;
   }
 
   if (!selectedConversation) {

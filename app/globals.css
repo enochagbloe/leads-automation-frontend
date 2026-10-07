@@ -60,6 +60,62 @@
   --composer-foreground: #f4f0e4;
 }
 
+/* Workspace density: preserve the 16px root and touch layouts. Portals inherit
+   these tokens from :root, so popovers and dialogs share the same dimensions. */
+:root {
+  --app-header-height: 4rem;
+  --app-sidebar-width: 17.5rem;
+  --app-sidebar-rail: 4.5rem;
+  --app-control-height: 2.75rem;
+  --app-control-large: 3rem;
+  --app-control-small: 2.25rem;
+  --app-card-padding: 1.25rem;
+  --app-page-padding: 1.5rem;
+  --app-section-gap: 1.5rem;
+  --app-content-gap: 1rem;
+  --app-page-title: 1.625rem;
+  --app-section-title: 1.25rem;
+  --app-detail-header: 5rem;
+  --app-menu-row: 2.75rem;
+}
+@media (min-width: 40rem) {
+  :root { --app-card-padding: 1.5rem; }
+}
+@media (min-width: 64rem) {
+  :root {
+    --app-header-height: 3.5rem;
+    --app-sidebar-width: 15rem;
+    --app-sidebar-rail: 4rem;
+    --app-control-height: 2.5rem;
+    --app-control-large: 2.75rem;
+    --app-card-padding: 1.25rem;
+    --app-detail-header: 4rem;
+    --app-menu-row: 2.25rem;
+  }
+}
+/* Large touch devices retain comfortable controls, independently of layout. */
+@media (min-width: 64rem) and (pointer: coarse) {
+  :root { --app-control-height: 2.75rem; --app-control-large: 3rem; --app-menu-row: 2.75rem; }
+}
+@theme inline {
+  --spacing-shell-header: var(--app-header-height);
+  --spacing-sidebar: var(--app-sidebar-width);
+  --spacing-sidebar-rail: var(--app-sidebar-rail);
+  --spacing-control: var(--app-control-height);
+  --spacing-control-lg: var(--app-control-large);
+  --spacing-control-sm: var(--app-control-small);
+  --spacing-card: var(--app-card-padding);
+  --spacing-page: var(--app-page-padding);
+  --spacing-section: var(--app-section-gap);
+  --spacing-content: var(--app-content-gap);
+  --spacing-detail-header: var(--app-detail-header);
+  --spacing-menu-row: var(--app-menu-row);
+  --text-page-title: var(--app-page-title);
+  --text-page-title--line-height: 1.25;
+  --text-section-title: var(--app-section-title);
+  --text-section-title--line-height: 1.4;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

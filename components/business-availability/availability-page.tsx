@@ -114,7 +114,7 @@ function formatTime(value?: string | null) {
 }
 
 function AvailabilityLoading() {
-  return <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8"><Skeleton className="h-9 w-52" /><Skeleton className="mt-3 h-4 w-[520px] max-w-full" /><Skeleton className="mt-6 h-28 rounded-xl" /><div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]"><Skeleton className="h-[780px] rounded-xl" /><div className="space-y-5"><Skeleton className="h-80 rounded-xl" /><Skeleton className="h-72 rounded-xl" /></div></div></main>;
+  return <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6  lg:p-page"><Skeleton className="h-9 w-52" /><Skeleton className="mt-3 h-4 w-[520px] max-w-full" /><Skeleton className="mt-6 h-28 rounded-xl" /><div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]"><Skeleton className="h-[780px] rounded-xl" /><div className="space-y-5"><Skeleton className="h-80 rounded-xl" /><Skeleton className="h-72 rounded-xl" /></div></div></main>;
 }
 
 function OpenSwitch({ checked, disabled, label, onChange }: { checked: boolean; disabled: boolean; label: string; onChange: (checked: boolean) => void }) {
@@ -210,8 +210,8 @@ export function AvailabilityPage() {
   }, [values.timezone]);
 
   if (auth.isPending || availability.isPending) return <AvailabilityLoading />;
-  if (!businessId) return <main className="p-6"><AppErrorState title="No active business" description="Select a business to manage its availability." /></main>;
-  if (availability.isError || !availability.data) return <main className="p-6"><AppErrorState title="Could not load availability" description={getApiErrorMessage(availability.error)} onRetry={() => void availability.refetch()} /></main>;
+  if (!businessId) return <main className="p-6 lg:p-page"><AppErrorState title="No active business" description="Select a business to manage its availability." /></main>;
+  if (availability.isError || !availability.data) return <main className="p-6 lg:p-page"><AppErrorState title="Could not load availability" description={getApiErrorMessage(availability.error)} onRetry={() => void availability.refetch()} /></main>;
 
   const replaceRules = (next: AvailabilityFormRule[]) => form.setValue("rules", next, { shouldDirty: true, shouldValidate: true });
   const copyMonday = (allDays: boolean) => {
@@ -238,8 +238,8 @@ export function AvailabilityPage() {
   });
 
   return <form onSubmit={submit} noValidate className="pb-24">
-    <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
-      <header><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Availability</h1><p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">Set your business hours so BizReply can answer when customers ask if you are open.</p></header>
+    <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6  lg:p-page">
+      <header><h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-page-title">Availability</h1><p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">Set your business hours so BizReply can answer when customers ask if you are open.</p></header>
       <BusinessSetupTabs activeKey="availability" className="mt-5" />
       <ProgressCard values={values} setup={setup.data} />
       <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">

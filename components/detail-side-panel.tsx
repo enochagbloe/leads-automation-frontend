@@ -54,7 +54,7 @@ export function DetailSidePanel({
               <DialogDescription className="sr-only">{description}</DialogDescription>
             </>
           ) : (
-            <header className="relative z-10 flex min-h-20 items-center justify-between gap-3 border-b bg-card px-4 py-3 sm:px-6">
+            <header className="relative z-10 flex min-h-detail-header items-center justify-between gap-3 border-b bg-card px-4 py-3 sm:px-6">
               <div className="flex min-w-0 items-center gap-2">
                 <AppButton size="icon" variant="ghost" aria-label={`Close ${title}`} onClick={() => onOpenChange(false)}>
                   <X className="size-5" aria-hidden="true" />

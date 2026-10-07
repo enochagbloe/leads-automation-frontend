@@ -541,7 +541,7 @@ function ConnectionLoadingState({ active, mode = "connecting", stage }: { active
     <div className="mx-auto grid min-h-[420px] max-w-md place-items-center text-center">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">{mode === "disconnecting" ? "Disconnecting" : "Connecting"}</p>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl lg:text-page-title">{title}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {mode === "disconnecting"
             ? "Please keep this page open. Your leads, conversations, and messages will stay available."
@@ -574,7 +574,7 @@ function ConnectedState({
     <div className="mx-auto max-w-xl text-center">
       <WhatsAppMark connected />
       <p className="mt-7 text-xs font-bold uppercase tracking-[0.18em] text-success">We are set</p>
-      <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">WhatsApp is connected</h1>
+      <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl lg:text-page-title">WhatsApp is connected</h1>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">Customer messages can now land inside BizReply for this business.</p>
       <p className="mt-7 text-sm text-muted-foreground">Connected number: <span className="font-bold text-foreground">{status.displayPhoneNumber ?? "Number connected"}</span></p>
       {canManage && (
@@ -755,7 +755,7 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
     <div className="mx-auto max-w-xl text-center">
       <WhatsAppMark busy={connecting || status.status === "CONNECTING"} />
       <p className="mt-7 text-xs font-bold uppercase tracking-[0.18em] text-primary">WhatsApp connection</p>
-      <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Connect your account</h1>
+      <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl lg:text-page-title">Connect your account</h1>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">Connect the WhatsApp number customers already use to reach {businessName}. We will keep this simple.</p>
 
       {!canManage ? (
@@ -780,7 +780,7 @@ function ConnectAccountFlow({ businessName, status, businessId, canManage, onRef
                 <label htmlFor="whatsapp-local-number" className="text-sm font-bold">WhatsApp number</label>
                 <div className="mt-2 grid gap-2 sm:grid-cols-[170px_1fr]">
                   <AppSelect value={countryCode} onValueChange={setCountryCode} options={COUNTRY_CODES} aria-label="Country code" className="rounded-2xl" />
-                  <AppInput id="whatsapp-local-number" type="tel" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="24 123 4567" className="h-11 rounded-2xl" autoComplete="tel-national" />
+                  <AppInput id="whatsapp-local-number" type="tel" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="24 123 4567" className="h-control rounded-2xl" autoComplete="tel-national" />
                 </div>
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">Select your country code, then enter the local number without the country code.</p>
                 <AppButton className="mt-5 w-full rounded-2xl" loading={connecting} loadingText="Connecting your number" disabled={!canSubmitConnection || connecting} onClick={connect}>{hasPendingConnection ? "Continue connection" : "Connect account"}</AppButton>
@@ -832,12 +832,12 @@ export function SettingsWhatsAppPage() {
   if (profile.isPending) return <LoadingPage />;
   if (profile.isError || !businessId) return <AppErrorState title="No active business" description="Select a business before managing WhatsApp." />;
   if (status.isPending) return <LoadingPage />;
-  if (status.isError) return <main className="mx-auto max-w-3xl p-5 sm:p-8"><AppErrorState title="Could not load WhatsApp connection" description={getApiErrorMessage(status.error)} onRetry={() => status.refetch()} /></main>;
+  if (status.isError) return <main className="mx-auto max-w-3xl p-5 sm:p-8 lg:p-page"><AppErrorState title="Could not load WhatsApp connection" description={getApiErrorMessage(status.error)} onRetry={() => status.refetch()} /></main>;
 
   const canManage = profile.data.membership?.role === "BUSINESS_OWNER";
 
   return (
-    <main className="grid min-h-[calc(100dvh-8rem)] place-items-center px-4 py-10 sm:px-6">
+    <main className="grid min-h-[calc(100dvh-8rem)] place-items-center px-4 py-10 sm:px-6 lg:p-page">
       <ConnectAccountFlow businessName={businessName} status={status.data} businessId={businessId} canManage={canManage} onRefresh={refreshStatus} />
     </main>
   );

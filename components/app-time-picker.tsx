@@ -87,7 +87,7 @@ export function AppTimePicker({
               data-required={required || undefined}
               onBlur={onBlur}
               className={cn(
-                "flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-lg border border-input bg-card px-3 text-left text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 hover:bg-muted/45 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                "flex h-control w-full cursor-pointer items-center gap-2.5 rounded-lg border border-input bg-card px-3 text-left text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 hover:bg-muted/45 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
                 !value && "text-muted-foreground",
                 clearable && value ? "pr-20" : "pr-10",
                 error && "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/20",

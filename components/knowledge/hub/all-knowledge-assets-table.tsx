@@ -145,7 +145,7 @@ export function AllKnowledgeAssetsTable({
 }) {
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="overflow-x-auto rounded-xl border bg-card">
         {Array.from({ length: 8 }).map((_, index) => (
           <div key={index} className="border-b px-4 py-3 last:border-b-0">
             <Skeleton className="h-8 rounded-lg" />
@@ -164,8 +164,8 @@ export function AllKnowledgeAssetsTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="grid grid-cols-[minmax(260px,1.6fr)_150px_120px_120px_112px_44px] gap-4 bg-muted/30 px-4 py-2.5 text-[11px] font-medium text-muted-foreground">
+    <div className="overflow-x-auto rounded-xl border bg-card">
+      <div className="grid min-w-[860px] grid-cols-[minmax(260px,1.6fr)_150px_120px_120px_112px_44px] gap-4 bg-muted/30 px-4 py-2.5 text-[11px] font-medium text-muted-foreground">
         <span>Name</span>
         <span>Source</span>
         <span>Added</span>
@@ -179,7 +179,7 @@ export function AllKnowledgeAssetsTable({
           const article = isArticle ? row.item : null;
           const document = row.kind === "document" ? row.item : null;
           return (
-            <div key={`${row.kind}-${row.item.id}`} className="grid grid-cols-[minmax(260px,1.6fr)_150px_120px_120px_112px_44px] items-center gap-4 px-4 py-3 text-sm transition-colors hover:bg-muted/25">
+            <div key={`${row.kind}-${row.item.id}`} className="grid min-w-[860px] grid-cols-[minmax(260px,1.6fr)_150px_120px_120px_112px_44px] items-center gap-4 px-4 py-3 lg:py-1 text-sm transition-colors hover:bg-muted/25">
               <button type="button" onClick={() => onSelect(row)} className="flex min-w-0 items-center gap-2 text-left">
                 <FiFileText className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate font-semibold">{row.item.title}</span>

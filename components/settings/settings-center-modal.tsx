@@ -72,7 +72,7 @@ export function SettingsCenterModal({
         <Dialog.Overlay className="fixed inset-0 z-[140] bg-foreground/35 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in" />
         <Dialog.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-[150] flex h-[min(90dvh,820px)] w-[min(calc(100vw-2rem),1180px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[24px] border bg-card text-card-foreground shadow-[0_30px_110px_rgba(20,35,27,0.28)] outline-none",
+            "fixed left-1/2 top-1/2 z-[150] flex h-[min(90dvh,820px)] lg:h-[min(90dvh,740px)] w-[min(calc(100vw-2rem),1180px)] lg:w-[min(calc(100vw-3rem),1060px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[24px] border bg-card text-card-foreground shadow-[0_30px_110px_rgba(20,35,27,0.28)] outline-none",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           )}
           aria-describedby="settings-center-description"
@@ -86,8 +86,8 @@ export function SettingsCenterModal({
           <Dialog.Title className="sr-only">Settings</Dialog.Title>
           <Dialog.Description id="settings-center-description" className="sr-only">Manage BizReply workspace settings.</Dialog.Description>
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-            <aside className="relative bg-muted/35 md:flex md:w-[264px] md:shrink-0 md:flex-col md:border-r">
-              <div className="hidden h-16 shrink-0 items-center justify-between border-b px-4 md:flex">
+            <aside className="relative bg-muted/35 md:flex md:w-[264px] lg:w-sidebar md:shrink-0 md:flex-col md:border-r">
+              <div className="hidden h-shell-header shrink-0 items-center justify-between border-b px-4 md:flex">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Settings</p>
                   <p className="mt-0.5 max-w-[180px] truncate text-sm font-bold">{profile.activeBusiness?.name ?? profile.account.name}</p>
