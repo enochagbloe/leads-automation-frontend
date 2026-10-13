@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { knowledgeService } from "@/services/knowledge-service";
 import type {
+  ResolveKnowledgeQualityInput,
   DraftKnowledgeArticleInput,
   KnowledgeDraftStreamHandlers,
   GenerateStarterArticlesInput,
@@ -160,5 +161,34 @@ export function useSendKnowledgeAsset(conversationId: string) {
   return useMutation({
     mutationFn: (input: KnowledgeSendInput) => knowledgeService.send({ conversationId, input }),
     onSuccess: () => invalidate(conversationId),
+  });
+}
+
+export const useKnowledgeQualityAudit = (businessId?: string | null, enabled = false) => useQuery({
+  queryKey: ["knowledge-quality-audit", businessId ?? ""],
+  queryFn: knowledgeService.qualityAudit,
+  enabled: Boolean(businessId && enabled),
+  retry: false,
+});
+
+export function useResolveKnowledgeQualityFinding(businessId?: string | null, canManage = false) {
+  const client = useQueryClient();
+  const refresh = () => Promise.all([
+    client.invalidateQueries({ queryKey: ["knowledge-quality-audit", businessId ?? ""] }),
+    client.invalidateQueries({ queryKey: [...queryKeys.knowledgeArticles.all, businessId ?? ""] }),
+    client.invalidateQueries({ queryKey: [...queryKeys.knowledgeSearch.all, businessId ?? ""] }),
+    client.invalidateQueries({ queryKey: ["knowledge-stats", businessId ?? ""] }),
+  ]);
+  return useMutation({
+    mutationFn: ({ input, idempotencyKey }: { input: ResolveKnowledgeQualityInput; idempotencyKey: string }) => {
+      if (!businessId || !canManage) throw new Error("Knowledge management access is required.");
+      return knowledgeService.resolveQualityFinding(input, idempotencyKey);
+    },
+    // A conflict requires a new user decision. Transport retries retain the caller's key.
+    retry: false,
+    onSuccess: refresh,
+    onError: async (error) => {
+      if ("status" in error && error.status === 409) await refresh();
+    },
   });
 }
