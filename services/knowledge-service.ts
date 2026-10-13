@@ -4,6 +4,9 @@ import { env } from "@/lib/env";
 import { tokenStore } from "@/lib/token-store";
 import { mockKnowledgeService } from "@/services/mock-knowledge-service";
 import type {
+  KnowledgeQualityAudit,
+  ResolveKnowledgeQualityInput,
+  ResolveKnowledgeQualityResponse,
   DraftKnowledgeArticleInput,
   KnowledgeDraftStreamHandlers,
   KnowledgeDraftStreamError,
@@ -322,6 +325,13 @@ function documentForm(input: KnowledgeDocumentInput & { file: File }) {
 }
 
 export const knowledgeService = {
+  qualityAudit: () => apiRequest<KnowledgeQualityAudit>("/business/knowledge/quality-audit"),
+  resolveQualityFinding: (input: ResolveKnowledgeQualityInput, idempotencyKey: string) =>
+    apiRequest<ResolveKnowledgeQualityResponse>("/business/knowledge/quality-audit/resolve", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(input),
+    }),
   stats: () => env.useMockApi
     ? mockKnowledgeService.stats()
     : apiRequest<KnowledgeStats>("/business/knowledge/stats"),

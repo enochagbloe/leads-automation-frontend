@@ -168,6 +168,7 @@ export interface KnowledgeArticle {
   category?: string | null;
   tags: string[];
   relatedServiceIds: string[];
+  relatedPolicyIds?: string[];
   status: KnowledgeArticleStatus;
   source: KnowledgeArticleSource;
   visibility: KnowledgeVisibility;
@@ -385,4 +386,52 @@ export interface KnowledgeSendResponse {
 export interface KnowledgeListResponse<T> {
   items: T[];
   pagination?: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export type KnowledgeQualityFindingCode =
+  | "DUPLICATE_CUSTOMER_ARTICLE"
+  | "CATEGORY_NORMALIZATION_NEEDED"
+  | "MISSING_RELEVANCE_METADATA"
+  | "POSSIBLE_OUT_OF_DOMAIN_ARTICLE"
+  | "SUSPICIOUS_RELEVANCE_RELATIONSHIP"
+  | "STALE_RELEVANCE_RELATIONSHIP";
+export type KnowledgeQualitySeverity = "INFO" | "WARNING";
+export type KnowledgeQualityReviewStatus = "OPEN" | "DISMISSED";
+export interface KnowledgeQualityFinding {
+  code: KnowledgeQualityFindingCode;
+  severity: KnowledgeQualitySeverity;
+  articleIds: string[];
+  suggestedAction: string;
+  metadata?: { relatedServiceIds: string[]; relatedPolicyIds: string[] };
+  findingKey: string;
+  articleRevisions: Array<{ articleId: string; updatedAt: string }>;
+  reviewStatus: KnowledgeQualityReviewStatus;
+}
+export interface KnowledgeQualityAuditSummary {
+  articlesScanned: number;
+  findings: number;
+  duplicateGroups: number;
+  categoryConflictGroups: number;
+  articlesNeedingReview: number;
+}
+export interface KnowledgeQualityAudit {
+  businessId: string;
+  findings: KnowledgeQualityFinding[];
+  summary: KnowledgeQualityAuditSummary;
+}
+type QualityFindingInput = { findingKey: string; note?: string };
+type QualityArticleInput = QualityFindingInput & { articleId: string; expectedArticleUpdatedAt: string };
+export type ResolveKnowledgeQualityInput =
+  | (QualityFindingInput & { action: "DISMISS" })
+  | (QualityArticleInput & { action: "UPDATE_CATEGORY"; category: string })
+  | (QualityArticleInput & { action: "UPDATE_RELATIONSHIPS"; relatedServiceIds: string[]; relatedPolicyIds: string[] })
+  | (QualityArticleInput & { action: "ARCHIVE_ARTICLE" });
+export interface ResolveKnowledgeQualityResponse {
+  action: ResolveKnowledgeQualityInput["action"];
+  articleId: string | null;
+  updatedAt?: string;
+  status?: KnowledgeArticleStatus;
+  reviewStatus?: "DISMISSED";
+  originalFindingStillAppears: boolean;
+  findings: KnowledgeQualityFinding[];
 }

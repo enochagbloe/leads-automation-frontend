@@ -9,6 +9,7 @@ import { AppInput } from "@/components/app-input";
 import { AllKnowledgeAssetsTable, createKnowledgeAssetRows, type KnowledgeAssetRow } from "@/components/knowledge/hub/all-knowledge-assets-table";
 import { DocumentConfirmationDialog, type DocumentConfirmation } from "@/components/knowledge/hub/document-confirmation-dialog";
 import { DocumentDetailsPanel } from "@/components/knowledge/hub/document-details-panel";
+import { KnowledgeQualityPanel, canReviewKnowledgeQuality } from "@/components/knowledge/hub/knowledge-quality-panel";
 import { KnowledgeAgentPanel } from "@/components/knowledge/hub/knowledge-agent-panel";
 import { NewDocMenu } from "@/components/knowledge/hub/new-doc-menu";
 import { RecentDocumentsRow, recentKnowledgeItems, type RecentKnowledgeItem } from "@/components/knowledge/hub/recent-documents-row";
@@ -434,6 +435,8 @@ export function KnowledgeBasePage() {
                 You can view approved knowledge where your workspace permissions allow it. Knowledge management is restricted.
               </div>
             )}
+
+            <KnowledgeQualityPanel key={businessId} businessId={businessId} canManage={canReviewKnowledgeQuality(profile.data)} articles={articleItems} />
 
             <RecentDocumentsRow items={recentItems} loading={loadingAssets} onSelect={selectRecent} />
 
