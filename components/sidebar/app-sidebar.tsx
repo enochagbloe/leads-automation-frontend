@@ -62,9 +62,9 @@ function SidebarModeMenu({ expanded }: { expanded: boolean }) {
   return (
     <DropdownMenu.Root onOpenChange={setInteractionOpen}>
       <DropdownMenu.Trigger asChild>
-        <button type="button" className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Sidebar settings">
+        <button type="button" className={cn("flex min-h-10 w-full items-center rounded-lg text-sm font-semibold text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring", expanded ? "gap-3 px-3" : "justify-center px-0")} aria-label="Sidebar settings">
           <Settings2 className="size-5 shrink-0" />
-          <span className={cn("min-w-0 flex-1 whitespace-nowrap text-left transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}>Sidebar settings</span>
+          <span className={cn("min-w-0 flex-1 whitespace-nowrap text-left transition-opacity duration-200", expanded ? "opacity-100" : "sr-only")}>Sidebar settings</span>
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -102,10 +102,10 @@ function BusinessSwitcher({ expanded, businesses, activeBusinessId, activeBusine
   return (
     <DropdownMenu.Root onOpenChange={setInteractionOpen}>
       <DropdownMenu.Trigger asChild>
-        <button type="button" className="flex min-h-12 w-full items-center gap-3 rounded-xl border bg-muted/30 px-2.5 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Switch business. Current business: ${activeBusinessName}`}>
+        <button type="button" className={cn("flex min-h-12 w-full items-center rounded-xl border bg-muted/30 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring", expanded ? "gap-3 px-2.5" : "justify-center px-0")} aria-label={`Switch business. Current business: ${activeBusinessName}`}>
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><BriefcaseBusiness className="size-4" /></span>
-          <span className={cn("min-w-0 flex-1 transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}><span className="block truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{workspaceName} · {businessCount} {businessCount === 1 ? "business" : "businesses"}</span><span className="block truncate text-sm font-semibold">{activeBusinessName}</span></span>
-          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")} />
+          <span className={cn("min-w-0 flex-1 transition-opacity duration-200", expanded ? "opacity-100" : "sr-only")}><span className="block truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{workspaceName} · {businessCount} {businessCount === 1 ? "business" : "businesses"}</span><span className="block truncate text-sm font-semibold">{activeBusinessName}</span></span>
+          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-opacity duration-200", expanded ? "opacity-100" : "hidden")} />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -150,38 +150,38 @@ export function AppSidebar(props: AppSidebarProps) {
 
   const sidebarContent = (expanded: boolean, mobile = false) => (
     <>
-      <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
+      <div className={cn("flex h-16 shrink-0 items-center border-b", expanded ? "justify-between gap-2 px-4" : "justify-center px-3")}>
         <div className="flex min-w-0 items-center overflow-hidden">
           <AppLogo linked={false} compact className="shrink-0" />
-          <span className={cn("ml-2.5 whitespace-nowrap text-lg font-bold tracking-tight transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>BizReply <span className="text-primary">AI</span></span>
+          <span className={cn("ml-2.5 whitespace-nowrap text-lg font-bold tracking-tight transition-opacity duration-200", expanded ? "opacity-100" : "hidden")}>BizReply <span className="text-primary">AI</span></span>
         </div>
         {mobile ? (
           <AppButton size="icon" variant="ghost" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X className="size-5" /></AppButton>
         ) : (
-          <AppButton size="icon" variant="ghost" className={cn("size-9 min-h-9 shrink-0 transition-opacity", expanded ? "opacity-100" : "pointer-events-none opacity-0")} aria-label={mode === "EXPANDED" ? "Collapse sidebar" : "Keep sidebar expanded"} onClick={() => setMode(mode === "EXPANDED" ? "COLLAPSED" : "EXPANDED")}>{mode === "EXPANDED" ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}</AppButton>
+          <AppButton size="icon" variant="ghost" className={cn("size-9 min-h-9 shrink-0 transition-opacity", expanded ? "opacity-100" : "hidden")} aria-label={mode === "EXPANDED" ? "Collapse sidebar" : "Keep sidebar expanded"} onClick={() => setMode(mode === "EXPANDED" ? "COLLAPSED" : "EXPANDED")}>{mode === "EXPANDED" ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}</AppButton>
         )}
       </div>
       <div className="px-3 pt-3"><BusinessSwitcher expanded={expanded} {...props} /></div>
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
+      <nav className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4" aria-label="Primary navigation">
         {groups.map((group) => (
           <section key={group.id} className="mb-5">
-            <p className={cn("mb-2 h-4 whitespace-nowrap px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>{group.label}</p>
+            <p className={cn("mb-2 h-4 truncate px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>{group.label}</p>
             <div className="space-y-1">
               {group.items.map((item) => {
                 const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
                 const Icon = item.icon;
-                return <Link key={item.href} href={item.href} onClick={() => mobile && setMobileOpen(false)} aria-current={active ? "page" : undefined} title={!expanded ? item.label : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-5 shrink-0" /><span className={cn("whitespace-nowrap transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}>{item.label}</span></Link>;
+                return <Link key={item.href} href={item.href} onClick={() => mobile && setMobileOpen(false)} aria-current={active ? "page" : undefined} title={!expanded ? item.label : undefined} className={cn("flex min-h-11 items-center rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", expanded ? "gap-3 px-3" : "justify-center px-0", active ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-5 shrink-0" /><span className={cn("min-w-0 flex-1 truncate transition-opacity duration-200", expanded ? "opacity-100" : "sr-only")}>{item.label}</span></Link>;
               })}
             </div>
           </section>
         ))}
       </nav>
       <footer className="space-y-2 border-t p-3">
-        {props.showBillingActions !== false && props.currentPlan !== "PREMIUM" && <button type="button" onClick={props.onOpenBilling} className={cn("w-full overflow-hidden rounded-xl border border-primary/15 bg-secondary/55 p-3 text-left transition-colors hover:bg-secondary", !expanded && "px-2")}><div className="flex items-center gap-3"><Sparkles className="size-5 shrink-0 text-primary" /><span className={cn("min-w-0 transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}><span className="block whitespace-nowrap text-xs font-bold">Upgrade your plan</span><span className="mt-0.5 block whitespace-nowrap text-[10px] text-muted-foreground">{props.currentPlan ?? "Basic"} plan active</span></span></div></button>}
+        {props.showBillingActions !== false && props.currentPlan !== "PREMIUM" && <button type="button" onClick={props.onOpenBilling} className={cn("w-full overflow-hidden rounded-xl border border-primary/15 bg-secondary/55 p-3 text-left transition-colors hover:bg-secondary", !expanded && "px-2")}><div className={cn("flex items-center", expanded ? "gap-3" : "justify-center")}><Sparkles className="size-5 shrink-0 text-primary" /><span className={cn("min-w-0 transition-opacity duration-200", expanded ? "opacity-100" : "sr-only")}><span className="block whitespace-nowrap text-xs font-bold">Upgrade your plan</span><span className="mt-0.5 block whitespace-nowrap text-[10px] text-muted-foreground">{props.currentPlan ?? "Basic"} plan active</span></span></div></button>}
         <SidebarModeMenu expanded={expanded} />
-        <div className="flex min-h-12 items-center gap-3 rounded-xl px-2.5">
+        <div className={cn("flex min-h-12 items-center rounded-xl", expanded ? "gap-3 px-2.5" : "justify-center px-0")}>
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground"><UserRound className="size-4" /></span>
-          <span className={cn("min-w-0 transition-opacity duration-200", expanded ? "opacity-100" : "pointer-events-none opacity-0")}><span className="block truncate text-xs font-bold">{props.userName}</span><span className="block truncate text-[10px] text-muted-foreground">{props.userEmail}</span></span>
+          <span className={cn("min-w-0 transition-opacity duration-200", expanded ? "opacity-100" : "sr-only")}><span className="block truncate text-xs font-bold">{props.userName}</span><span className="block truncate text-[10px] text-muted-foreground">{props.userEmail}</span></span>
         </div>
       </footer>
     </>

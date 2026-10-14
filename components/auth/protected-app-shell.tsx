@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, BookOpen, Building2, CalendarDays, ContactRound, CreditCard, LayoutDashboard, Menu, MessageSquareText, Smartphone, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserAccountMenu } from "@/components/account/user-account-menu";
@@ -62,6 +62,7 @@ function getMembershipAccessMessage(status?: MembershipStatus) {
 
 function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const isKnowledgeWorkspace = usePathname() === "/knowledge-base";
   const client = useQueryClient();
   const { mode, toggleMobile } = useSidebar();
   const profile = useCurrentUser();
@@ -172,7 +173,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
 
   return (
     <RealtimeProvider activeBusinessId={profile.data.activeBusiness?.id} enabled={!logout.isPending}>
-    <div className="min-h-dvh bg-background">
+    <div className={cn("bg-background", isKnowledgeWorkspace ? "h-dvh overflow-hidden" : "min-h-dvh")}>
       <AppSidebar
         navItems={navItems}
         businesses={memberships}
@@ -192,7 +193,7 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
         onOpenBilling={() => router.push("/settings/billing")}
       />
 
-      <div className={cn("min-h-dvh transition-[margin-left] duration-[250ms] ease-out", mode === "EXPANDED" ? "lg:ml-[280px]" : "lg:ml-[72px]")}>
+      <div className={cn("transition-[margin-left] duration-[250ms] ease-out", isKnowledgeWorkspace ? "flex h-full min-h-0 flex-col overflow-hidden [&>header]:shrink-0 [&>aside]:shrink-0" : "min-h-dvh", mode === "EXPANDED" ? "lg:ml-[280px]" : "lg:ml-[72px]")}>
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/85 px-4 backdrop-blur-xl sm:px-6" aria-label="Application top bar">
           <div className="flex min-w-0 items-center gap-3">
             <AppButton size="icon" variant="ghost" className="lg:hidden" aria-label="Open navigation" onClick={toggleMobile}><Menu className="size-5" /></AppButton>
