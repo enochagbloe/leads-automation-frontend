@@ -78,12 +78,14 @@ export function CalendarShell() {
   const [detailAppointment, setDetailAppointment] = useState<CalendarAppointment | null>(null);
   const [assignStaffId, setAssignStaffId] = useState("");
   const initialLeadId = searchParams.get("leadId") ?? "";
-  const composerVisible = composerOpen || Boolean(initialLeadId && canCreate);
+  const createRequested = searchParams.get("create") === "appointment";
+  const composerVisible = canCreate && (composerOpen || Boolean(initialLeadId) || createRequested);
 
   const clearComposerLeadParam = () => {
-    if (!initialLeadId) return;
+    if (!initialLeadId && !createRequested) return;
     const next = new URLSearchParams(searchParams.toString());
     next.delete("leadId");
+    next.delete("create");
     router.replace(`/appointments/calendar${next.size ? `?${next.toString()}` : ""}`);
   };
 
