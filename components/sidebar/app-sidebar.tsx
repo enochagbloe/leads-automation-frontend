@@ -2,25 +2,26 @@
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
-  BriefcaseBusiness,
+  CalendarDays,
+  Home,
+  Inbox,
+  SquarePen,
+  ContactRound,
   Check,
-  ChevronDown,
   PanelLeft,
   PanelLeftClose,
-  Plus,
   Settings2,
   Sparkles,
   UserRound,
-  X,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { BusinessMembership } from "@/types/auth";
 import type { PlanCode } from "@/types/subscription";
 import { AppButton } from "@/components/app-button";
-import { AppLogo } from "@/components/app-logo";
 import { useSidebar, type SidebarMode } from "@/components/sidebar/sidebar-provider";
+import { SidebarNotificationInbox } from "@/components/sidebar/sidebar-notification-inbox";
+import { SidebarActivity } from "@/components/sidebar/sidebar-activity";
 import { cn } from "@/lib/utils";
 
 export type SidebarNavItem = {
@@ -33,21 +34,17 @@ export type SidebarNavItem = {
 
 type AppSidebarProps = {
   navItems: SidebarNavItem[];
-  businesses: BusinessMembership[];
   activeBusinessId?: string;
-  activeBusinessName: string;
-  workspaceName: string;
-  businessCount: number;
   userName: string;
   userEmail: string;
   currentPlan?: PlanCode;
   showBillingActions?: boolean;
-  canCreateBusiness: boolean;
-  showCreateBusiness?: boolean;
-  createBusinessReason?: string;
-  onSelectBusiness: (businessId: string) => void;
-  onCreateBusiness: () => void;
   onOpenBilling: () => void;
+  canCreateLead: boolean;
+  canCreateAppointment: boolean;
+  canViewNotifications?: boolean;
+  canManageNotifications?: boolean;
+  unreadNotifications?: number;
 };
 
 const MODES: { value: SidebarMode; label: string; description: string }[] = [
@@ -82,90 +79,62 @@ function SidebarModeMenu({ expanded }: { expanded: boolean }) {
   );
 }
 
-function roleLabel(role: BusinessMembership["role"]) {
-  if (role === "BUSINESS_OWNER") return "Owner";
-  if (role === "MANAGER") return "Manager";
-  return "Staff";
-}
-
-function membershipStatusLabel(status: BusinessMembership["status"]) {
-  if (status === "SUSPENDED_BY_PLAN") return "Suspended";
-  if (status === "DISABLED") return "Disabled";
-  if (status === "REMOVED") return "Removed";
-  if (status === "INVITED") return "Invite pending";
-  return null;
-}
-
-function BusinessSwitcher({ expanded, businesses, activeBusinessId, activeBusinessName, workspaceName, businessCount, canCreateBusiness, showCreateBusiness = true, createBusinessReason, onSelectBusiness, onCreateBusiness }: Pick<AppSidebarProps, "businesses" | "activeBusinessId" | "activeBusinessName" | "workspaceName" | "businessCount" | "canCreateBusiness" | "showCreateBusiness" | "createBusinessReason" | "onSelectBusiness" | "onCreateBusiness"> & { expanded: boolean }) {
-  const memberships = Array.isArray(businesses) ? businesses : [];
-  const { setInteractionOpen } = useSidebar();
-  return (
-    <DropdownMenu.Root onOpenChange={setInteractionOpen}>
-      <DropdownMenu.Trigger asChild>
-        <button type="button" className={cn("flex min-h-12 w-full items-center rounded-xl border bg-muted/30 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring", expanded ? "gap-3 px-2.5" : "justify-center px-0")} aria-label={`Switch business. Current business: ${activeBusinessName}`}>
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-primary"><BriefcaseBusiness className="size-4" /></span>
-          <span className={cn("min-w-0 flex-1 transition-opacity duration-200", expanded ? "opacity-100" : "sr-only")}><span className="block truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{workspaceName} · {businessCount} {businessCount === 1 ? "business" : "businesses"}</span><span className="block truncate text-sm font-semibold">{activeBusinessName}</span></span>
-          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-opacity duration-200", expanded ? "opacity-100" : "hidden")} />
-        </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content side="right" align="start" sideOffset={10} collisionPadding={12} className="account-menu-content z-[70] w-72 rounded-2xl border bg-popover p-2 shadow-[0_18px_55px_rgba(20,35,27,0.16)] outline-none">
-          <div className="px-2 pb-2 pt-1"><p className="text-xs font-bold">{workspaceName}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{businessCount} {businessCount === 1 ? "business" : "businesses"} on this workspace plan</p></div>
-          {memberships.map(({ business, role, status }) => {
-            const unavailable = status !== "ACTIVE";
-            const statusLabel = membershipStatusLabel(status);
-            return (
-            <DropdownMenu.Item key={business.id} disabled={unavailable} onSelect={() => onSelectBusiness(business.id)} className="flex min-h-12 cursor-pointer select-none items-center gap-3 rounded-xl px-2 outline-none data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55">
-              <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary text-xs font-bold text-primary">{business.name[0]?.toUpperCase()}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{business.name}</span>
-                <span className="mt-0.5 block truncate text-[10px] font-semibold text-muted-foreground">{statusLabel ?? roleLabel(role)}{activeBusinessId === business.id ? " · Current workspace" : ""}</span>
-              </span>
-              {activeBusinessId === business.id && <Check className="size-4 text-primary" />}
-            </DropdownMenu.Item>
-            );
-          })}
-          {showCreateBusiness && (
-            <>
-              <DropdownMenu.Separator className="my-1 h-px bg-border" />
-              <DropdownMenu.Item disabled={!canCreateBusiness} onSelect={onCreateBusiness} className="flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-xl px-2 text-sm font-semibold outline-none data-[highlighted]:bg-muted data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50">
-                <span className="grid size-7 place-items-center rounded-lg border bg-card"><Plus className="size-4" /></span>Create new business
-              </DropdownMenu.Item>
-              {!canCreateBusiness && createBusinessReason && <p className="px-2 py-1 text-xs leading-5 text-muted-foreground">{createBusinessReason}</p>}
-            </>
-          )}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
-  );
-}
-
 export function AppSidebar(props: AppSidebarProps) {
   const pathname = usePathname();
-  const { mode, setMode, desktopExpanded, setHovered, mobileOpen, setMobileOpen } = useSidebar();
+  const { setMode, desktopExpanded, setHovered, mobileOpen, setMobileOpen, setInteractionOpen } = useSidebar();
+  const shortcuts = [
+    { href: "/dashboard", label: "Home", icon: Home },
+    { href: "/conversations", label: "Inbox", icon: Inbox },
+    { href: "/appointments/calendar", label: "Calendar", icon: CalendarDays },
+  ].filter(item => props.navItems.some(nav => nav.href === item.href && nav.visible !== false));
+  const canView = (href: string) => props.navItems.some(item => item.href === href && item.visible !== false);
+  const createItems = [
+    ...(props.canCreateLead ? [{ href: "/leads/new", label: "Lead", icon: ContactRound }] : []),
+    ...(props.canCreateAppointment ? [{ href: "/appointments/calendar?create=appointment", label: "Appointment", icon: CalendarDays }] : []),
+  ];
   const groups = [
-    { id: "main", label: "Main", items: props.navItems.filter((item) => item.section === "main" && item.visible !== false) },
+    { id: "main", label: "Business", items: props.navItems.filter((item) => item.section === "main" && item.visible !== false && !shortcuts.some(shortcut => shortcut.href === item.href)) },
     { id: "workspace", label: "Workspace", items: props.navItems.filter((item) => item.section === "workspace" && item.visible !== false) },
   ];
 
+  const notificationButton = props.canViewNotifications && props.activeBusinessId
+    ? <SidebarNotificationInbox key={props.activeBusinessId} businessId={props.activeBusinessId} unreadCount={props.unreadNotifications} canManage={props.canManageNotifications} /> : null;
   const sidebarContent = (expanded: boolean, mobile = false) => (
     <>
-      <div className={cn("flex h-16 shrink-0 items-center border-b", expanded ? "justify-between gap-2 px-4" : "justify-center px-3")}>
-        <div className="flex min-w-0 items-center overflow-hidden">
-          <AppLogo linked={false} compact className="shrink-0" />
-          <span className={cn("ml-2.5 whitespace-nowrap text-lg font-bold tracking-tight transition-opacity duration-200", expanded ? "opacity-100" : "hidden")}>BizReply <span className="text-primary">AI</span></span>
-        </div>
-        {mobile ? (
-          <AppButton size="icon" variant="ghost" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X className="size-5" /></AppButton>
-        ) : (
-          <AppButton size="icon" variant="ghost" className={cn("size-9 min-h-9 shrink-0 transition-opacity", expanded ? "opacity-100" : "hidden")} aria-label={mode === "EXPANDED" ? "Collapse sidebar" : "Keep sidebar expanded"} onClick={() => setMode(mode === "EXPANDED" ? "COLLAPSED" : "EXPANDED")}>{mode === "EXPANDED" ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}</AppButton>
-        )}
+      <div className={cn("flex h-16 shrink-0 items-center gap-1 border-b px-3", !expanded && "justify-center")}>
+        <AppButton
+          size="icon"
+          variant="ghost"
+          className="size-9 min-h-9 shrink-0"
+          aria-label={mobile ? "Close navigation" : expanded ? "Collapse sidebar" : "Expand sidebar"}
+          aria-expanded={expanded}
+          title={mobile ? "Close navigation" : expanded ? "Collapse sidebar" : "Expand sidebar"}
+          onClick={() => mobile ? setMobileOpen(false) : setMode(expanded ? "COLLAPSED" : "EXPANDED")}
+        >
+          {expanded ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
+        </AppButton>
+        {expanded && notificationButton}
       </div>
-      <div className="px-3 pt-3"><BusinessSwitcher expanded={expanded} {...props} /></div>
+      {!expanded && notificationButton && <div className="flex justify-center pt-2">{notificationButton}</div>}
+      {createItems.length > 0 && <div className="shrink-0 px-3 pt-3">
+        <DropdownMenu.Root onOpenChange={setInteractionOpen}>
+          <DropdownMenu.Trigger asChild><button type="button" aria-label="Create" title="Create" className={cn("flex min-h-10 w-full items-center rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", expanded ? "gap-2 px-2" : "justify-center")}><SquarePen className="size-5 shrink-0" /><span className={!expanded ? "sr-only" : undefined}>Create</span></button></DropdownMenu.Trigger>
+          <DropdownMenu.Portal><DropdownMenu.Content side="right" align="start" sideOffset={8} collisionPadding={12} className="z-[70] min-w-44 rounded-lg border bg-popover p-1 shadow-lg">
+            {createItems.map(item => <DropdownMenu.Item key={item.href} asChild><Link href={item.href} onClick={() => mobile && setMobileOpen(false)} className="flex min-h-10 items-center gap-2 rounded-md px-3 text-sm outline-none data-[highlighted]:bg-muted"><item.icon className="size-4" />{item.label}</Link></DropdownMenu.Item>)}
+          </DropdownMenu.Content></DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </div>}
       <nav className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-4" aria-label="Primary navigation">
-        {groups.map((group) => (
+        <div className={cn("mb-5 flex gap-1", expanded ? "items-center" : "flex-col")}>
+          {shortcuts.map(item => {
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return <Link key={item.href} href={item.href} title={item.label} aria-label={item.label} aria-current={active ? "page" : undefined} onClick={() => mobile && setMobileOpen(false)} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-md px-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted", expanded && "flex-1")}><item.icon className="size-4 shrink-0" />{expanded && item.label === "Home" && <span>Home</span>}</Link>;
+          })}
+        </div>
+        {expanded && (!mobile || mobileOpen) && <SidebarActivity businessId={props.activeBusinessId} canViewLeads={canView("/leads")} canViewAppointments={canView("/appointments/calendar")} onNavigate={() => mobile && setMobileOpen(false)} />}
+        {groups.filter(group => group.items.length > 0).map((group) => (
           <section key={group.id} className="mb-5">
-            <p className={cn("mb-2 h-4 truncate px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>{group.label}</p>
+            <p className={cn("mb-2 h-4 truncate px-2 text-xs font-medium text-muted-foreground transition-opacity duration-200", expanded ? "opacity-100" : "opacity-0")}>{group.label}</p>
             <div className="space-y-1">
               {group.items.map((item) => {
                 const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));

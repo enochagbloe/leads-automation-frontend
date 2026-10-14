@@ -176,21 +176,17 @@ function ProtectedAppShellContent({ children }: { children: React.ReactNode }) {
     <div className={cn("bg-background", isKnowledgeWorkspace ? "h-dvh overflow-hidden" : "min-h-dvh")}>
       <AppSidebar
         navItems={navItems}
-        businesses={memberships}
         activeBusinessId={profile.data.activeBusiness?.id}
-        activeBusinessName={profile.data.activeBusiness?.name ?? "BizReply AI"}
-        workspaceName={profile.data.account.name}
-        businessCount={profile.data.accountUsage.businessesCount}
         userName={fullName}
         userEmail={profile.data.user.email}
         currentPlan={subscription.data?.plan.code ?? profile.data.plan?.code}
         showBillingActions={canManageBilling}
-        canCreateBusiness={!subscriptionInactive && accountCanCreateBusiness && (businessCreation?.allowed ?? false)}
-        showCreateBusiness={accountCanCreateBusiness}
-        createBusinessReason={accountCanCreateBusiness && businessCreation && !businessCreation.allowed ? businessCreation.reason : undefined}
-        onSelectBusiness={selectBusiness}
-        onCreateBusiness={openCreateBusiness}
         onOpenBilling={() => router.push("/settings/billing")}
+        canViewNotifications={canViewNotifications}
+        canManageNotifications={permissions.canManageOwnNotifications}
+        unreadNotifications={notificationCounts.data?.unread ?? 0}
+        canCreateLead={canViewLeads && (permissions.canViewAllOperationalLeads || profile.data.membership?.role === "BUSINESS_OWNER" || profile.data.membership?.role === "MANAGER")}
+        canCreateAppointment={canViewAppointments && (permissions.canViewAllOperationalAppointments || profile.data.membership?.role === "BUSINESS_OWNER" || profile.data.membership?.role === "MANAGER")}
       />
 
       <div className={cn("transition-[margin-left] duration-[250ms] ease-out", isKnowledgeWorkspace ? "flex h-full min-h-0 flex-col overflow-hidden [&>header]:shrink-0 [&>aside]:shrink-0" : "min-h-dvh", mode === "EXPANDED" ? "lg:ml-[280px]" : "lg:ml-[72px]")}>
