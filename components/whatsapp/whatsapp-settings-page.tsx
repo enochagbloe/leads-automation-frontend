@@ -188,7 +188,7 @@ type ParsedStringPayload = {
   variants: string[];
 };
 
-function parseStringPayload(value: string):ParsedStringPayload {
+function parseStringPayload(value: string): ParsedStringPayload{
   const variants = stringPayloadVariants(value);
 
   for (const variant of variants) {
