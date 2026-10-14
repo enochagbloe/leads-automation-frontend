@@ -410,8 +410,3 @@ select {
     animation-iteration-count: 1 !important;
   }
 }
-@media (min-width: 1024px) {
-  html {
-    font-size: 75.0%;
-  }
-}
