@@ -182,7 +182,13 @@ function stringPayloadVariants(value: string) {
   return [...variants];
 }
 
-function parseStringPayload(value: string) {
+type ParsedStringPayload = {
+  parsed: unknown | null;
+  parsedAs: string;
+  variants: string[];
+};
+
+function parseStringPayload(value: string):ParsedStringPayload {
   const variants = stringPayloadVariants(value);
 
   for (const variant of variants) {
