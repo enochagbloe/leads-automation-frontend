@@ -1,5 +1,7 @@
 "use client";
 
+import { BusinessDemoCard } from "@/components/demo/business-demo-card";
+
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -952,12 +954,13 @@ export function SettingsWhatsAppPage() {
   if (profile.isPending) return <LoadingPage />;
   if (profile.isError || !businessId) return <AppErrorState title="No active business" description="Select a business before managing WhatsApp." />;
   if (status.isPending) return <LoadingPage />;
-  if (status.isError) return <main className="mx-auto max-w-3xl p-5 sm:p-8"><AppErrorState title="Could not load WhatsApp connection" description={getApiErrorMessage(status.error)} onRetry={() => status.refetch()} /></main>;
+  if (status.isError) return <main className="mx-auto max-w-3xl p-5 sm:p-8">{profile.data.membership?.role === "BUSINESS_OWNER" && <BusinessDemoCard key={businessId} />}<AppErrorState title="Could not load WhatsApp connection" description={getApiErrorMessage(status.error)} onRetry={() => status.refetch()} /></main>;
 
   const canManage = profile.data.membership?.role === "BUSINESS_OWNER";
 
   return (
     <main className="grid min-h-[calc(100dvh-8rem)] place-items-center px-4 py-10 sm:px-6">
+      {canManage && <BusinessDemoCard key={businessId} />}
       <ConnectAccountFlow businessName={businessName} status={status.data} businessId={businessId} canManage={canManage} onRefresh={refreshStatus} />
     </main>
   );

@@ -1,6 +1,6 @@
 import type { LeadActivity, LeadAssignee, LeadStatus } from "@/types/lead";
 
-export type ConversationChannel = "MANUAL" | "WHATSAPP" | "OTHER" | "INSTAGRAM" | "FACEBOOK" | "WEBSITE_CHAT" | "EMAIL";
+export type ConversationChannel = "DEMO" | "MANUAL" | "WHATSAPP" | "OTHER" | "INSTAGRAM" | "FACEBOOK" | "WEBSITE_CHAT" | "EMAIL";
 export type ConversationStatus = "OPEN" | "AI_HANDLING" | "HUMAN_HANDLING" | "NEEDS_HUMAN_REVIEW" | "CLOSED" | "PLAN_LIMIT_BLOCKED";
 export type ConversationPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export type MessageSenderType = "CUSTOMER" | "STAFF" | "AI" | "SYSTEM";

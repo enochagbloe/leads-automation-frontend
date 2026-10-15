@@ -191,7 +191,7 @@ function InboxList({
             <label className="relative min-w-0 flex-1"><span className="sr-only">Search conversations</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><AppInput className="pl-9" placeholder="Search conversations" value={query.search ?? ""} onChange={(event) => onParams({ search: event.target.value || undefined, page: 1 })} /></label>
             <div className="grid grid-cols-2 gap-2 lg:w-[860px] lg:grid-cols-5">
               <AppSelect aria-label="Filter conversation status" value={query.status ?? "ALL"} options={[{ value: "ALL", label: "All statuses" }, ...CONVERSATION_STATUSES.map((status) => ({ value: status, label: CONVERSATION_STATUS_LABELS[status] }))]} onValueChange={(value) => onParams({ status: value === "ALL" ? undefined : value, page: 1 })} />
-              <AppSelect aria-label="Filter conversation channel" value={query.channel ?? "ALL"} options={[{ value: "ALL", label: "All channels" }, ...CONVERSATION_CHANNELS.map((channel) => ({ value: channel, label: CONVERSATION_CHANNEL_LABELS[channel] }))]} onValueChange={(value) => onParams({ channel: value === "ALL" ? undefined : value, page: 1 })} />
+              <AppSelect aria-label="Filter conversation channel" value={query.channel ?? "ALL"} options={[{ value: "ALL", label: "All channels" }, ...[...CONVERSATION_CHANNELS, "DEMO" as const].map((channel) => ({ value: channel, label: CONVERSATION_CHANNEL_LABELS[channel] }))]} onValueChange={(value) => onParams({ channel: value === "ALL" ? undefined : value, page: 1 })} />
               <AppSelect aria-label="Filter conversation priority" value={query.priority ?? "ALL"} options={[{ value: "ALL", label: "All priorities" }, ...CONVERSATION_PRIORITIES.map((priority) => ({ value: priority, label: CONVERSATION_PRIORITY_LABELS[priority] }))]} onValueChange={(value) => onParams({ priority: value === "ALL" ? undefined : value, page: 1 })} />
               <AppIsoDatePicker aria-label="Filter conversations created from date" value={query.dateFrom} onChange={(value) => onParams({ dateFrom: value || undefined, page: 1 })} placeholder="Created from" disabledDates={dateTo ? { after: dateTo } : undefined} />
               <AppIsoDatePicker aria-label="Filter conversations created to date" value={query.dateTo} onChange={(value) => onParams({ dateTo: value || undefined, page: 1 })} placeholder="Created to" disabledDates={dateFrom ? { before: dateFrom } : undefined} />
@@ -275,7 +275,7 @@ export function ConversationsInbox() {
   const businessSetup = useBusinessSetupStatus(profile.data?.activeBusiness?.id);
   const whatsapp = useWhatsAppStatus(profile.data?.activeBusiness?.id);
   const currentDetail = detail.data?.pages[0];
-  const leadDetail = useLead(currentDetail?.conversation.leadId ?? "");
+  const leadDetail = useLead(currentDetail?.conversation.channel === "DEMO" ? "" : currentDetail?.conversation.leadId ?? "");
   const sendMessage = useSendConversationMessage();
   const sendKnowledgeAsset = useSendKnowledgeAsset(selectedId);
   const retryMessage = useRetryConversationMessage();
@@ -321,8 +321,8 @@ export function ConversationsInbox() {
   };
 
   useEffect(() => {
-    if (selectedConversation?.unreadCount) markConversationRead(selectedConversation.id);
-  }, [markConversationRead, selectedConversation?.id, selectedConversation?.unreadCount]);
+    if (selectedConversation?.channel !== "DEMO" && selectedConversation?.unreadCount) markConversationRead(selectedConversation.id);
+  }, [markConversationRead, selectedConversation?.id, selectedConversation?.unreadCount, selectedConversation?.channel]);
 
   const updateDraft = (value: string) => {
     if (selectedId) setDrafts((current) => ({ ...current, [selectedId]: value }));
@@ -512,7 +512,7 @@ export function ConversationsInbox() {
       leadDetail={leadDetail.data}
       activities={currentDetail?.activities ?? []}
       assigneeOptions={assigneeOptions}
-      canManage={canManage}
+      canManage={canManage && selectedConversation.channel !== "DEMO"}
       senderName={`${profile.data?.user.firstName ?? ""} ${profile.data?.user.lastName ?? ""}`.trim() || "BizReply Team"}
       whatsappCanSend={selectedConversation.channel !== "WHATSAPP" || (whatsapp.data?.canSendMessages ?? true)}
       whatsappStatus={whatsapp.data?.status}

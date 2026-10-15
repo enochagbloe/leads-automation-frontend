@@ -15,6 +15,7 @@ export const CONVERSATION_STATUS_LABELS: Record<ConversationStatus, string> = {
 };
 
 export const CONVERSATION_CHANNEL_LABELS: Record<ConversationChannel, string> = {
+  DEMO: "Demo",
   MANUAL: "Manual",
   WHATSAPP: "WhatsApp",
   WEBSITE_CHAT: "Website chat",
